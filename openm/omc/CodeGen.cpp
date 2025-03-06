@@ -168,6 +168,10 @@ void CodeGen::do_preamble()
     c += model_symbol->cxx_definition_global();
     c += "";
 
+    // Get definition code associated with the model version
+    c += version_symbol->cxx_definition_global();
+    c += "";
+
     // Get definition code associated with the model_type symbol
     c += model_type_symbol->cxx_definition_global();
     c += "";
@@ -835,7 +839,7 @@ void CodeGen::do_RunOnce()
     if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Finished handling missing parameters\");";
     c += "";
 
-    c += "// make a list of compute suppressed tables: tables which are not computed by the model due to supporession";
+    c += "// make a list of compute suppressed tables: tables which are not computed by the model due to suppression";
     if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Handle run-time suppressed tables\");";
 
     c += "for (const auto & ti : om_table_name_id) {";
@@ -1281,7 +1285,7 @@ void CodeGen::do_ModelShutdown()
     c += "int64_t last_progress_ms = getMilliseconds();";
     c += "int n_table = 0;";
     c += "";
-    for ( auto table : Symbol::pp_all_entity_tables ) {
+    for (auto table : Symbol::pp_all_entity_tables) {
         if (!table->is_internal) {
             c += "if (!is_suppressed_write(\"" + table->name + "\", i_model)) {";
             c += "last_progress_ms = report_table_write_progress(simulation_member, ++n_table, \"" + table->name + "\", last_progress_ms);";
@@ -1296,22 +1300,20 @@ void CodeGen::do_ModelShutdown()
     c += "";
 
     c += "// write derived tables (measures) and release measures memory";
-    for ( auto derived_table : Symbol::pp_all_derived_tables ) {
+    for (auto derived_table : Symbol::pp_all_derived_tables) {
         if (!derived_table->is_internal) {
-            c += "if (" + derived_table->cxx_instance + ") {";
+            c += "if (" + derived_table->cxx_instance + " && !is_suppressed_write(\"" + derived_table->name + "\", i_model)) {";
             c += "last_progress_ms = report_table_write_progress(simulation_member, ++n_table, \"" + derived_table->name + "\", last_progress_ms);";
             if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Write '" + derived_table->name + "'\");";
             c += " i_model->writeOutputTable(\"" +
-                derived_table->name + "\", " + 
-                derived_table->cxx_instance + "->n_cells, " + 
+                derived_table->name + "\", " +
+                derived_table->cxx_instance + "->n_cells, " +
                 derived_table->cxx_instance + "->measure_storage);";
             c += "}";
         }
     }
     if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Finished writing derived tables\");";
     c += "// at this point table->measure[k][j] will cause memory access violation";
-    c += "";
-    c += "theLog->logFormatted(\"member=%d Write output tables - finish\", simulation_member);";
 
     if (Symbol::any_parameters_to_tables) {
         // process derived parameters published as tables
@@ -1319,6 +1321,7 @@ void CodeGen::do_ModelShutdown()
         c += "theLog->logFormatted(\"member=%d Write derived parameters - start\", simulation_member);";
         for (auto param : Symbol::pp_all_parameters) {
             if (param->metadata_as_table && !param->is_suppressed_table) {
+                c += "if (!is_suppressed_write(\"" + param->name + "\", i_model)) {";
                 if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Write derived parameter '" + param->name + "' as table\");";
                 // Write this derived parameter as a table
                 c += "{ // " + param->name;
@@ -1341,11 +1344,15 @@ void CodeGen::do_ModelShutdown()
                               to_string(param->size()) +
                               ", the_storage);";
                 c += "}";
+                c += "}";
             }
         }
         if (Symbol::option_checkpoints) c += "CHECKPOINT(\"checkpoint: Finished writing derived parameters as tables\");";
         c += "theLog->logFormatted(\"member=%d Write derived parameters - finish\", simulation_member);";
     }
+    c += "";
+    c += "theLog->logFormatted(\"member=%d Write output tables - finish\", simulation_member);";
+    c += "";
 
     if (Symbol::pp_all_entity_tables.size()) {
         c += "// Entity table destruction";
@@ -1414,7 +1421,7 @@ void CodeGen::do_RunShutdown()
 {
     c += "// Process shutdown: last entry point from user code before process exit";
     c += "// All modelling threads are completed at this point, parameters and output tables memory released";
-    c += "// Any attempt to use parameters or out put table may cause memory violation crush";
+    c += "// Any attempt to use parameters or output table may cause memory violation crush";
     c += "void RunShutdown(bool i_isError, IRunBase * const i_runBase)";
     c += "{";
     c += "// max memory usage";
@@ -1952,7 +1959,7 @@ void CodeGen::do_table_interface()
     h += "extern std::unordered_set<std::string> om_compute_suppressed;";
     h += "";
 
-    c += "// Map table name to table id";
+    c += "// Map table name to table id (it is NOT ALL database output tables)";
     c += "static const std::unordered_map<std::string, int> om_table_name_id = {";
     for (auto tbl : Symbol::pp_all_tables) {
         c += "{ \"" + tbl->name + "\", " + to_string(tbl->pp_table_id) + " },";
