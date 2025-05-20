@@ -1,0 +1,284 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Dementia_PrevalenceStart
+/* FILE_NOTE(EN) 
+This module assigns dementia prevalence status at start of the simulation. 
+Essentially, there is a mis-alignment between self-reported AMI prevalence in our starting population (CCHS) and our target dementia prevalence in 2002/03 (CCDSS). 
+Most likely there is an under-reporting of dementia as compared with our target data, although sometimes there could be over-reporting. The differences vary by age, sex and province. 
+
+This module reassigns dementia so that (i) target rates are met and (ii) minimal alteration is done to the CCHS information read in.
+When re-assigning, the risk of dementia may be taken into consideration.  So if more dementia is needed in a given  age/sex/province cell, we will tend to take a person with no dementia according
+to CCHS but with elevated risk of (future) demetia as a candidate for flipping (from no dementia to dementia) at initiation.  
+This behavior is achieved by using WeightForUnderlyingAmiCvdportishUniform=1.  -- DH please update this inforamtion abse don conversation with CN
+
+This is mostly copy/paste from DiabetesPrevalenceStart.mpp which may have more details here and there.
+
+*/
+
+
+parameter_group pgDEMENTIA_Calibration_Inputs{ //EN DEMPoRT calibration parameters
+	DementiaInitialAlterationPopulationScope ,
+	DementiaInitialAlterationYearScope ,
+	WeightForUnderlyingDemportUniform, 
+	DementiaPrevalenceTarget2001    
+};
+
+
+parameters {
+	//Alteration of dementia status found on StartPop file (CCHS)
+	logical DementiaInitialAlterationPopulationScope [cPopulationSource];    //EN Initial dementia alteration : In scope populations
+	int     DementiaInitialAlterationYearScope       [cLOWER_UPPER_BOUNDS];  //EN Initial dementia alteration : In scope years
+	double  WeightForUnderlyingDemportUniform;                           //EN Initial dementia alteration : Correspondence with dementia risk
+	double  DementiaPrevalenceTarget2001[SEX][FROM_20_TO_80_BY_5][PROVINCE]; //EN Initial dementia alteration : Prevalence by age, sex and province for year 2001 
+
+	model_generated double UnderlyingUniformWhereaboutsForSrDementia          [DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+	model_generated double UnderlyingUniformWhereaboutsForDementia  [DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+};
+
+actor Person            // Core Individual
+{
+	void    DementiaAlterInitialValue();
+	hook    DementiaAlterInitialValue, InitializationEmptyHub, 43; // 41 = execution number, the higher the value, the later the execution //DH this execution number may have to be udpated- ask CN
+};
+
+void	Person::DementiaAlterInitialValue()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if ( std::abs(WeightForUnderlyingDemportUniform) <= 1.0 && DementiaInitialAlterationPopulationScope[ population_source ]  &&
+		DementiaInitialAlterationYearScope[LOWER_BOUND] <= calendar_year && calendar_year <= DementiaInitialAlterationYearScope[UPPER_BOUND] )
+	{   
+		double weight = WeightForUnderlyingDemportUniform;
+		double *underlying_uniform_whereabouts_for_risk    = UnderlyingUniformWhereaboutsForDementia[cchs_record] ;
+		double *underlying_uniform_whereabouts_for_disease = UnderlyingUniformWhereaboutsForSrDementia[cchs_record] ;
+
+		//BEGIN this piece of code is shared by AmiCvdportAlterInitialValue and StrokeCvdportAlterInitialValue  (with different random seed though).  Could be a function.
+
+		double gods_unif_for_disease , gods_unif_for_risk, unif_for_disease_draw, cauchy_noise ;
+
+		cauchy_noise = qcauchy(RandUniform(150),0,1);
+		gods_unif_for_risk = runif( RandUniform(151) , underlying_uniform_whereabouts_for_risk[LOWER_BOUND] , underlying_uniform_whereabouts_for_risk[UPPER_BOUND] );
+		unif_for_disease_draw = pcauchy( weight*qcauchy(gods_unif_for_risk,0,1) + (1-std::abs(weight))*cauchy_noise ,0,1);
+		/* NOTES
+		     A few interesting special cases of the above
+		       weight =  1 ==> unif_for_disease_draw =   gods_unif_for_risk  which turns out to be the proper things to use
+		       weight =  0 ==> unif_for_disease_draw =   RandUniform(139)    which is OKish (OK but does not take person's risk )
+		       weight = -1 ==> unif_for_disease_draw = 1-gods_unif_for_risk  which is bad (improper use of person's risk )
+             In any case (any weight),  unif_for_disease_draw ~ U(0,1)
+		*/
+
+		gods_unif_for_disease       = runif(unif_for_disease_draw,underlying_uniform_whereabouts_for_disease[LOWER_BOUND],underlying_uniform_whereabouts_for_disease[UPPER_BOUND]);
+		//This is U(0,1) and perceived as the uniform variates used by God to simulate the respondent's SR disease.
+
+
+		//God assigns NO for small U(0,1) and YES otherwise.  We do the reverse below.  We thus need to flip God's uniform variate.
+		gods_unif_for_disease = 1.0 - gods_unif_for_disease;
+
+		//END this piece of code is shared by AmiCvdportAlterInitialValue and StrokeCvdportAlterInitialValue  (with different random seed though).  Could be a function.
+
+		dementia_initial_altered = gods_unif_for_disease < DementiaPrevalenceTarget2001[sex][SPLIT(truncated_age, FROM_20_TO_80_BY_5)][province] ? DEMENTIA_YES : DEMENTIA_NO;  
+		dementia  = dementia_initial_altered;
+		dementia_time_begin = dementia == DEMENTIA_YES ? time : TIME_INFINITE;
+
+		if (dementia == DEMENTIA_YES) {
+			age_at_dementia_onset = age;
+		}
+
+		if (EcrireDebugLogEntry == 22 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND])
+		{
+			//std::stringstream ss;
+			//ss << "\nStart, " << case_seed << ", " << dementia_initial_altered << ", " << dementia;
+			//WriteDebugLogEntry(ss.str().c_str());
+			char line[199];
+			snprintf(line, 199, "%i, %15.1f, Start, %15.9f, %15.9f, %i, %i  \n", (int)case_id, (double)case_seed, (double)time, (double)age, int(dementia_initial_altered), int(dementia));
+			WriteDebugLogEntry(line);
+		}
+
+	}
+	
+	
+};
+
+
+
+
+void PreSimulation()
+{
+	int    covariates[SIZE(COVARIATE_X)] ;
+	int n_records_tot ;
+
+	double in_scope  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = {  -1.0, 9e9,
+					                                                     -1.0, 9e9,  
+				                                                         -1.0, 9e9, 
+						                                                 -1.0, 9e9  } ;
+
+	/* BEGIN get underlying uniform for SR AMI  */
+
+	covariates[0] =  cDb_Sex         ; 
+	covariates[1] =  cDb_Province    ; 
+	covariates[2] =      -1          ;  // will be replaced by mgStartPopAlternativeX computed below (age group)
+	covariates[3] =  cDb_Sex         ; 
+
+	for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+		if(mgCumStartPopWeight[record_looper] > 0.0)
+			mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+
+
+	n_records_tot = StoreData(mgStartPopCopy  ,covariates,cDb_Dementia,mgStartPopAlternativeX,NULL,in_scope );  //Compute Xgroup from covariates and Y=cDb_Dementia and copy them to mgStartPopCopy with respondent weight and ID (row number).
+		
+	qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+	GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForSrDementia, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+   /* END get underlying uniform for SR Dementia */
+
+ 
+
+
+   /* BEGIN get underlying uniform for DEMPoRT-like risk     */
+
+	covariates[0] =  cDb_Sex         ; 
+	covariates[1] =  cDb_Province    ; 
+	covariates[2] =      -1          ;  // will be replaced by mgStartPopAlternativeX computed below (age group)
+	covariates[3] =  cDb_Dementia ; 
+	
+
+	for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+		if(mgCumStartPopWeight[record_looper] > 0.0)
+		{
+			mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+			mgStartPopAlternativeY[record_looper] = DemportishRisk(pStartPop[record_looper]) ;
+			if (EcrireDebugLogEntry == 2)
+			{
+				if(record_looper==0)
+					WriteDebugLogEntry("case_id,cchs_record,sex,age,province,disease_init,disease_altered,risk\n");
+
+				char line[199];
+				snprintf(line,199,"%i, %i, %i, %i, %i, %i, %i, %0.9f \n", -9, record_looper, -9, -9, -9, -9, -9, mgStartPopAlternativeY[record_looper]);               
+				WriteDebugLogEntry(line);
+			}
+		}
+
+	n_records_tot = StoreData(mgStartPopCopy  ,covariates,-1,mgStartPopAlternativeX,mgStartPopAlternativeY,in_scope );  //Compute Xgroup from covariates and Y=Dementia and copy them to mgStartPopCopy with respondent weight and ID (row number).
+
+	qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+	GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForDementia, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+  /*  get underlying uniform for DEMPoRT-like risk */                 
+  
+};
+
+
+//This function requires mgDementiaSumMainTermsCoefMeanCovariate and mgDementiaSumInteractionCoefMeanCovariate.
+//So Dementia.mpp's PreSimulation needs to run before  Dementia_PrevalenceStart.mpp's PreSimulation.
+//It is OK according to debugger.  The fact that PreSimulations are run in alphabetical order of file names plays in our favor ( AMI_CVDPoRT < AMI_CVDPoRT_PrevalenceStart )
+double DemportishRisk(const double person_characteristics[SIZE(DB_FIELDS)])  // (double *person_characteristics)  should work as well 
+{
+	ETHNICITY      local_gEthnicityNonWhite = (ETHNICITY) int(person_characteristics[cDb_Ethnicity]); //DH updated Jan 13 2019
+	EDUCATION      local_gEducation           = ( EDUCATION   ) int(person_characteristics[cDb_Education        ]); //DH update these variables
+	SEX            local_sex                  = ( SEX         ) int(person_characteristics[cDb_Sex              ]);		
+	HIGH_BP_STATE  local_hypertension         = (HIGH_BP_STATE) int(person_characteristics[cDb_SP_HBP           ]);
+	DIAB_STATE     local_diabetes             = (DIAB_STATE   ) int(person_characteristics[cDb_SP_DM            ]);
+	CVDPORT_AMI_STATE	 local_ami    = (CVDPORT_AMI_STATE    ) int(person_characteristics[cDb_HeartAttack      ]);
+	CVDPORT_STROKE_STATE local_stroke = (CVDPORT_STROKE_STATE ) int(person_characteristics[cDb_Stroke           ]);
+	double         local_gBMI                 =                     person_characteristics[cDb_BMI              ] ;
+	double         local_total_packyears      =                     person_characteristics[cDb_SmokingPackYears ] ;
+	int            local_AgeGrp               =                 int(person_characteristics[cDb_AgeGrp           ]);
+
+	int            local_alcohol_on_start_pop =                 int(person_characteristics[cDb_Alcohol          ]) ;
+	ALCOHOL5       local_gAlcohol5                = GetAlcohol5FromStartPop(local_alcohol_on_start_pop,local_sex);
+	double         local_number_drinks_past_week  = double(max(0,local_alcohol_on_start_pop));
+
+	int            local_age             = 5*local_AgeGrp + 7 ; // 3 --> 22, 4 --> 27	
+
+	// Extra work needed to get the following 3 states.  Not done
+	SMOKING_STATE4 local_smoking_status4         = (SMOKING_STATE4) 0;
+	int            local_time_since_quit_smoking = 0;
+	double         local_mets                    = 0;
+
+	// BEGIN 
+	double sum_of_splines =
+	   CubicSpline((double)local_age    , (double*)DementiaAgeSplineLocationCoef        [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)DementiaAgeSplineLocationCoef        [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)DementiaAgeSplineCompanion[local_sex])
+	 + CubicSpline((double)local_gBMI           , (double*)DementiaBmiSplineLocationCoef        [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)DementiaBmiSplineLocationCoef        [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)DementiaBmiSplineCompanion[local_sex])
+	 + CubicSpline((double)local_total_packyears, (double*)DementiaPackYearsSplineLocationCoef  [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)DementiaPackYearsSplineLocationCoef[local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)DementiaPackYearsSplineCompanion[local_sex])
+	 + CubicSpline((double)local_number_drinks_past_week, (double*)DementiaDrinksSplineLocationCoef[local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)DementiaDrinksSplineLocationCoef[local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)DementiaDrinksSplineCompanion[local_sex])
+	 + CubicSpline((double)local_mets           , (double*)DementiaMetsSplineLocationCoef       [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)DementiaMetsSplineLocationCoef     [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)DementiaMetsSplineCompanion[local_sex]);
+
+
+	const double *main_coefs      = DementiaMainTermsCoefficients[local_sex];
+	const double *interactions    = DementiaInteractionCoefficients[local_sex];
+	const double *five_year_base  = DementiaBaseline;
+	const double *cum_haz_curve_x = DementiaLogBaseCumulativeHazard[local_sex][COORDINATES_X];
+	const double *cum_haz_curve_y = DementiaLogBaseCumulativeHazard[local_sex][COORDINATES_Y];
+	double mean_age         = DementiaAgeSplineCompanion[local_sex][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+	double sum_maincoef_mean  = mgDementiaSumMainTermsCoefMeanCovariate[local_sex]; //sum_k   coef_k  * mean_Xk   for main coefficients
+	double sum_intercoef_mean = mgDementiaSumInteractionCoefMeanCovariate[local_sex]; //sum_k   coef_k  * mean_Xk   for interaction coefficients
+	const double *alteration_specs = DementiaAlterationSpecs[local_sex];
+	if(!DementiaAlterationSpecsAppliesToPrevalenceFixSR)
+		alteration_specs = NULL;
+
+	// END 
+
+	double hazard; // Update this inline with updates above
+	//BEGIN Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+	hazard = interactions[DEMPORT_INTER_AGE_SMOKER_CURRENT] * (local_smoking_status4 == LIGHT_smoker || local_smoking_status4 == HEAVY_smoker)
+			+ interactions[DEMPORT_INTER_AGE_SMOKER_FORMER_LT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking < 4)
+			+ interactions[DEMPORT_INTER_AGE_SMOKER_FORMER_GT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking >= 4)
+			+ interactions[DEMPORT_INTER_AGE_PACK_YEARS] * local_total_packyears
+			+ interactions[DEMPORT_INTER_AGE_DRINK_FORMER] * (local_gAlcohol5 == ALCOHOL_FORMER)
+			+ interactions[DEMPORT_INTER_AGE_DRINKS_LAST_WEEK] * local_number_drinks_past_week
+			+ interactions[DEMPORT_INTER_AGE_PA_MET] * local_mets
+			+ interactions[DEMPORT_INTER_AGE_BMI] * local_gBMI
+			+ interactions[DEMPORT_INTER_AGE_HYPERTENSION] * (local_hypertension == HIGH_BP_YES)
+			+ interactions[DEMPORT_INTER_AGE_DIABETES] * (local_diabetes == DIAB_YES)
+	        + interactions[DEMPORT_INTER_AGE_HEART_DISEASE] * (local_ami == CVDPORT_AMI_YES)
+		    + interactions[DEMPORT_INTER_AGE_STROKE] * (local_stroke == CVDPORT_STROKE_YES);
+			
+	hazard = hazard - sum_intercoef_mean;   // got ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )  so far
+	hazard *= (local_age - mean_age);  
+	//END Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+
+	//BEGIN Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+	hazard = hazard
+			+ main_coefs[DEMPORT_MAIN_SMOKER_CURRENT] * (local_smoking_status4 == LIGHT_smoker || local_smoking_status4 == HEAVY_smoker)
+			+ main_coefs[DEMPORT_MAIN_SMOKER_FORMER_LT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking <  4)
+			+ main_coefs[DEMPORT_MAIN_SMOKER_FORMER_GT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking >= 4)
+			+ main_coefs[DEMPORT_MAIN_DRINK_FORMER] * (local_gAlcohol5 == ALCOHOL_FORMER)
+		    + main_coefs[DEMPORT_MAIN_ETHNICITY] * (local_gEthnicityNonWhite == ETHNICITY_NONWHITE) // DH check this
+			+ main_coefs[DEMPORT_MAIN_EDUC_HIGH_SCHOOL_GRAD] * (local_gEducation == EDUC2)
+			+ main_coefs[DEMPORT_MAIN_EDUC_SOME_PS] * (local_gEducation == EDUC3)
+			+ main_coefs[DEMPORT_MAIN_EDUC_PS_GRAD] * (local_gEducation == EDUC4)
+			+ main_coefs[DEMPORT_MAIN_HYPERTENSION] * (local_hypertension == HIGH_BP_YES)
+			+ main_coefs[DEMPORT_MAIN_DIABETES] * (local_diabetes == DIAB_YES) 
+	        + main_coefs[DEMPORT_MAIN_HEART_DISEASE] * (local_ami == CVDPORT_AMI_YES)
+		    + main_coefs[DEMPORT_MAIN_STROKE] * (local_stroke == CVDPORT_STROKE_YES); // added sum_k   coef_k  * Xk   so far
+
+	hazard = hazard - sum_maincoef_mean;   // substract sum_k   coef_k  * mean_Xk    so step 2 is done
+	 //END   Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+
+	//BEGIN Step 3: add on splines and alteration_specs to complete the computation of CVDPoRT's score 
+	hazard = hazard + sum_of_splines;
+	hazard = hazard + (alteration_specs == NULL ? 0.0 : alteration_specs[SPLIT(local_age, FROM_25_TO_90_BY_5)  ]);
+			
+	//END   Step 3: add on splines and alteration_specs to complete the computation of DEMPoRT's score   (at this point, local variable hazard contains DEMPoRT's score)
+
+	hazard = exp(hazard); //  hazard = baseline * exp(score) with baseline handled below.//DH to check if DemPoRT is 5 year risk
+
+	if (five_year_base[local_sex] >= 0)
+		hazard *= five_year_base[local_sex] / 5.0; //baseline = 5 year cumulative hazard / 5. 
+	else
+	{
+		double log_cum_haz_age, log_cum_haz_agep1;
+		
+		log_cum_haz_age   = PieceLinearLookup(local_age  , cum_haz_curve_x, cum_haz_curve_y , SIZE(SCATTER_PLOT_ELEMENTS));
+        log_cum_haz_agep1 = PieceLinearLookup(local_age+1, cum_haz_curve_x, cum_haz_curve_y , SIZE(SCATTER_PLOT_ELEMENTS));
+
+		hazard *= (exp(log_cum_haz_agep1) - exp(log_cum_haz_age)); //baseline hazard over [age,age+1] = H(age+1)-H(age)
+	}
+
+
+	return hazard;
+
+};
+

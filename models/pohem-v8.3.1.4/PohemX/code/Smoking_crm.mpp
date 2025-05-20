@@ -1,0 +1,1297 @@
+//LABEL(Smoking_crm, EN) Smoking module
+
+/*NOTE(Smoking_crm, EN)
+
+	This module describes smoking patterns in Canada fited to historical data
+	and projected into the future.
+
+	Definition of pack-years used in NLST screening criteria is
+	that 1 pack-year is equivalent of smoking 1 pack per day for 365 days.
+
+	Note that the Whittemore equation used requires packs smoked (which was
+	done correctly but the variable names were misleading so changed)
+
+*/
+
+#include "pohem.h"
+
+classification	SMOKING_FUTURE_ASSUMPTIONS { //EN Future smoking assumptions
+	CONSTANT_PREVALENCE_RATES,	//EN Assume constant prevalence rates into future
+	CONTINUE_PREVIOUS_TREND		//EN Assume recent smoking trends continue into future
+};
+
+classification SMOKING_INTERVENTION_CRITERIA {  //EN Smoking cessation
+	SMOKING_INTERVENTION_YEAR_START,		//EN Year start
+	SMOKING_INTERVENTION_YEAR_END,			//EN Year end
+	SMOKING_INTERVENTION_AGE_LOW,			//EN Age start
+	SMOKING_INTERVENTION_AGE_HIGH,			//EN Age end
+	SMOKING_INTERVENTION_REDUCTION_LIGHT,	//EN Proportion of light smokers who quit (0.0 to 1.0)
+	SMOKING_INTERVENTION_REDUCTION_HEAVY,	//EN Proportion of heavy smokers who quit (0.0 to 1.0)
+	SMOKING_INTERVENTION_PERMANENT			//EN Proportion of quitters that quit for life (0.0 to 1.0)
+};
+//	SMOKING_INTERVENTION_COST				//EN Cost of smoking cessation strategy
+
+classification SMOKING_PERIOD {  //EN Smoking periods
+	SMOKING_BEFORE_1966,			//EN Smoking prior to 1966
+	SMOKING_1966_1970,				//EN Smoking between 1966 and 1970
+	SMOKING_1970_1974,				//EN Smoking between 1970 and 1974
+	SMOKING_1974_1979,				//EN Smoking between 1974 and 1979
+	SMOKING_1979_1984,				//EN Smoking between 1979 and 1984
+	SMOKING_1984_1989,				//EN Smoking between 1984 and 1989
+	SMOKING_1989_1994,				//EN Smoking between 1989 and 1994
+	SMOKING_1994_1999,				//EN Smoking between 1994 and 1999
+	SMOKING_1999_2004,				//EN Smoking between 1999 and 2004
+	SMOKING_2004_2009,				//EN Smoking between 2004 and 2009
+	SMOKING_2009_FUTURE				//EN Smoking after 2009
+};
+classification SMOKER_TYPE {  //EN Smoker type
+	LIGHT_SMOKER_TYPE,        //EN Light Smoker
+	HEAVY_SMOKER_TYPE         //EN Heavy Smoker
+};
+classification SMOKING_STATE {  //EN Smoking State
+	NON_SMOKER,					//EN Non-smoker
+	LIGHT_SMOKER,               //EN Light Smoker
+	HEAVY_SMOKER                //EN Heavy Smoker
+};
+classification SMOKING_STATE_TO {  //EN To Smoking State
+	TO_NON_SMOKER,				//EN To Non-smoker
+	TO_LIGHT_SMOKER,            //EN To Light Smoker
+	TO_HEAVY_SMOKER				//EN To Heavy Smoker
+};
+
+classification SMOKING_STATE4 {  //EN Smoking State
+	SMOKER_NUL,                 //EN Null initial state
+	NEVER_smoker,               //EN Never Smoker
+	LIGHT_smoker,               //EN Light Smoker (1-20 cigarettes/day)
+	HEAVY_smoker,               //EN Heavy Smoker (20+ cigarettes/day)
+	FORMER_smoker               //EN Former Smoker
+};
+classification SMOKING_INDEX {  //EN Smoking State
+	iNEVER_SMOKER,              //EN Never Smoker
+	iLIGHT_SMOKER,              //EN Light Smoker (1-20 cigarettes/day)
+	iHEAVY_SMOKER,              //EN Heavy Smoker (20+ cigarettes/day)
+	iFORMER_SMOKER              //EN Former Smoker
+};
+classification TERCILE { //EN Tercile
+	TERCILE1,			//EN Lowest tercile 
+	TERCILE2,			//EN Middle tercile
+	TERCILE3			//EN Highest tercile
+};
+
+classification SMOKING_ADJ_CUT {	//EN Cut-points
+	 CUT1,	//EN First cut-point
+	 CUT2,	//EN Second cut-point
+	 CUT3	//EN Third cut-point
+};
+classification SMOKING_ADJ_COEF {	//EN Year and adjustment amount
+	YEAR_ADJ,	//EN Year
+	COEF_ADJ	//EN Adjustment
+};
+
+partition   PACKYEARSCAT{ 0, 20, 40 };
+partition	AGE_QUIT_SMOKING	{ 0, 30, 35, 40, 45, 50, 55, 60, 65, 70 };
+partition	AGE_GROUP20			{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70}; //EN Age Group
+partition	AGE3				{ 25, 50 };		//EN Age Group
+partition	SMOKING_PERIODS_PARTITION { 1966, 1970, 1974, 1979, 1984, 1989, 1994, 1999, 2004, 2009 };
+
+range SMOKE_LAG_YEARS	{ 0, 20 };	//EN Lagged cumulative smoking years
+range SMOKING_REPORT_YEARS { 1969, 2019 }; //EN Year
+range SMOKING_YEARS_1929 { 1929, 2019 }; //EN Year
+range SMOKING_YEARS_1949 { 1949, 2039 }; //EN Year
+
+parameter_group Smoking_Parameters { //EN Smoking
+	SmokingProjection,
+	SmokingIntervention,
+	Smoking_Parameters_ExpertsOnly
+};
+parameter_group Smoking_Parameters_ExpertsOnly { //EN Experts only
+//	Smoking_Marginal_Parameters,
+	SmokingMarginalProbs,
+	Smoking_Marginal_Adjustment,
+	SmokingTransitionProbs,
+	SurveyOffsetYears,
+//	Mean_Cigarettes_Parameters,
+	CigarettesSmokedDistribution,
+	CigarettesSmokedMean,
+	Smoking_MeanCigarettes_Adjustment,
+	SmokerEducationRR,
+	HeavySmokerEducationRR,
+	LungCancerSmokingLagPeriod
+};
+
+/* NOTE ( Smoking_Marginal_Adjustment, EN )
+Adjustment parameters multiply the base case estimates to improve fit with historical smoking data.
+*/
+parameter_group Smoking_Marginal_Adjustment { //EN Adjust distribution of smokers aged 15-19
+	SmokingAdj,
+	MultiplierSmokingPrevalenceMarginals
+};
+
+/* NOTE ( Smoking_MeanCigarettes_Adjustment, EN )
+Adjustment parameters multiply the base case estimates to improve fit with historical smoking data.
+*/
+parameter_group Smoking_MeanCigarettes_Adjustment { //EN Adjust average number of cigarettes smoked
+	CigarettesSmokedMeanMultiplier
+};
+
+// Controlling smoking by education was not implemented successfully; 
+// the relative risks are set to 1 to have no impact and are hidden from the user at this time.
+hide( SmokerEducationRR );
+hide( HeavySmokerEducationRR );
+
+
+parameters {
+	/* NOTE ( SmokingProjection, EN )
+		>Smoking can be projected in such way to maintain the same age-sex prevalence
+		observed most recently, or to apply the recent (downward) trend of smoking
+		prevalence into the future. In addition to the choice made here, the user has
+		the option of "intervening" in future years through "Future reduction of
+		smoking prevalence" parameter.
+		>
+		>Uses the transitional probability matrix estimated for the last period (which
+		assumed constant prevalence) or for the previous period, which captured the
+		trend between previous period and last period (downward trend towards lower
+		prevalence).
+	*/
+	//EN Smoking assumption for future years
+	SMOKING_FUTURE_ASSUMPTIONS SmokingProjection;
+
+	/* NOTE ( SmokingIntervention, EN )
+	This parameter can be used to reduce smoking prevalence in a given year or over a range of years, 
+	for targetted age range.
+
+	>It allows the user to specify: 
+		year range, age range, 
+		proportion of light smokers that become non-smokers, 
+		proportion of heavy smokers that become non-smokers, and 
+		whether the are quitters for life or follow baseline transitions with chance to restart.
+
+	Example1: Complete smoking cessation starting in 2010.
+		Set start year to 2010
+		Set end year to 9999
+		Set start age to 0
+		Set end age to 99
+		Set proportion of light to non-smoker to 1.0
+		Set proportion of heavy to non-smoker to 1.0
+		Set Quitter for life to 1 (true).
+
+	Example2: To reduce smoking prevalence by 20% in 15 to 24 year olds in the year 2010 
+			 and to have quitters remain quitters for the rest of their life:
+		Set start year to 2010
+		Set end year to 2010
+		Set start age to 15 
+		Set end age to 24
+		Set proportion of light to non-smoker to 0.20
+		Set proportion of heavy to non-smoker to 0.20
+		Set Quitter for life to 1 (true).
+
+	Example3: To reduce smoking prevalence by 20% targetted specifically to 15 year olds over the next five years
+			 and to have quitters remain quitters for the rest of their life:
+		Set start year to 2010
+		Set end year to 2015
+		Set start age to 15 
+		Set end age to 15
+		Set proportion of light to non-smoker to 0.20
+		Set proportion of heavy to non-smoker to 0.20
+		Set Quitter for life to 1 (true).
+
+	Note: Setting both the year range to more than one year AND the age range to more than one year allows 
+	individuals multiple opportunities to "succeed". For instance, if in the second example above, 
+	you had set the end year to 2011, this would provide a second chance for every smoker still in the 
+	age range 15-24 in 2011 a chance to quit, in effect nearly doubling the effect of the intervention from 20% to 40%.
+	
+	>Valid values and defaults: 
+	>Year range: 0 to 9999
+	>Age range:	 0 to 99
+	>Proportion quitters: 0 (default base case) to 1 (100% reduction)
+	>Quitter for life:	0 (false) or 1 (true)
+	*/
+
+	//EN Smoking cessation options
+	double SmokingIntervention[CRM_PROVINCE][SMOKING_INTERVENTION_CRITERIA];
+
+/* NOTE ( SmokingAdj, EN )
+>
+>DESCRIPTION
+>	Adjusts proportion of 15-19 year olds who start smoking to better line up
+with historical data sources. It effectively modifies parameter
+>		Smoking marginal probability of 15-19 year olds
+>for the periods within the range specified here. The adjustment factor
+>is a value >= 0 and a value of 1 means no adjustment. The difference in values
+	between the year cut-points is evenly divided and applied linearly.
+>
+>
+>DIMENSIONS
+>	Three year cut-points, three corresponding multipliers
+>
+>SOURCE
+>	User defined
+>
+>DEFINITION
+>
+>
+>METHODS
+>	Linear interpolation between the cut-points such that multiplier gradually
+changes across time. The multiplier is applied to the smoking distribution of
+15-19 year olds, to adjust the prevalence up or down in a smooth manner. The
+objective is to fit better historical smoking data for males and females.
+>
+>ASSUMPTIONS
+>
+>
+>DECISIONS
+>
+>
+>REFERENCES
+>
+>
+>COMMENTS
+Values have been identified to improve fit of smoking, and lung cancer incidence has been
+re-calibrated taking this into account.
+>
+*/
+
+	//EN Adjustment of distribution of smokers aged 15-19
+	double SmokingAdj[SEX][SMOKING_ADJ_CUT][SMOKING_ADJ_COEF];
+
+/* NOTE ( MultiplierSmokingPrevalenceMarginals, EN )
+>
+>DESCRIPTION
+>	This parameter is used to reduce smoking prevalence of 15-19 year olds from
+baseline values. This is accomplished using a simple multiplier that can be set
+for light and heavy smokers separately and varied by time period and province
+>Example1: To reduce the prevalence of smokers by 10%, set all values to 0.9
+>Example2: To reduce the prevalence of smokers after 2008 by 20%,  leave
+default values at 1.0 for all periods  except period = Smoking after 2008: set
+to 0.8
+>Default value: 1 (i.e. no change to baseline prevalence ) Acceptable values: 0
+to 1
+>Alternative: change mean cigarettes smoked , see Multiplier of average number
+of cigarettes smoked
+>
+>DIMENSIONS
+>	Smoking period, province, type of smoking
+>
+>SOURCE
+>	User defined
+>
+>DEFINITION
+>	Multipliers
+>
+>METHODS
+>	In the simulation, the smoking marginal probabilities are adjusted according
+to these scalars.
+>
+>ASSUMPTIONS
+>
+>
+>DECISIONS
+>
+>
+>REFERENCES
+>
+>
+>COMMENTS
+>
+*/
+	//EN Multipliers of distribution of smokers aged 15-19 (default 1)
+	double MultiplierSmokingPrevalenceMarginals[SMOKING_PERIOD][SMOKER_TYPE][SEX][CRM_PROVINCE];
+
+/* NOTE ( CigarettesSmokedDistribution, EN )
+>
+>DESCRIPTION
+>	This parameter is used to further subdivide light and heavy smokers into
+terciles based on number of cigarettes smoked. This parameter is used along
+with Average number of cigarettes smoked to assign a mean number of cigarettes
+smoked to the simulated individual. A persons smoking is accumulated over time
+to derive the cumulative pack-years of cigarettes smoked in their lifetime, and
+used to assess the individual's risk of developing lung cancer.
+>
+>DIMENSIONS
+>	Smoking category, sex, province, age group (15-25, 25-50, 50+), tercile of
+number of cigarettes
+>
+>SOURCE
+>	CCHS 2008
+>
+>DEFINITION
+>	For the heavy smokers, a distribution of the number of cigarettes per day was
+divided into terciles: 20, 21 to 24, 25 and more.
+>For the light smokers, a distribution of the number of cigarettes per day was
+divided into terciles: 0 to <6, 6 to <12, 12 to 19.
+>
+>METHODS
+>	From CCHS 4.1 (2007), a frequency distribution of the number of cigarettes
+smoked per day was produced. For the heavy and the light smokers separately, we
+decided to divide this distribution into terciles.  The terciles do not
+represent one third of the distribution because of the huge modes; in
+particular, for the heavy smokers, there is a mode at 20; it is unclear if this
+value is reported for rounding reason (which is the size of a cigarette pack)
+or if it is an exact value.  Some papers try to address the validity of the
+number of cigarettes smoked per day, in particular Gariti et al. and Burns et
+al.
+>
+>In the simulation, once the smoking category is determined for a given
+individual at a given year and if the smoking category is Light smoker or Heavy
+smoker, then the tercile Distribution of smokers by number of cigarettes smoked
+(0-6, 6-12, 12-19 or 20, 21-24, 25+) is randomly assigned, according to the
+other dimensions of the parameter (sex, province, age group).
+>
+>ASSUMPTIONS
+>
+>
+>DECISIONS
+>	Since the distribution of number of cigarettes is not normal, and since we
+want to distinguish the path of heavy smokers and light smokers, it would have
+been useless to try to reproduce variability of number of cigarettes.  In other
+words, instead of drawing a random number of cigarettes among the distribution
+at each year, we assign the same value (the mean) for 5 years.
+>
+>REFERENCES
+>	David M. Burns, Jacqueline M. Major, Thomas G. Shanks
+>Changes in Number of Cigarettes Smoked per Day: Cross-Sectional and Birth
+Cohort Analyses Using NHIS, Smoking and Tobacco Control Monograph No. 15
+>Gariti et al. , Peter W., Alterman, Arthur I., Ehrman, Ronald N. and
+Pettinati, Helen M.(1998)'Reliability and Validity of the
+>Aggregate Method of Determining Number of Cigarettes Smoked Per Day, American
+Journal on Addictions,7:4,283 - 287
+>
+>COMMENTS
+>	Could consider expanding this to capture different historical periods.
+*/
+
+	//EN Distribution of smokers by number of cigarettes smoked
+	cumrate CigarettesSmokedDistribution[SMOKING_PERIOD][SMOKER_TYPE][SEX][CRM_PROVINCE][AGE3][TERCILE];
+
+/* NOTE ( CigarettesSmokedMean, EN )
+>
+>DESCRIPTION
+>	This parameter is used to assign the mean number of cigarettes smoked based
+on the simulated persons assigned smoking category and tercile.
+>
+>DIMENSIONS
+>	Smoking category, sex, province, age group (15-25, 25-50, 50+), tercile of
+number of cigarettes
+>
+>SOURCE
+>	CCHS 2008
+>
+>DEFINITION
+>	Average number of cigarettes smoked based on self-reported survey data
+>
+>METHODS
+>	Simple average within each smoking tercile.
+>
+>In the simulation,  when smoking tercile is updated, the number of cigarettes
+smoked per day Average number of cigarettes smoked (which is the mean observed
+for this smoking category, sex, province, age group) is assigned to the
+individual.  Therefore, the individual - and all the individuals in the same
+smoking category, sex, province, age group - will have the same number of
+cigarettes smoked until the next update of smoking category (i.e. 5 years
+later).
+>
+>ASSUMPTIONS
+>
+>
+>DECISIONS
+>	Since the distribution of number of cigarettes is not normal, and since we
+want to distinguish the path of heavy smokers and light smokers, it would have
+been useless to try to reproduce variability of number of cigarettes.  In other
+words, instead of drawing a random number of cigarettes among the distribution
+at each year, we assign the same value (the mean) for 5 years.
+>
+>REFERENCES
+>	David M. Burns, Jacqueline M. Major, Thomas G. Shanks
+>Changes in Number of Cigarettes Smoked per Day: Cross-Sectional and Birth
+Cohort Analyses Using NHIS, Smoking and Tobacco Control Monograph No. 15
+>Gariti et al. , Peter W., Alterman, Arthur I., Ehrman, Ronald N. and
+Pettinati, Helen M.(1998)'Reliability and Validity of the
+>Aggregate Method of Determining Number of Cigarettes Smoked Per Day, American
+Journal on Addictions,7:4,283 - 287
+>
+>COMMENTS
+>	Could consider expanding this to capture different historical periods.
+*/
+
+	//EN Average number of cigarettes smoked
+	double CigarettesSmokedMean[SMOKING_PERIOD][SMOKER_TYPE][SEX][CRM_PROVINCE][AGE3][TERCILE];
+
+	/* NOTE ( CigarettesSmokedMeanMultiplier, EN )
+	>
+	>DESCRIPTION
+	>	This parameter is used to explore smoking reduction scenarios by changing
+	the mean number of cigarettes smoked from the baseline values by type of
+	smoker. This is accomplished using a simple multiplier, which can be set
+	separately for light and heavy smokers by time period, province, sex, and age
+	group.
+	>Default: set to 1 to have no impact.
+	>Acceptable values: 0 to 1 for reduction
+	>
+	>Example1: To reduce the average number of cigarettes smoked by all smokers by
+	10%, set all values to 0.9
+	>Example2: To reduce the average number of cigarettes smoked only in the
+	province of Nova Scotia  and only after 2008 by 20%, leave default values at
+	1.0 everywhere except for  province = Nova Scotia and period = Smoking after
+	2008: set them to 0.8 Default value: 1 (i.e. no change to mean value)
+	>
+	>
+	>Alternative: change prevalence, see Multiplier of smoking prevalence
+	>
+	>DIMENSIONS
+	>	Smoking period, province, sex and age group, type of smoker
+	>
+	>SOURCE
+	>	User defined
+	>
+	>DEFINITION
+	>	Multiplier
+	>
+	>METHODS
+	>	In the simulation, the mean number of cigarettes (baseline estimate) is
+	modified by multiplying by this parameter.
+	>
+	>ASSUMPTIONS
+	>	That smoking reduction intervention strategy reduces number of cigarettes
+	smoked (for targetted subpopulation) as opposed to increasing number of
+	quitters or non-starters.
+	>
+	>DECISIONS
+	>
+	>
+	>REFERENCES
+	>
+	>
+	>COMMENTS
+	>
+	*/
+	//EN Multipliers of average number of cigarettes smoked (default 1)
+	double CigarettesSmokedMeanMultiplier[SMOKING_PERIOD][SMOKER_TYPE][SEX][CRM_PROVINCE][AGE3];
+
+
+	//EN Average number of cigarettes smoked adjusted by intervention parameter
+	model_generated double CigarettesSmokedMeanAdjusted[SMOKING_PERIOD][SMOKER_TYPE][SEX][CRM_PROVINCE][AGE3][TERCILE];
+
+	//EN Relative risk of being a smoker (light or heavy) by education level
+	double SmokerEducationRR[SEX][CRM_EDUCATION];
+
+	//EN Relative risk of being a heavy smoker by education level, given that person is a smoker
+	double HeavySmokerEducationRR[SEX][CRM_EDUCATION];
+
+	/* NOTE ( SmokingMarginalProbs, EN )
+		>DESCRIPTION
+		>	Prevalence of smoking in 15-19 year olds for different historical periods.
+		Smoking categories are
+		>*Non smoker
+		>*Light smoker (less than 20 cigarettes per day)
+		>*Heavy smoker (20 or more cigarettes per day)
+		>
+		>DIMENSIONS
+		>	Smoking period, sex, province, smoking category
+		>
+		>SOURCE
+		>	CHS 1979, NPHS 1994, CCHS 2008
+		>
+		>DEFINITION
+		>	Smoking categories are from the derived variables of CCHS and NPHS, which
+		have 4 values: Never smoker, Daily Smoker, Occasional Smoker, Former Smoker.
+		For daily smoker, if number of cigarettes smoked per day is >= 20, then
+		category=Heavy smoker, else Light smoker.  For occasional smoker, if number of
+		cigarettes per month is >= 600, then category =Heavy smoker, else Light smoker.
+		 For never smoker or former smoker, type= Non smoker.
+		>
+		>METHODS
+		>	Using data of persons aged e.g. 15-19 in 1979 from CHS (and 30-34 in 1994
+		from NPHS), we computed the percentage of heavy smokers, light smokers and non
+		smokers (pH, pL, pN) in 1979 and in 1994.  For any intermediate year y between
+		1979 and 1994, we applied the following linear interpolation:
+		pH(y)=(pH(1994)-pH(1979))/15*(y-1979), pL(y)=(pL(1994)-pL(1979))/15*(y-1979),
+		pN(y)=(pN(1994)-pN(1979))/15*(y-1979) [because 15 is the number of years
+		between 1979 and 1994].  We repeated the same process for each province, each
+		age group and each sex.  We did the same process for 1994 (NPHS) and 2008 (CCHS
+		4.1) and intermediate years between 1994 and 2008.
+		>
+		>ASSUMPTIONS
+		>	For CHS 1979, only 5 regions were available (instead of the provinces):
+		Atlantic, Québec, Ontario, Prairies and Vancouver.  We assume that all 4
+		Atlantic provinces share the same prevalence and that BC is similar to
+		Vancouver.
+		>
+		>DECISIONS
+		>
+		>
+		>REFERENCES
+		>
+		>
+		>COMMENTS
+		>	Territories (Yukon, NT, Nunavut) have small samples, therefore the
+		interpolation may be unreliable.
+	*/
+	//EN Distribution of smokers aged 15-19
+	double  SmokingMarginalProbs[SMOKING_PERIOD][SEX][CRM_PROVINCE][SMOKING_STATE];
+
+	/* NOTE ( SmokingTransitionProbs, EN )
+		>DESCRIPTION
+		>	Probability of transition between smoking categories as simulated individual
+		changes from one age group to the next, conditioned on historical period.
+		>
+		>DIMENSIONS
+		>	Smoking period, sex, province, age group (from), smoking category (from),
+		smoking category (to)
+		>
+		>SOURCE
+		>	CHS 1979, NPHS 1994, CCHS 2008
+		>
+		>DEFINITION
+		>	See parameters Distribution of smokers aged 15-19 for definition of smoking
+		categories.
+		>
+		>METHODS
+		>	For the period 1979-1994, we consider 3 transitions: 1979-1984, 1984-1989,
+		1989-1994.  For each of these transitions, we build the transition matrix,
+		where the row marginals are the prevalence rates for the beginning period, and
+		the columns marginals are the prevalence observed for the next period (for the
+		age group 5 years older).  We then build the transition matrix, using the
+		North-West method [in this method, one tries to determine the values of the
+		cells such that the marginals are satisfied; starting at the cell at the
+		North-West of the table].
+		>
+		>For example, if, for a given sex, province, age group the row marginals are
+		0.1, 0.6 and 0.3 (resp. prop. of Heavy, Light and Non smokers) and the columns
+		marginals (for the age group 5 years older 5 years later) are: 0.2, 0.7, 0.1,
+		then the transitions satisfying the marginals are:
+		>
+		>Change required            Probability matrix
+		>----+---------------------+--------------------
+		>       0.2    0.7    0.1     0.2    0.7    0.1
+		>----+---------------------+--------------------
+		>0.1    0.1                   1/1
+		>0.6    0.1    0.5            1/6    5/6
+		>0.3           0.2	0.1		         2/3    1/3
+		>----+---------------------+--------------------
+		>
+		>For the period 1994-2008, we consider 3 transitions: 1994-1999, 1999-2003,
+		2003-2008 using the data interpolated between 1994 and 2008 (even though more
+		years are available: NPHS 1996, 1998, 2000, 2002, 2004, 2006, CCHS 2001, 2003,
+		2005; these data will be used to validate the process).
+		>
+		>For years after 2008, we built the transition from 2008 to 2008 (for the next
+		age group). For years before 1979, we built the transition from 1979 to 1979
+		(for the next age group).
+		>
+		>For all these smoking periods, it is not possible for a person to directly
+		move from non-smoker to heavy smoker (and vice-versa) in one transition.
+		>
+		>ASSUMPTIONS
+		>	For CHS 1979, only 5 regions were available (instead of provinces): Atlantic,
+		Québec, Ontario, Prairies and Vancouver.  We assume that all 4 Atlantic
+		provinces share the same prevalence and that BC is similar to Vancouver.
+		>
+		>DECISIONS
+		>
+		>
+		>REFERENCES
+		>
+		>
+		>COMMENTS
+		>	 Territories (Yukon, NT, Nunavut) have small samples, therefore the
+		interpolation may be unreliable.
+	*/
+	//EN Smoking transitional probability for subsequent 5-year age groups
+	double  SmokingTransitionProbs[SMOKING_PERIOD][SEX][CRM_PROVINCE][AGE_GROUP20][SMOKING_STATE][SMOKING_STATE_TO];
+	
+	//EN Smoking marginal probability by education
+	model_generated cumrate SmokingMarginalProbsAdjusted[SMOKING_PERIOD][SEX][CRM_PROVINCE][CRM_EDUCATION][SMOKING_STATE];
+
+	//EN Smoking transitional probability by education
+	model_generated cumrate SmokingTransitionProbsAdjusted[SMOKING_PERIOD][SEX][CRM_PROVINCE][AGE_GROUP20][SMOKING_STATE][CRM_EDUCATION][SMOKING_STATE_TO];
+
+/* NOTE ( SurveyOffsetYears, EN )
+>
+>DESCRIPTION
+>	The survey offset years parameter takes into account the year when the person
+reaches the entry age of an age group, so that when they reach the survey year
+they fall into the age group. For example, persons aged 15-19 in 1994, were
+aged 15 in 1994, 1993, 1992, 1991 and 1990 based on being 15, 16, 17 18 or 19
+in 1994.
+>
+*/
+	//EN Survey offset years to line up simulation age with survey age group (default 4)
+	int SurveyOffsetYears;
+
+
+};
+
+actor Person            // Core Individual
+{
+	logical smoking_intervention_permanent = {FALSE};	//EN Smoking intervention can be permament or allowed to transition back into smoker
+
+//	SMOKING_PERIOD	smoking_period = { SMOKING_2009_FUTURE };	//EN Smoking period
+	int				smoking_period_year = int(year)+SurveyOffsetYears;
+	SMOKING_PERIOD	smoking_period		= SMOKING_PERIOD( split(smoking_period_year, SMOKING_PERIODS_PARTITION) );	//EN Smoking period (updated even at start)
+
+	SMOKING_STATE	previous_smoking_status ;	//EN Previous smoking status
+	SMOKING_STATE	smoking_status;				//EN Smoking status
+	SMOKING_STATE4	smoking_status4;			//EN Smoking status
+	SMOKER_TYPE		daily_smoker_type;			//EN Smoker type
+	SMOKING_INDEX	smoking_status_index;
+
+	TERCILE cigarettes_smoked_tercile; 
+
+	// Smoking variables
+	logical	daily_smoker = { FALSE };               //EN Daily Smoker
+	float	packs_smoked[SMOKE_LAG_YEARS];		//EN Array of past years of packs of cigarettes smoked (for lagging)
+	float	cumlag_packs_smoked = {0.0};		//EN Cumulative packs of cigarettes smoked, lagged by 10 years
+	double  total_packs_smoked = {0.0};				//EN Total packs of cigarettes smoked
+	double  total_packyears_smoked = {0.0};			//EN Total pack-years of cigarettes smoked
+	
+	int		light_smoker_duration= {0};			//EN Years as light smoker
+	int		heavy_smoker_duration= {0};			//EN Years as heavy smoker
+	int		year_quit_smoking = {9999};				//EN Year quit smoking
+	int		age_recent_quit_smoking = {-1};	// Never smoker
+	int		age_first_quit_smoking = {-1}; // Never smoker
+
+
+	// Routines and Functions
+	void	SmokingInitialize();					//EN Initialize smoking variables
+	hook	SmokingInitialize, Smoking_Initialize; 
+	void	SmokingUpdate();						//EN Update smoking status
+	hook	SmokingUpdate, RiskFactorsUpdatesEmptyHub, 40; // 40 = execution number, the higher the value, the later the execution
+	void	ApplySmokingIntervention();				//EN Apply smoking intervention (if any)
+	hook	ApplySmokingIntervention, RiskFactorInterventions, 10; // 10 = execution number, the higher the value, the later the execution;
+	void	IdentifyFormerSmokers();				//EN Identify former smokers
+	void	UpdateSmokingStatus( int nSmokingState );					//EN Update smoking variables
+	void	UpdateCumulativeSmokingHistory();	//EN Update cumulative smoking
+
+	// Continuously updated variables
+	int		smoking_age_group = split( integer_age, AGE_GROUP20);	//EN Age group
+	int		smoking_age3 = split( integer_age, AGE3);				//EN Age group
+	SMOKING_REPORT_YEARS	smoking_report_year = COERCE( SMOKING_REPORT_YEARS, year);	//EN Year
+    SMOKING_YEARS_1929		smoking_year_1929 = COERCE( SMOKING_YEARS_1929, year);	//EN Year
+    SMOKING_YEARS_1949		smoking_year_1949 = COERCE( SMOKING_YEARS_1949, year);	//EN Year
+
+	// local variables ( made global for testing)
+	float	packyears_smoked_thisyear = { 0.0 };		//EN Pack-years smoked in current year
+	float	packs_smoked_per_year = { 0.0 };		//EN Packs smoked per year
+	double	cigarettes_per_day = { 0.0 };		//EN Cigarettes smoked per day
+	double	cigarettes_per_pack = { 20.0 };		//EN Number of cigarettes per pack
+};
+
+void hook_SmokingUpdate() {};
+
+void Person::SmokingUpdate()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	// local variables
+	int	nOffset = {0};
+	int	nSmokingState = {0};
+	double dHeavySmokerProb = {0.0};
+	double dLightSmokerProb = {0.0};
+	double dNonSmokerProb	= {1.0};
+	double dRand = {0.0};
+	double dMultMarg = {1.0};
+
+
+	// Model smoking from age 15 on from marginal and transitional probabilities
+	// The survey offset years is meant to take into account the year when the person reaches the entry age of an age group
+	// so that when they reach the survey year they fall into the age group
+	// however, we are updating the period at every age so this may not be exactly right
+	if (integer_age >= 15  &&
+	    integer_age > lifespan_age_start   //more in line with POHEM 8202
+		) 
+	{
+/*
+		if ( year < 1966 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_BEFORE_1966;		
+		}
+		else if (year < 1970 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1966_1970;		
+		}
+		else if (year < 1974 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1970_1974;		
+		}
+		else if (year < 1979 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1974_1979;		
+		}
+		else if ( year < 1984 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1979_1984;
+		}
+		else if ( year < 1989 - SurveyOffsetYears  ) 
+		{
+			smoking_period = SMOKING_1984_1989;
+		}
+		else if ( year < 1994 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1989_1994;
+		}
+		else if ( year < 1999 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1994_1999;
+		}
+		else if ( year < 2004 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_1999_2004;
+		}
+		else if ( year < 2009 - SurveyOffsetYears ) 
+		{
+			smoking_period = SMOKING_2004_2009;
+		}
+		else // Future 
+		{
+			smoking_period = SMOKING_2009_FUTURE;
+		};
+*/	
+		previous_smoking_status = smoking_status;
+		switch (integer_age)  {
+
+			// At age 15, initialize smoking status using marginal rates
+			case 15: 
+
+				// Historical adjustment to improve fit of smoking data
+				if (year <= SmokingAdj[sex][CUT3][YEAR_ADJ]) 
+				{ 	
+					if (year <= SmokingAdj[sex][CUT1][YEAR_ADJ]) 		
+					{		
+						dMultMarg = SmokingAdj[sex][CUT1][COEF_ADJ];	
+					}
+					else if ( year <= SmokingAdj[sex][CUT2][YEAR_ADJ] )
+					{	
+						// linear interpolation of multiplier between year cut-points 1 and 2
+						dMultMarg = SmokingAdj[sex][CUT1][COEF_ADJ] +
+							( SmokingAdj[sex][CUT2][COEF_ADJ] - SmokingAdj[sex][CUT1][COEF_ADJ] )
+							 /( SmokingAdj[sex][CUT2][YEAR_ADJ] - SmokingAdj[sex][CUT1][YEAR_ADJ] )
+							* ( year - SmokingAdj[sex][CUT1][YEAR_ADJ] );	
+					}
+					else 	
+					{		
+						// linear interpolation of multiplier between year cut-points 2 and 3
+						dMultMarg = SmokingAdj[sex][CUT2][COEF_ADJ] + 
+							( SmokingAdj[sex][CUT3][COEF_ADJ] - SmokingAdj[sex][CUT2][COEF_ADJ] )
+							/( SmokingAdj[sex][CUT3][YEAR_ADJ] - SmokingAdj[sex][CUT2][YEAR_ADJ] )
+							* ( year - SmokingAdj[sex][CUT2][YEAR_ADJ] );	
+					};
+					dHeavySmokerProb = dMultMarg * SmokingMarginalProbsAdjusted[smoking_period][sex][province][eventual_education][HEAVY_SMOKER];
+					dLightSmokerProb = dMultMarg * SmokingMarginalProbsAdjusted[smoking_period][sex][province][eventual_education][LIGHT_SMOKER];
+					dNonSmokerProb = (1 - dHeavySmokerProb - dLightSmokerProb );
+					dRand = RandUniform(56);
+					if ( dRand <= dNonSmokerProb )  
+					{
+						nSmokingState=0;	// non smoker
+					} 
+					else if ( dRand <= dNonSmokerProb + dLightSmokerProb )
+					{
+						nSmokingState=1;	// light smoker
+					} 
+					else 
+					{
+						nSmokingState=2;	// heavy smoker
+					};
+				} 
+
+				// Recent smoking is a lookup 
+				else 	
+				{ 
+					Lookup_SmokingMarginalProbsAdjusted( RandUniform(33), 
+						smoking_period, sex, province, eventual_education, &nSmokingState);
+				} 
+
+				// updated once per 5 years on change of age group
+				UpdateSmokingStatus( nSmokingState ); 
+				break;
+
+			// At age 20 and every 5 years after, apply smoking transition probabilities
+			case 20:
+			case 25:
+			case 30:
+			case 35:
+			case 40:
+			case 45:
+			case 50:
+			case 55:
+			case 60:
+			case 65:
+			case 70:
+
+				nOffset=0;
+				if (smoking_period ==SMOKING_2009_FUTURE && SmokingProjection==CONTINUE_PREVIOUS_TREND)
+				{
+					// Continue trend from previous period
+					nOffset = 1;
+				}
+				// Apply probability of changing smoking status
+				Lookup_SmokingTransitionProbsAdjusted( RandUniform(34), smoking_period - nOffset, sex, province,
+					smoking_age_group-1, smoking_status, eventual_education, &nSmokingState);	
+
+				// updated once per 5 years on change of age group
+				UpdateSmokingStatus( nSmokingState );
+				break;
+
+			default:;
+		}; // end switch
+
+		// ========================================
+		// The following are updated each year from age 15 on
+		// ========================================
+
+		// Update smoking history (even if not a daily smoker this year)
+		UpdateCumulativeSmokingHistory();
+
+	}
+
+	hook_SmokingUpdate();
+};	// end smoking status
+
+void hook_UpdateSmokingStatus() {};
+
+void Person::UpdateSmokingStatus( int nSmokingState )
+{
+	// local variables
+	int nCigTercile;
+	logical bPreviousDailySmoker;
+
+	if ( !smoking_intervention_permanent )	// intervention can be applied to be permament 
+	{
+		bPreviousDailySmoker = daily_smoker;
+
+		// assign smoking status
+		smoking_status = (SMOKING_STATE) (nSmokingState);
+		daily_smoker = ( smoking_status == LIGHT_SMOKER) || ( smoking_status == HEAVY_SMOKER);
+
+		// keep track of never and former smokers
+		IdentifyFormerSmokers();
+
+		// derive annual number of packs of cigarettes smoked
+		cigarettes_per_day =  0.0;	// reset
+		packyears_smoked_thisyear = 0.0;	// reset
+		packs_smoked_per_year = 0.0;	// reset
+		if ( daily_smoker ) 
+		{
+			daily_smoker_type = (SMOKER_TYPE) ( smoking_status-1 );
+			Lookup_CigarettesSmokedDistribution( RandUniform(47), smoking_period, daily_smoker_type, sex, province, smoking_age3,  &nCigTercile);
+			cigarettes_smoked_tercile = (TERCILE) (nCigTercile);
+			cigarettes_per_day =  (double) (CigarettesSmokedMeanAdjusted[smoking_period][daily_smoker_type][sex]
+												[province][smoking_age3][cigarettes_smoked_tercile]);
+
+			// The number of cigarettes smoked each year converted to pack-years (One pack year equals 365 packs of cigarettes.)
+			packs_smoked_per_year = (float) (365.0 * cigarettes_per_day / cigarettes_per_pack);	// eg 10 cigs per day = 1/2 pack per day = 182.5 packs per year
+			packyears_smoked_thisyear = (float) (cigarettes_per_day / cigarettes_per_pack);	// equivalent to packs per day assumed constant rate for year eg 10 cigs per day = 1/2 pack per day = 1/2 pack year
+		}
+
+		// set year quit smoking only when person becomes a former smoker (can occur multiple times, if smoker resumes)
+		if ( !daily_smoker && bPreviousDailySmoker ) {	
+			year_quit_smoking = year;
+		}
+
+		// for reporting number of lung cancer deaths by current, former and never smokers
+		if ( daily_smoker ) 
+		{
+			age_recent_quit_smoking = 999;		// means daily smoker
+			if (age_first_quit_smoking == -1 )	// never smoker then...
+			{
+				age_first_quit_smoking = 999;	// means daily smoker
+			}
+		}
+		else if (smoking_status4 == FORMER_smoker )
+		{
+			// if transitioning from daily smoker to former smoker
+			if ( bPreviousDailySmoker )			
+			{
+				age_recent_quit_smoking = integer_age;
+			}
+			// if this is the first time quitting (must have been a smoker)
+			if (age_first_quit_smoking == 999 )
+			{
+				age_first_quit_smoking = integer_age;
+			}
+		}
+
+	}
+
+	hook_UpdateSmokingStatus();
+}
+
+void hook_ApplySmokingIntervention() {};
+
+void Person::ApplySmokingIntervention()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if (daily_smoker &&
+		integer_age > lifespan_age_start  &&  //more in line with POHEM 8202
+		year >= SmokingIntervention[province][SMOKING_INTERVENTION_YEAR_START] && 
+		year <= SmokingIntervention[province][SMOKING_INTERVENTION_YEAR_END] && 
+		integer_age >= SmokingIntervention[province][SMOKING_INTERVENTION_AGE_LOW] &&
+		integer_age <= SmokingIntervention[province][SMOKING_INTERVENTION_AGE_HIGH]  )
+	{
+		// apply a cost-per-person targetted by smoking cessation
+//		smoking_cessation_program_cost_base += SmokingCessationProgramCost[province];
+		
+		if ( ( smoking_status == LIGHT_SMOKER && 
+				RandUniform(72) < SmokingIntervention[province][SMOKING_INTERVENTION_REDUCTION_LIGHT] )
+			||	( smoking_status == HEAVY_SMOKER && 
+				RandUniform(73) < SmokingIntervention[province][SMOKING_INTERVENTION_REDUCTION_HEAVY] ) )
+		{
+				UpdateSmokingStatus( NON_SMOKER ); 
+
+				// Proportion can be made permanent quitters
+				if ( RandUniform(107) < SmokingIntervention[province][SMOKING_INTERVENTION_PERMANENT] )
+				{
+					smoking_intervention_permanent = TRUE;
+				}
+		}
+	}
+
+	hook_ApplySmokingIntervention();
+};
+
+void hook_IdentifyFormerSmokers() {};
+
+void Person::IdentifyFormerSmokers()
+{
+	// Reassign smoking status distinguishing between Never and Former smokers
+	if ( daily_smoker )	
+	{	
+		smoking_status4 = (SMOKING_STATE4) (smoking_status +1);	// Light or Heavy smoker
+	}
+	else if ( smoking_status4 == NEVER_smoker || smoking_status4 == SMOKER_NUL )
+	{
+		smoking_status4 = NEVER_smoker;
+	}
+	else
+	{
+		smoking_status4 = FORMER_smoker;
+	}
+	smoking_status_index =  SMOKING_INDEX(smoking_status4 - 1);
+
+	hook_IdentifyFormerSmokers();
+};	
+
+// Risk of smoking on lung cancer incidence is measured in cumulative pack-years smoked, 
+// lagged 10 years
+// Each year update cumulative lagged cigarettes smoked for lung cancer
+// Pack-year is number of packs smoked per day over year (20 cigarettes per pack)
+
+// Updated every year on birthday
+
+void hook_UpdateCumulativeSmokingHistory() {};
+
+void Person::UpdateCumulativeSmokingHistory()
+{
+	// Lag index inversely related to Lag parameter (index 0 means 10 year lag; index set to 10 means no lag)
+	int nLagIndex ={0};
+	int nMaxLagYears  = SIZE(SMOKE_LAG_YEARS)-1;
+	nLagIndex = COERCE( SMOKE_LAG_YEARS, nMaxLagYears - LungCancerSmokingLagPeriod[sex]);
+
+	// Cumulative **pack-years** smoked (not lagged)
+	total_packyears_smoked += packyears_smoked_thisyear;
+
+	// Cumulative number of **packs** of cigarettes smoked
+	total_packs_smoked += packs_smoked_per_year;
+
+	// Current year does not have impact on lung cancer until n years later (default 10)
+	packs_smoked[nMaxLagYears] = packs_smoked_per_year;
+	
+	// Update cumulative pack years smoked, lagged by n years (parameter specificed, max 20, default 10)
+	cumlag_packs_smoked += packs_smoked[nLagIndex];
+
+	// Moves the entire 10 year history forward one year closer to contributing to lung cancer risk
+	memmove(&packs_smoked[0], &packs_smoked[1], nMaxLagYears  * sizeof(float));
+
+	// Years since quit smoking (used to index into risk of lung cancer for former smokers)
+	if ( smoking_status4 == FORMER_smoker )
+	{
+		years_since_quit_smoking++;
+	}
+	else
+	{
+		if ( years_since_quit_smoking > 0 )
+		{
+			years_since_quit_smoking--;		// reduce counter when starts smoking again
+		}
+	}
+	// Accumulate years person has smoked for modification of risk equation
+	if ( daily_smoker ) 
+	{
+		if (smoking_status == HEAVY_SMOKER) 
+		{
+			heavy_smoker_duration++;
+		}
+		else 
+		{
+			light_smoker_duration++;
+		}
+	}
+
+	hook_UpdateCumulativeSmokingHistory();
+}
+
+void Person::SmokingInitialize()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	// initialize array which holds last 10 years of cigarettes smoked
+	int i;
+	for	(i=0; i < SIZE(SMOKE_LAG_YEARS); i++) 
+	{
+		packs_smoked[i] = (float) 0;
+	}
+
+	hook_SmokingInitialize();
+};
+
+
+
+void PreSimulation()
+{
+/* This portion of the program is to compute the marginals, adjusted for level of education
+	The only data we need is:
+             (1) p: the global probability of being smoker [heavy smoker]
+			 (2) the relative risk of education on prob. of being a smoker [heavy smoker], for each educ. category educ_1, educ_2, educ_3: RR_1,RR_2,RR_3 [typically RR_1>RR_2>RR_3=1] 
+			 (3) the number of persons in each educ. category: n_1, n_2, n_3;
+*/
+
+	int agg;
+	int edu;
+	int pro;
+	int smp;
+	int sms;
+	int smsa;
+	int smsb;
+	int sx;
+
+	double invntot[SIZE(SEX)];
+	double invnhtot[SIZE(SEX)];
+	double nhtot[SIZE(SEX)];
+	double nhtota[SIZE(SEX)][SIZE(CRM_EDUCATION)];
+	double ntot[SIZE(SEX)];
+	double ntota[SIZE(SEX)][SIZE(CRM_EDUCATION)];
+	double PrPH[SIZE(SMOKING_PERIOD)][SIZE(SEX)][SIZE(CRM_PROVINCE)];
+	double PrS[SIZE(SMOKING_PERIOD)][SIZE(SEX)][SIZE(CRM_PROVINCE)];
+	double SmT[SIZE(SMOKING_PERIOD)][SIZE(SEX)][SIZE(CRM_PROVINCE)];
+
+	double(*SmTransProb)[SIZE(SEX)][SIZE(CRM_PROVINCE)][SIZE(AGE_GROUP20)][SIZE(SMOKING_STATE)][SIZE(SMOKING_STATE_TO)][SIZE(CRM_EDUCATION)] =
+		new double[SIZE(SMOKING_PERIOD)][SIZE(SEX)][SIZE(CRM_PROVINCE)][SIZE(AGE_GROUP20)][SIZE(SMOKING_STATE)][SIZE(SMOKING_STATE_TO)][SIZE(CRM_EDUCATION)];
+
+	double(*SmTransProbT)[SIZE(SEX)][SIZE(CRM_PROVINCE)][SIZE(AGE_GROUP20)][SIZE(SMOKING_STATE)][SIZE(CRM_EDUCATION)] =
+		new double[SIZE(SMOKING_PERIOD)][SIZE(SEX)][SIZE(CRM_PROVINCE)][SIZE(AGE_GROUP20)][SIZE(SMOKING_STATE)][SIZE(CRM_EDUCATION)];
+
+	for ( smp= 0; smp < SIZE( SMOKING_PERIOD ); smp++ ) 
+	{
+		for ( sx= 0; sx < SIZE( SEX); sx++ ) 
+		{
+			for ( pro= 0; pro < SIZE( CRM_PROVINCE); pro++ ) 
+			{
+				SmT[smp][sx][pro]=0.0;
+				for ( sms= 0; sms < SIZE( SMOKING_STATE); sms++ ) 
+				{
+					SmT[smp][sx][pro]+=SmokingMarginalProbs[smp][sx][pro][sms]; // should give 1
+				};
+				
+				PrS[smp][sx][pro]=0.0;
+				for ( sms= 1; sms < SIZE( SMOKING_STATE); sms++ ) 
+				{
+					PrS[smp][sx][pro]+=SmokingMarginalProbs[smp][sx][pro][sms];
+				};
+
+				if (PrS[smp][sx][pro]==0 ) 
+				{
+					PrPH[smp][sx][pro]=1.0;
+				}
+				else 
+				{ 
+					PrPH[smp][sx][pro]=SmokingMarginalProbs[smp][sx][pro][2]/PrS[smp][sx][pro];
+				};
+			};
+		};
+	};
+
+	for ( sx= 0; sx< SIZE( SEX); sx++ ) 
+	{
+		ntot[sx]=0.0; // (d)
+		nhtot[sx]=0.0; // (d)
+		invntot[sx]=0.0; // (d)
+		invnhtot[sx]=0.0; // (d)
+		for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+		{
+ 			ntot[sx]+=SmokerEducationRR[sx][edu]; // sum of RRs
+ 			nhtot[sx]+=HeavySmokerEducationRR[sx][edu]; // sum of RRs
+ 			invntot[sx]+=(1/SmokerEducationRR[sx][edu]); // sum of 1/RRs
+ 			invnhtot[sx]+=(1/HeavySmokerEducationRR[sx][edu]); // sum of 1/RRs
+		};
+	};
+
+	for ( sx= 0; sx< SIZE( SEX); sx++ ) 
+	{
+		for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+			{
+ 				ntota[sx][edu]=(SmokerEducationRR[sx][edu]/ntot[sx])*3; // Average RR
+ 				nhtota[sx][edu]=(HeavySmokerEducationRR[sx][edu]/nhtot[sx])*3; // Average RR
+			};
+	};
+
+	double S, H;
+	double ML, MH, Non, Light, Heavy, newLight, newHeavy, newNon;
+	for ( smp= 0; smp< SIZE( SMOKING_PERIOD); smp++ ) 
+	{
+		for ( sx= 0; sx< SIZE(SEX); sx++ ) 
+		{
+			for ( pro= 0; pro< SIZE(CRM_PROVINCE); pro++ ) 
+			{
+				for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+				{
+					S = PrS[smp][sx][pro]*ntota[sx][edu]; 
+					H = PrPH[smp][sx][pro]*nhtota[sx][edu];
+
+					// Prevalence reduction of 15-19 year olds as sensitivity analysis 
+					// eg ML = 0.9 means 10% reduction in prevalence of light smokers
+					ML = MultiplierSmokingPrevalenceMarginals[smp][LIGHT_SMOKER_TYPE][sx][pro];
+					MH = MultiplierSmokingPrevalenceMarginals[smp][HEAVY_SMOKER_TYPE][sx][pro];
+					Non = (1-S);
+					Light = S * (1-H);
+					Heavy = S * H;
+					newLight = Light * ML;
+					newHeavy = Heavy * MH;
+					newNon = 1 - newLight - newHeavy; 
+					// If multipliers are greater than 1 (increased prevalence)
+					// it is possible to generate inconsistent distribution
+					// The following checks and rescales if this were to happen
+					if ( newNon < 0.0 ) 
+					{
+						newNon = 0.0;
+						newLight = newLight/(newLight+newHeavy);
+						newHeavy = newHeavy/(newLight+newHeavy);
+					}
+					/* Converting to single lookup of non, light and heavy smokers (BF) */
+					SmokingMarginalProbsAdjusted[smp][sx][pro][edu][NON_SMOKER]  = newNon;	// (1-S);
+					SmokingMarginalProbsAdjusted[smp][sx][pro][edu][LIGHT_SMOKER]= newLight;	// S * (1-H);
+					SmokingMarginalProbsAdjusted[smp][sx][pro][edu][HEAVY_SMOKER]= newHeavy;	// S * H;
+				};
+			};
+		};
+	};
+
+	for ( smp= 0; smp< SIZE(SMOKING_PERIOD); smp++ ) 
+	{
+		for (sx= 0; sx< SIZE(SEX); sx++ ) 
+		{
+			for (pro= 0; pro< SIZE(CRM_PROVINCE); pro++ ) 
+			{
+				for (agg= 0; agg< SIZE(AGE_GROUP20); agg++ ) 
+				{
+					for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+					{
+						SmTransProb[smp][sx][pro][agg][0][2][edu]=SmokingTransitionProbs[smp][sx][pro][agg][0][2]*SmokerEducationRR[sx][edu]/ntot[sx]*HeavySmokerEducationRR[sx][edu]/nhtot[sx]*9;
+						SmTransProb[smp][sx][pro][agg][0][1][edu]=SmokingTransitionProbs[smp][sx][pro][agg][0][1]*SmokerEducationRR[sx][edu]/ntot[sx]*3;
+						SmTransProb[smp][sx][pro][agg][0][0][edu]=SmokingTransitionProbs[smp][sx][pro][agg][0][0];
+						SmTransProb[smp][sx][pro][agg][1][2][edu]=SmokingTransitionProbs[smp][sx][pro][agg][1][2]*HeavySmokerEducationRR[sx][edu]/ntot[sx]*3;
+						SmTransProb[smp][sx][pro][agg][1][1][edu]=SmokingTransitionProbs[smp][sx][pro][agg][1][1];
+						SmTransProb[smp][sx][pro][agg][1][0][edu]=SmokingTransitionProbs[smp][sx][pro][agg][1][0]*(1/SmokerEducationRR[sx][edu])/invntot[sx]*3;
+						SmTransProb[smp][sx][pro][agg][2][2][edu]=SmokingTransitionProbs[smp][sx][pro][agg][2][2];
+						SmTransProb[smp][sx][pro][agg][2][1][edu]=SmokingTransitionProbs[smp][sx][pro][agg][2][1]*(1/HeavySmokerEducationRR[sx][edu])/invnhtot[sx]*3;
+						SmTransProb[smp][sx][pro][agg][2][0][edu]=SmokingTransitionProbs[smp][sx][pro][agg][2][0]*(1/HeavySmokerEducationRR[sx][edu])/invnhtot[sx]*(1/SmokerEducationRR[sx][edu])/invntot[sx]*9;
+					};
+				};
+			};
+		};
+	};
+
+
+	for ( smp= 0; smp< SIZE(SMOKING_PERIOD); smp++ ) 
+	{
+		for ( sx= 0; sx< SIZE(SEX); sx++ ) 
+		{
+			for (pro= 0; pro< SIZE(CRM_PROVINCE); pro++ ) 
+			{
+				for (agg= 0; agg< SIZE(AGE_GROUP20); agg++ ) 
+				{
+					for ( smsa= 0; smsa< SIZE(SMOKING_STATE); smsa++ ) 
+					{
+						for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+						{
+							SmTransProbT[smp][sx][pro][agg][smsa][edu]=0.0;
+							for ( smsb= 0; smsb< SIZE(SMOKING_STATE); smsb++ ) 
+
+							{
+								SmTransProbT[smp][sx][pro][agg][smsa][edu]+=SmTransProb[smp][sx][pro][agg][smsa][smsb][edu];
+							};	
+						}; 
+					};	
+				};	
+			};
+		};
+	};
+
+	
+
+	for ( smp= 0; smp< SIZE(SMOKING_PERIOD); smp++ ) 
+	{
+	for ( sx= 0; sx< SIZE(SEX); sx++ ) 
+	{
+		for (pro= 0; pro< SIZE(CRM_PROVINCE); pro++ ) 
+		{
+			for (agg= 0; agg< SIZE(AGE_GROUP20); agg++ ) 
+			{
+				for ( edu= 0; edu< SIZE(CRM_EDUCATION); edu++ ) 
+				{
+					for ( smsa= 0; smsa< SIZE(SMOKING_STATE); smsa++ ) 
+					{
+						if (SmTransProbT[smp][sx][pro][agg][smsa][edu]>0)
+						{
+							for ( smsb= 0; smsb< SIZE(SMOKING_STATE); smsb++ ) 
+							{
+								SmokingTransitionProbsAdjusted[smp][sx][pro][agg][smsa][edu][smsb] =
+										SmTransProb[smp][sx][pro][agg][smsa][smsb][edu] 
+									/ SmTransProbT[smp][sx][pro][agg][smsa][edu];
+							};
+						}
+						else
+						{
+							for ( smsb= 0; smsb< SIZE(SMOKING_STATE); smsb++ ) 
+							{
+								if (smsb==smsa)
+								{
+										SmokingTransitionProbsAdjusted[smp][sx][pro][agg][smsa][edu][smsb]=1.0;
+								}
+								else 
+								{
+									SmokingTransitionProbsAdjusted[smp][sx][pro][agg][smsa][edu][smsb]=0.0;
+								};
+							};
+						}
+					};	
+				};	
+			};	
+		};	
+	};	
+};	
+
+// INTERVENTION ADJUSTMENTS
+	// multiplier of mean
+	for ( int period = 0; period < SIZE(SMOKING_PERIOD); period++ ) 
+	{
+		for ( int nSmokType = 0; nSmokType< SIZE(SMOKER_TYPE); nSmokType++ ) 
+		{
+			for ( int nSex=0; nSex< SIZE(SEX); nSex++ ) 
+			{
+				for ( int prov= 0; prov< SIZE(CRM_PROVINCE); prov++ ) 
+				{
+					for ( int nAge= 0; nAge< SIZE(AGE3); nAge++ ) 
+					{
+						for ( int nTercile = 0; nTercile < SIZE(TERCILE); nTercile ++ ) 
+						{
+							CigarettesSmokedMeanAdjusted[period][nSmokType][nSex][prov][nAge][nTercile] = 
+								CigarettesSmokedMean[period][nSmokType][nSex][prov][nAge][nTercile] *
+								CigarettesSmokedMeanMultiplier[period][nSmokType][nSex][prov][nAge];
+						}
+					}
+				}
+			}
+		}
+	}
+
+	delete[] SmTransProb;
+	delete[] SmTransProbT;
+};

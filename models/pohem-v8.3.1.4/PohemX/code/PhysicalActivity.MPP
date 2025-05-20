@@ -1,0 +1,698 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Physical Activity Model
+/* FILE_NOTE(EN) 
+	This file updates the values (categories) of 4 physical activity variables at two year intervals. 
+	  It implements regressions of individual PA evolution observed in the longitudinal 
+	  National Population Health Survey (1994-2006). 
+	  BEGIN needs to be updated 
+	    This module can be deactived using 
+	    Intervention Parameters for BMI (see parameter "Risk Factor Control Panel").
+	  END needs to be updated 
+*/
+
+
+partition LTPA_4CAT_CUTOFFS { 0.0001, 0.5, 1.0 };
+partition METS4CAT			{ 0.0001, 1.5, 3.0 };     //EN METs categories
+
+classification LTPA_4CAT {	     //EN Leisure Time Physical Activity 
+	LTPA_NO,                     //EN No physical activity from leisure time
+	LTPA_0_30 ,                  //EN 0-30 minutes/day of physical activity from leisure time 
+	LTPA_30_60,                  //EN 30-60 minutes/day of physical activity from leisure time 
+	LTPA_60_plus                 //EN 60+ minutes/day of physical activity from leisure time 
+};
+classification BIKE_ERRANDS {    //EN Bikes for errands 
+	BIKE_NO,                     //EN Does not bike for errands
+	BIKE_YES                     //EN Bikes for errands
+};
+classification WALK_ERRANDS {    //EN Walks for errands 
+	WALK_NO,                     //EN Does not walk for errands
+	WALK_0_5 ,                   //EN Walks 0 to 5 hrs/week for errands
+	WALK_6_10,                   //EN Walks 6 to 10 hrs/week for errands
+	WALK_11_plus                 //EN Walks 11+ hrs/week for errands
+};
+classification PA_USUAL_DAY {    //EN Level of physical activity for usual day
+	SIT,                         //EN Usually sit
+	STAND_WALK ,                 //EN Stand or walk quite a lot 
+	LIFT,                        //EN Usually lift or carry light loads 
+	HEAVY_WORK                   //EN Do heavy work or carry very heavy loads
+};
+
+classification PA_INTERVENTION_RECRUITMENT {	//EN Overall program controls
+	PAIR_SEX,					//EN	Sex (0=female, 1=male, 2=both) 
+	PAIR_AGE_START,				//EN	Age start
+	PAIR_AGE_END,				//EN	Age end
+	PAIR_YEAR_START,			//EN	Year start
+	PAIR_YEAR_END,				//EN	Year end
+	PAIR_BMI_LOWER_BOUND,		//EN	BMI lower bound
+	PAIR_BMI_UPPER_BOUND,		//EN	BMI upper bound
+	PAIR_ASSIGN_IG				//EN	Assign intervention group (1,2,...,5)
+};
+
+range	PA_INTERVENTION_ELEMENT { 0, 19 }; //EN Physical activity intervention program element
+
+range   PA_INTERVENTION_GROUP { 1, 5 }; //EN Physical activity intervention group
+
+classification PA_MAIN_LINEAR_PREDICTOR {  //EN Main linear predictors
+	PA_MAIN_LP_INTERCEPT, //EN Intercept
+	PA_MAIN_LP_CALENDAR_TIME, //EN Calendar time
+	PA_MAIN_LP_FEMALE,  //EN Female
+	PA_MAIN_LP_MALE,  //EN Male
+	PA_MAIN_LP_ETHNICITY_WHITE, //EN Ethnicitiy white
+	PA_MAIN_LP_ETHNICITY_NONWHITE, //EN Ethnicitiy non-white
+	PA_MAIN_LP_ABORIGINAL_NO, //EN Not aboriginal
+	PA_MAIN_LP_ABORIGINAL_YES, //EN Aboriginal
+	PA_MAIN_LP_ATLANTIC, //EN Region: Atlantic
+	PA_MAIN_LP_QUEBEC,   //EN Region: Quebec
+	PA_MAIN_LP_ONTARIO,  //EN Region: Ontario
+	PA_MAIN_LP_PRAIRIES, //EN Region: Prairies
+	PA_MAIN_LP_BCregion, //EN Region: British Columbia
+	PA_MAIN_LP_EDUC1, //EN Education: < than secondary
+	PA_MAIN_LP_EDUC2, //EN Education: secondary graduate  
+	PA_MAIN_LP_EDUC3, //EN Education: other post-secondary  
+	PA_MAIN_LP_EDUC4, //EN Education: post-secondary graduate
+	PA_MAIN_LP_INCOME_Q1,	//EN Income quartile 1 (poorest)
+	PA_MAIN_LP_INCOME_Q2,	//EN Income quartile 2 (lower middle)
+	PA_MAIN_LP_INCOME_Q3,	//EN Income quartile 3 (upper middle)
+	PA_MAIN_LP_INCOME_Q4,   //EN Income quartile 4 (richest)
+	PA_MAIN_LP_AGE_GROUP10_LT30,   //EN 10 year age group : [0,30[
+	PA_MAIN_LP_AGE_GROUP10_30_40,  //EN 10 year age group : [30,40[
+	PA_MAIN_LP_AGE_GROUP10_40_50,  //EN 10 year age group : [40,50[
+	PA_MAIN_LP_AGE_GROUP10_50_60,  //EN 10 year age group : [50,60[
+	PA_MAIN_LP_AGE_GROUP10_60_70,  //EN 10 year age group : [60,70[
+	PA_MAIN_LP_AGE_GROUP10_70_80,  //EN 10 year age group : [70,80[
+	PA_MAIN_LP_AGE_GROUP10_80plus, //EN 10 year age group : 80+
+	PA_MAIN_LP_AGE_GROUP5_LT30, //EN 5 year age group : [0,30[
+	PA_MAIN_LP_AGE_GROUP5_30_35, //EN 5 year age group : [30,35[
+	PA_MAIN_LP_AGE_GROUP5_35_40, //EN 5 year age group : [35,40[
+	PA_MAIN_LP_AGE_GROUP5_40_45, //EN 5 year age group : [40,45[
+	PA_MAIN_LP_AGE_GROUP5_45_50, //EN 5 year age group : [45,50[
+	PA_MAIN_LP_AGE_GROUP5_50_55, //EN 5 year age group : [50,55[
+	PA_MAIN_LP_AGE_GROUP5_55_60, //EN 5 year age group : [55,60[
+	PA_MAIN_LP_AGE_GROUP5_60_65, //EN 5 year age group : [60,65[
+	PA_MAIN_LP_AGE_GROUP5_65_70, //EN 5 year age group : [65,70[
+	PA_MAIN_LP_AGE_GROUP5_70_75, //EN 5 year age group : [70,75[
+	PA_MAIN_LP_AGE_GROUP5_75_80, //EN 5 year age group : [75,80[
+	PA_MAIN_LP_AGE_GROUP5_80plus, //EN 5 year age group : 80+
+	PA_MAIN_LP_AGE_PAST_85,			//EN Age past 85
+	PA_MAIN_LP_BMI_CAT1, //EN BMI < 18.5
+	PA_MAIN_LP_BMI_CAT2, //EN 18.5 <= BMI < 25
+	PA_MAIN_LP_BMI_CAT3, //EN 25 <= BMI < 30
+	PA_MAIN_LP_BMI_CAT4, //EN 30 <= BMI < 35
+	PA_MAIN_LP_BMI_CAT5, //EN BMI >= 35
+    PA_MAIN_LP_ALCOHOL_NEVER,    //EN Alcohol: Never drank alcohol
+    PA_MAIN_LP_ALCOHOL_FORMER,   //EN Alcohol: Former drinker
+    PA_MAIN_LP_ALCOHOL_LIGHT ,   //EN Alcohol: Less than 2 drinks per week
+    PA_MAIN_LP_ALCOHOL_MODERATE, //EN Alcohol: 2-14 (2-9) drinks per week for male (female)
+    PA_MAIN_LP_ALCOHOL_HEAVY,    //EN Alcohol: More than 14 (9) drinks per week for male (female)
+	PA_MAIN_LP_NEVER_SMOKER,			//EN Never Smoker
+	PA_MAIN_LP_FORMER_SMOKER,			//EN Former Smoker
+	PA_MAIN_LP_CURRENT_SMOKER,			//EN Current Smoker
+	PA_MAIN_LP_DIAB_NO,						//EN No diabetes reported
+	PA_MAIN_LP_DIAB_YES	,					//EN Diabetes reported
+	PA_MAIN_LP_HEART_DISEASE_NO,						//EN No heart disease reported
+	PA_MAIN_LP_HEART_DISEASE_YES,						//EN Heart disease reported
+	PA_MAIN_LP_CC_COUNT_EX5_NONE, //EN No chronic condition (excluding OA, CA, HD, DB, HPB)
+	PA_MAIN_LP_CC_COUNT_EX5_1 , //EN One chronic condition (excluding OA, CA, HD, DB, HPB)
+	PA_MAIN_LP_CC_COUNT_EX5_2, //EN Two chronic conditions (excluding OA, CA, HD, DB, HPB)
+	PA_MAIN_LP_CC_COUNT_EX5_3plus, //EN Three or more chronic conditions (excluding OA, CA, HD, DB, HPB)
+	PA_MAIN_LP_LAG0_BIKE_NO,        //EN Biking for errands current: none
+	PA_MAIN_LP_LAG0_BIKE_YES,       //EN Biking for errands current: some
+	PA_MAIN_LP_LAG1_BIKE_NO,        //EN Biking for errands 2 years ago: none
+	PA_MAIN_LP_LAG1_BIKE_YES,       //EN Biking for errands 2 years ago: some
+	PA_MAIN_LP_LAG2_BIKE_NO,        //EN Biking for errands 4 years ago: none
+	PA_MAIN_LP_LAG2_BIKE_YES,       //EN Biking for errands 4 years ago: some
+	PA_MAIN_LP_LAG3_BIKE_NO,        //EN Biking for errands 6 years ago: none
+	PA_MAIN_LP_LAG3_BIKE_YES,       //EN Biking for errands 6 years ago: some
+	PA_MAIN_LP_LAG4_BIKE_NO,        //EN Biking for errands 8 years ago: none
+	PA_MAIN_LP_LAG4_BIKE_YES,       //EN Biking for errands 8 years ago: some
+	PA_MAIN_LP_LAG0_USUAL_DAY_SIT,                         //EN Usual day current: Sit
+	PA_MAIN_LP_LAG0_USUAL_DAY_STAND_WALK ,                 //EN Usual day current: Stand or walk quite a lot 
+	PA_MAIN_LP_LAG0_USUAL_DAY_LIFT,                        //EN Usual day current: Usually lift or carry light loads 
+	PA_MAIN_LP_LAG0_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day current: Do heavy work or carry very heavy loads
+	PA_MAIN_LP_LAG1_USUAL_DAY_SIT,                         //EN Usual day 2 years ago: Sit
+	PA_MAIN_LP_LAG1_USUAL_DAY_STAND_WALK ,                 //EN Usual day 2 years ago: Stand or walk quite a lot 
+	PA_MAIN_LP_LAG1_USUAL_DAY_LIFT,                        //EN Usual day 2 years ago: Usually lift or carry light loads 
+	PA_MAIN_LP_LAG1_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day 2 years ago: Do heavy work or carry very heavy loads
+	PA_MAIN_LP_LAG2_USUAL_DAY_SIT,                         //EN Usual day 4 years ago: Sit
+	PA_MAIN_LP_LAG2_USUAL_DAY_STAND_WALK ,                 //EN Usual day 4 years ago: Stand or walk quite a lot 
+	PA_MAIN_LP_LAG2_USUAL_DAY_LIFT,                        //EN Usual day 4 years ago: Usually lift or carry light loads 
+	PA_MAIN_LP_LAG2_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day 4 years ago: Do heavy work or carry very heavy loads
+	PA_MAIN_LP_LAG3_USUAL_DAY_SIT,                         //EN Usual day 6 years ago: Sit
+	PA_MAIN_LP_LAG3_USUAL_DAY_STAND_WALK ,                 //EN Usual day 6 years ago: Stand or walk quite a lot 
+	PA_MAIN_LP_LAG3_USUAL_DAY_LIFT,                        //EN Usual day 6 years ago: Usually lift or carry light loads 
+	PA_MAIN_LP_LAG3_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day 6 years ago: Do heavy work or carry very heavy loads
+	PA_MAIN_LP_LAG4_USUAL_DAY_SIT,                         //EN Usual day 8 years ago: Sit
+	PA_MAIN_LP_LAG4_USUAL_DAY_STAND_WALK ,                 //EN Usual day 8 years ago: Stand or walk quite a lot 
+	PA_MAIN_LP_LAG4_USUAL_DAY_LIFT,                        //EN Usual day 8 years ago: Usually lift or carry light loads 
+	PA_MAIN_LP_LAG4_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day 8 years ago: Do heavy work or carry very heavy loads
+	PA_MAIN_LP_LAG0_LTPA_NO,                     //EN physical activity from leisure time current: No 
+	PA_MAIN_LP_LAG0_LTPA_0_30 ,                  //EN physical activity from leisure time current: 0-30 minutes/day 
+	PA_MAIN_LP_LAG0_LTPA_30_60,                  //EN physical activity from leisure time current: 30-60 minutes/day 
+	PA_MAIN_LP_LAG0_LTPA_60_plus,                //EN physical activity from leisure time current: 60+ minutes/day 
+	PA_MAIN_LP_LAG1_LTPA_NO,                     //EN physical activity from leisure time 2 years ago: No 
+	PA_MAIN_LP_LAG1_LTPA_0_30 ,                  //EN physical activity from leisure time 2 years ago: 0-30 minutes/day 
+	PA_MAIN_LP_LAG1_LTPA_30_60,                  //EN physical activity from leisure time 2 years ago: 30-60 minutes/day 
+	PA_MAIN_LP_LAG1_LTPA_60_plus,                //EN physical activity from leisure time 2 years ago: 60+ minutes/day 
+	PA_MAIN_LP_LAG2_LTPA_NO,                     //EN physical activity from leisure time 4 years ago: No 
+	PA_MAIN_LP_LAG2_LTPA_0_30 ,                  //EN physical activity from leisure time 4 years ago: 0-30 minutes/day 
+	PA_MAIN_LP_LAG2_LTPA_30_60,                  //EN physical activity from leisure time 4 years ago: 30-60 minutes/day 
+	PA_MAIN_LP_LAG2_LTPA_60_plus,                //EN physical activity from leisure time 4 years ago: 60+ minutes/day 
+	PA_MAIN_LP_LAG3_LTPA_NO,                     //EN physical activity from leisure time 6 years ago: No 
+	PA_MAIN_LP_LAG3_LTPA_0_30 ,                  //EN physical activity from leisure time 6 years ago: 0-30 minutes/day 
+	PA_MAIN_LP_LAG3_LTPA_30_60,                  //EN physical activity from leisure time 6 years ago: 30-60 minutes/day 
+	PA_MAIN_LP_LAG3_LTPA_60_plus,                //EN physical activity from leisure time 6 years ago: 60+ minutes/day 
+	PA_MAIN_LP_LAG4_LTPA_NO,                     //EN physical activity from leisure time 8 years ago: No 
+	PA_MAIN_LP_LAG4_LTPA_0_30 ,                  //EN physical activity from leisure time 8 years ago: 0-30 minutes/day 
+	PA_MAIN_LP_LAG4_LTPA_30_60,                  //EN physical activity from leisure time 8 years ago: 30-60 minutes/day 
+	PA_MAIN_LP_LAG4_LTPA_60_plus,                //EN physical activity from leisure time 8 years ago: 60+ minutes/day 
+	PA_MAIN_LP_LAG0_WALK_NO,                     //EN Walk for errands current: None 
+	PA_MAIN_LP_LAG0_WALK_0_5 ,                   //EN Walk for errands current: 0 to 5 hrs/week
+	PA_MAIN_LP_LAG0_WALK_6_10,                   //EN Walk for errands current: 6 to 10 hrs/week 
+	PA_MAIN_LP_LAG0_WALK_11_plus,                //EN Walk for errands current: 11+ hrs/week 
+	PA_MAIN_LP_LAG1_WALK_NO,                     //EN Walk for errands 2 years ago: None 
+	PA_MAIN_LP_LAG1_WALK_0_5 ,                   //EN Walk for errands 2 years ago: 0 to 5 hrs/week
+	PA_MAIN_LP_LAG1_WALK_6_10,                   //EN Walk for errands 2 years ago: 6 to 10 hrs/week 
+	PA_MAIN_LP_LAG1_WALK_11_plus,                //EN Walk for errands 2 years ago: 11+ hrs/week 
+	PA_MAIN_LP_LAG2_WALK_NO,                     //EN Walk for errands 4 years ago: None 
+	PA_MAIN_LP_LAG2_WALK_0_5 ,                   //EN Walk for errands 4 years ago: 0 to 5 hrs/week
+	PA_MAIN_LP_LAG2_WALK_6_10,                   //EN Walk for errands 4 years ago: 6 to 10 hrs/week 
+	PA_MAIN_LP_LAG2_WALK_11_plus,                //EN Walk for errands 4 years ago: 11+ hrs/week 
+	PA_MAIN_LP_LAG3_WALK_NO,                     //EN Walk for errands 6 years ago: None 
+	PA_MAIN_LP_LAG3_WALK_0_5 ,                   //EN Walk for errands 6 years ago: 0 to 5 hrs/week
+	PA_MAIN_LP_LAG3_WALK_6_10,                   //EN Walk for errands 6 years ago: 6 to 10 hrs/week 
+	PA_MAIN_LP_LAG3_WALK_11_plus,                //EN Walk for errands 6 years ago: 11+ hrs/week 
+	PA_MAIN_LP_LAG4_WALK_NO,                     //EN Walk for errands 8 years ago: None 
+	PA_MAIN_LP_LAG4_WALK_0_5 ,                   //EN Walk for errands 8 years ago: 0 to 5 hrs/week
+	PA_MAIN_LP_LAG4_WALK_6_10,                   //EN Walk for errands 8 years ago: 6 to 10 hrs/week 
+	PA_MAIN_LP_LAG4_WALK_11_plus                 //EN Walk for errands 8 years ago: 11+ hrs/week 
+
+};
+
+classification MET_MODEL {   //EN MET model parameters
+	MET_MODEL_POWER,         //EN Power transformation
+	MET_MODEL_LOCATION ,     //EN Location
+	MET_MODEL_SCALE          //EN Scale
+};
+
+partition AGE_GROUP_from30_to80_by10	{ 30, 40, 50, 60, 70, 80 }; //EN Age group
+partition AGE_GROUP_from30_to80_by5  	{ 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80 };//EN Age group
+
+
+
+parameter_group pgPA_Parameters{ //EN Physical activity
+	pgPA_CONTROL,
+	pgPA_Interventions,
+	pgPA_Regression 
+};
+
+parameter_group pgPA_CONTROL { //EN Physicial activity control parameters
+	pgExpertPACONTROL
+};
+
+parameter_group pgPA_Interventions { //EN Physicial activity interventions
+  PA_intervention,
+  PaDispatcher,
+  LTPA_4CAT_transition,
+  PA_USUAL_DAY_transition,
+  WALK_ERRANDS_transition,
+  BIKE_ERRANDS_transition,
+  pgExpertPAInterventions
+};
+
+parameter_group pgPA_Regression { //EN Physical activity regression parameters
+ pgExpertPARegression
+};
+
+parameter_group pgExpertPACONTROL{ //EN Experts only
+	PA_MaxAutoRegressiveOrder,
+	PA_BootstrapIndexMultiplier,
+	PA_BootstrapOffset,
+	LTPA_4CAT_CalendarTimeCap,
+	PA_USUAL_DAY_CalendarTimeCap,
+	WALK_ERRANDS_CalendarTimeCap,
+	BIKE_ERRANDS_CalendarTimeCap
+};
+
+parameter_group pgExpertPAInterventions{ //EN Experts only
+	Isolate_core_PA
+	
+};
+
+parameter_group pgExpertPARegression{ //EN Experts only
+	LeisureTimeActivityLinearPred,
+	BikeErrandsMainLinearPred,
+	UsualDayMainLinearPred,
+	WalkErrandsMainLinearPred,
+	MetDistribution,
+	MetCorrelation
+};
+/*
+parameter_group pgPA_CONTROL{ //EN Physicial activity control parameters
+	PA_MaxAutoRegressiveOrder,
+	PA_BootstrapIndexMultiplier,
+	PA_BootstrapOffset,
+	LTPA_4CAT_CalendarTimeCap,
+	PA_USUAL_DAY_CalendarTimeCap ,
+	WALK_ERRANDS_CalendarTimeCap,
+	BIKE_ERRANDS_CalendarTimeCap
+};
+
+parameter_group pgPA_Interventions{ //EN Physicial activity interventions
+	PA_intervention,
+	Isolate_core_PA,
+	LTPA_4CAT_transition,
+	PA_USUAL_DAY_transition,
+	WALK_ERRANDS_transition,
+	BIKE_ERRANDS_transition
+};
+
+parameter_group pgPA_Regression{ //EN Physical activity regression parameters (NPHS)
+	LeisureTimeActivityLinearPred ,
+	BikeErrandsMainLinearPred     ,
+	UsualDayMainLinearPred        ,
+	WalkErrandsMainLinearPred
+};
+
+
+};*/
+parameters {
+	
+    /* NOTE ( PA_MaxAutoRegressiveOrder, EN )
+     We have models of different auto-regressive order.
+	   order 1: PA(t) modeled from PA(t-2) and other covariates
+	   order 2: PA(t) modeled from PA(t-2) , PA(t-4) and other covariates 
+	   order 3: PA(t) modeled from PA(t-2) , PA(t-4) , PA(t-6) and other covariates 
+	   etc ...
+	   The first PA generated is from a model of auto-regressive order 1, the second PA from order 2, etc...
+	   At some point, we keep the same model as indicated by "PA_MaxAutoRegressiveOrder". Default value is 4.
+    */
+	int PA_MaxAutoRegressiveOrder;  //EN Order of auto-regressive model used by default
+    int	PA_BootstrapIndexMultiplier; //EN Allow the use of bootstrap replicates (1) or not (0)
+    int	PA_BootstrapOffset; //EN First bootstrap replicate to be used
+
+	
+	double	LTPA_4CAT_CalendarTimeCap ;    //EN Cap on time trend for leasure time physical activity (LTPA)
+	double	PA_USUAL_DAY_CalendarTimeCap ; //EN Cap on time trend for usual day activity level
+	double	WALK_ERRANDS_CalendarTimeCap ; //EN Cap on time trend for walking for errends
+	double	BIKE_ERRANDS_CalendarTimeCap ; //EN Cap on time trend for biking for errends
+	
+
+	double PaDispatcher[PA_INTERVENTION_RECRUITMENT][PA_INTERVENTION_ELEMENT]; //EN Physical activity dispatcher
+	
+	double LeisureTimeActivityLinearPred [BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][LTPA_4CAT   ][PA_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for auto-regressive model for leisure time physical activity
+	double BikeErrandsMainLinearPred     [BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][BIKE_ERRANDS][PA_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for auto-regressive model for usual day level of activity
+	double UsualDayMainLinearPred        [BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][PA_USUAL_DAY][PA_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for auto-regressive model for leisure time physical activity
+	double WalkErrandsMainLinearPred     [BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][WALK_ERRANDS][PA_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for auto-regressive model for walking for errands
+
+	double MetDistribution               [SEX][AGE_GROUP_from30_to80_by10][LTPA_4CAT][MET_MODEL]; //EN Physical activity MET model parameter
+	double MetCorrelation ; //EN Correlation in the MET percentile
+	
+	logical PA_intervention;  //EN Switch for physical activity intervention
+	logical Isolate_core_PA;  //EN Physical activity intervention does not feed back in equation for physical activity
+	// double /*cumrate*/ LTPA_4CAT_transition[LTPA_4CAT][LTPA_4CAT];          //EN Transition matrix to implement intervention on leisure time physical activity
+	// double /*cumrate*/ PA_USUAL_DAY_transition[PA_USUAL_DAY][PA_USUAL_DAY]; //EN Transition matrix to implement intervention on usual day level of activity
+	// double /*cumrate*/ WALK_ERRANDS_transition[WALK_ERRANDS][WALK_ERRANDS]; //EN Transition matrix to implement intervention on walking for errands
+	// double /*cumrate*/ BIKE_ERRANDS_transition[BIKE_ERRANDS][BIKE_ERRANDS]; //EN Transition matrix to implement intervention on biking for errands
+	cumrate LTPA_4CAT_transition[PA_INTERVENTION_GROUP][LTPA_4CAT][LTPA_4CAT];          //EN Transition matrix to implement intervention on leisure time physical activity
+	cumrate PA_USUAL_DAY_transition[PA_INTERVENTION_GROUP][PA_USUAL_DAY][PA_USUAL_DAY]; //EN Transition matrix to implement intervention on usual day level of activity
+	cumrate WALK_ERRANDS_transition[PA_INTERVENTION_GROUP][WALK_ERRANDS][WALK_ERRANDS]; //EN Transition matrix to implement intervention on walking for errands
+	cumrate BIKE_ERRANDS_transition[PA_INTERVENTION_GROUP][BIKE_ERRANDS][BIKE_ERRANDS]; //EN Transition matrix to implement intervention on biking for errands
+};
+
+
+
+actor Person            // Core Individual
+{
+
+/*
+  There are two stochastic processes: 
+   i)  PA This is what other equations (e.g. mortality) should use
+   ii) PA_core is meant to be the processes arising from the auto-regressive equations.
+       It may or may not be isolated from the intervention (depending on the value of Isolate_core_PA)
+  We do the following four steps
+  1 ) Update PA_core based on its past values and the auto-regressive model
+  2 ) Copy PA_core into PA
+  3 ) Let intervention alter PA 
+  4 ) If Isolate_core_PA is FALSE, Copy PA into PA_core
+  There are three different possibility
+  A ) PA_intervention == FALSE
+      PA_core is the result of the auto-regressive model only. PA is a copy of PA_core 
+  B ) PA_intervention == TRUE and Isolate_core_PA == TRUE
+      PA_core is the result of the auto-regressive model only (should be the same as in case A).
+	  PA != PA_core .  PA has been altered by intervention but PA_core is not affected by the intervention
+  C)  PA_intervention == TRUE and Isolate_core_PA == FALSE
+      Like B) but at the outcome of the intervention is fed back in PA_core so that PA and PA_core are identical
+      
+*/
+
+/* The core PA are the value of the PA coming for the model 
+	   The non-core PA is the core PA possibly altered by an intervention */
+
+	LTPA_4CAT           gLTPA_cat;          //EN Self-reported Leisure Time Physical Activity 
+	BIKE_ERRANDS        gBike_errands;      //EN Self-reported Commuting by bike for errands
+	WALK_ERRANDS        gWalk_errands;      //EN Self-reported Commuting by foot for errands
+	PA_USUAL_DAY        gPA_usual_day;      //EN Self-reported Level of physical activity for usual day	
+	LTPA_4CAT           gLTPA_cat_core;     //EN Self-reported Leisure Time Physical Activity 
+	BIKE_ERRANDS        gBike_errands_core; //EN Self-reported Commuting by bike for errands
+	WALK_ERRANDS        gWalk_errands_core; //EN Self-reported Commuting by foot for errands
+	PA_USUAL_DAY        gPA_usual_day_core; //EN Self-reported Level of physical activity for usual day
+	LTPA_4CAT  			gLTPA_cat_before_update     ;//EN Self-reported Leisure Time Physical Activity 
+	BIKE_ERRANDS		gBike_errands_before_update ;//EN Self-reported Commuting by bike for errands
+	WALK_ERRANDS		gWalk_errands_before_update ;//EN Self-reported Commuting by foot for errands
+	PA_USUAL_DAY		gPA_usual_day_before_update ;//EN Self-reported Level of physical activity for usual day	
+
+	LTPA_4CAT    Histo_LTPA_cat    [AR_ORDER_INDEX_4];  //EN history of PA_core (LTPA)
+	BIKE_ERRANDS Histo_bike_errands[AR_ORDER_INDEX_4];  //EN history of PA_core (BIKE)
+	WALK_ERRANDS Histo_walk_errands[AR_ORDER_INDEX_4];  //EN history of PA_core (WALK)
+	PA_USUAL_DAY Histo_pa_usual_day[AR_ORDER_INDEX_4];  //EN history of PA_core (PA_USUAL_DAY)
+
+	int    pa_bootstrap_index={0};      //EN Parameter set for physical activity equations
+
+	//double gBMI4PA = BmiSourceIsPhac ? gBMI_PHAC :  gBMI;
+	double gBMI4PA =  gBMI_PHAC ;
+
+	double cauchy_met_static ;
+	double cauchy_met_iid ;
+
+//	double uniform_for_met = pcauchy( MetCorrelation*cauchy_met_static + (1-std::abs(MetCorrelation))*cauchy_met_iid ,0,1);
+	double uniform_for_met = UpdateUniformForMet(cauchy_met_static,cauchy_met_iid);
+
+	int    age_group_from_30_to_80_by_10 = split(truncated_age,AGE_GROUP_from30_to80_by10);
+	double physical_activity_met = uniform_for_met == 0.0 ? 0.0 :  //modgen seems to evaluate this too early  (uniform_for_met==0)  so handle this here
+		                           pow(    MetDistribution[sex][age_group_from_30_to_80_by_10][gLTPA_cat][MET_MODEL_LOCATION] 
+	                                     - MetDistribution[sex][age_group_from_30_to_80_by_10][gLTPA_cat][MET_MODEL_SCALE] * log(uniform_for_met) ,
+						               1.0/MetDistribution[sex][age_group_from_30_to_80_by_10][gLTPA_cat][MET_MODEL_POWER] ) ; // icitte_May2019 should use gLTPA_cat or gLTPA_cat_after_DPP ??
+	
+	double ComputePhysicalActivityLinearPredictor(const double * Coefficients, double CalendarTimeCap);
+	void   ApplyPhysicalActivityRegressionEquations();
+
+	void PhysicalActivityFirstUpdate(); // Things to be done the first time around
+	void UpdatePhysicalActivity();
+	hook UpdatePhysicalActivity, RiskFactorsUpdatesEmptyHub, 30; // 30 = execution number, the higher the value, the later the execution
+
+	void InitializePhysicalActivity();
+	hook InitializePhysicalActivity, InitializationEmptyHub,  0; // 0 = execution number, the higher the value, the later the execution.    execution number no spelled out so that warning will be generated if additional hook added
+
+	void ReadFromStartPopPhysicalActivity();
+	hook ReadFromStartPopPhysicalActivity,ReadFromStartPop, 100; // 100 = execution number, the higher the value, the later the execution
+};
+
+
+
+double UpdateUniformForMet(double cauchy_static, double cauchy_iid)
+{
+	return pcauchy( MetCorrelation*cauchy_static + (1-std::abs(MetCorrelation))*cauchy_iid ,0,1);;
+}
+
+void  Person::ReadFromStartPopPhysicalActivity()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	double  ltpa_continous = record_to_be_read[cDb_PA_LTPA] ;
+	gLTPA_cat    = ( LTPA_4CAT    ) SPLIT(ltpa_continous,LTPA_4CAT_CUTOFFS);
+	gWalk_errands= ( WALK_ERRANDS ) int(record_to_be_read[cDb_PA_walk2job]);
+	gBike_errands= ( BIKE_ERRANDS ) int(record_to_be_read[cDb_PA_bike2job]);
+	gPA_usual_day= ( PA_USUAL_DAY ) int(record_to_be_read[cDb_PA_UsualDay]);
+	//gLTPA_cat    = ( LTPA_4CAT    ) int(record_to_be_read[cDb_PA_LTPA]);	cDb_PA_LTPA now contains continous time (e.g. 0.45 hours/day), not category
+	
+    gLTPA_cat_core     =gLTPA_cat;    
+	gBike_errands_core =gBike_errands; 
+	gWalk_errands_core =gWalk_errands; 
+	gPA_usual_day_core =gPA_usual_day;
+	gLTPA_cat_before_update     = gLTPA_cat;
+	gBike_errands_before_update = gBike_errands;
+	gWalk_errands_before_update = gWalk_errands;
+	gPA_usual_day_before_update = gPA_usual_day;
+};
+
+
+
+
+
+double Person::ComputePhysicalActivityLinearPredictor(const double * Coefficients, double CalendarTimeCap)
+{
+	return
+		Coefficients[PA_MAIN_LP_INTERCEPT                                                            ] 
+	  + Coefficients[PA_MAIN_LP_CALENDAR_TIME                                                        ]* (min(time, CalendarTimeCap) -1992.0)
+	  + Coefficients[PA_MAIN_LP_ABORIGINAL_NO      + gAboriginal                                     ]
+	  + Coefficients[PA_MAIN_LP_AGE_GROUP10_LT30   + age_group_from_30_to_80_by_10 ]
+	  + Coefficients[PA_MAIN_LP_AGE_GROUP5_LT30    + SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)  ]
+	  + Coefficients[PA_MAIN_LP_BMI_CAT1           + SPLIT(gBMI4PA ,BMI5CAT)                         ]
+	  + Coefficients[PA_MAIN_LP_CC_COUNT_EX5_NONE  + gCC_count_ex5_cap3                              ]
+	  + Coefficients[PA_MAIN_LP_ALCOHOL_NEVER      + gAlcohol5                                       ]
+	  + Coefficients[PA_MAIN_LP_EDUC1              + gEducation                                      ]
+	  + Coefficients[PA_MAIN_LP_DIAB_NO            + gDiabetes_PA                                    ]
+	  + Coefficients[PA_MAIN_LP_HEART_DISEASE_NO   + gHeartDisease_PA                                ]
+	  + Coefficients[PA_MAIN_LP_INCOME_Q1          + gIncomeQuartile                                 ]
+	  + Coefficients[PA_MAIN_LP_FEMALE             + sex                                             ]
+	  + Coefficients[PA_MAIN_LP_ETHNICITY_WHITE    + gEthnicityNonWhite                              ]
+	  + Coefficients[PA_MAIN_LP_ATLANTIC           + gRegion                                         ]
+	  + Coefficients[PA_MAIN_LP_NEVER_SMOKER       + smoking_cancer_dynamic                                      ]
+	  + Coefficients[PA_MAIN_LP_AGE_PAST_85                                                          ]  * (max(truncated_age,85.0) -85.0)
+	  + Coefficients[PA_MAIN_LP_LAG4_BIKE_NO       + Histo_bike_errands[3]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG3_BIKE_NO       + Histo_bike_errands[2]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG2_BIKE_NO       + Histo_bike_errands[1]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG1_BIKE_NO       + Histo_bike_errands[0]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG0_BIKE_NO       + gBike_errands_core                              ]
+	  + Coefficients[PA_MAIN_LP_LAG4_USUAL_DAY_SIT + Histo_pa_usual_day[3]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG3_USUAL_DAY_SIT + Histo_pa_usual_day[2]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG2_USUAL_DAY_SIT + Histo_pa_usual_day[1]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG1_USUAL_DAY_SIT + Histo_pa_usual_day[0]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG0_USUAL_DAY_SIT + gPA_usual_day_core                              ]
+	  + Coefficients[PA_MAIN_LP_LAG4_LTPA_NO       + Histo_LTPA_cat[3]                               ]
+	  + Coefficients[PA_MAIN_LP_LAG3_LTPA_NO       + Histo_LTPA_cat[2]                               ]
+	  + Coefficients[PA_MAIN_LP_LAG2_LTPA_NO       + Histo_LTPA_cat[1]                               ]
+	  + Coefficients[PA_MAIN_LP_LAG1_LTPA_NO       + Histo_LTPA_cat[0]                               ]
+	  + Coefficients[PA_MAIN_LP_LAG0_LTPA_NO       + gLTPA_cat_core                                  ]
+	  + Coefficients[PA_MAIN_LP_LAG4_WALK_NO       + Histo_walk_errands[3]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG3_WALK_NO       + Histo_walk_errands[2]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG2_WALK_NO       + Histo_walk_errands[1]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG1_WALK_NO       + Histo_walk_errands[0]                           ]
+	  + Coefficients[PA_MAIN_LP_LAG0_WALK_NO       + gWalk_errands_core                              ] 
+	  ;
+
+}
+
+	
+
+
+void hook_PhysicalActivityFirstUpdate() {};
+
+void Person::PhysicalActivityFirstUpdate() // Things to be done the first time around
+{
+   	
+		/* does not work for some unknown reason
+       for (int i=0; i<SIZE( AR_ORDER_INDEX_4 ); i++ )
+	   { 
+	     Histo_LTPA_cat[(AR_ORDER_INDEX_4)i]=    gLTPA_cat;
+	     Histo_bike_errands[(AR_ORDER_INDEX_4)i]=gBike_errands;
+	     Histo_walk_errands[i]=gWalk_errands;
+	     Histo_pa_usual_day[i]=gPA_usual_day;
+	   }
+	   */
+		
+	// Initialize the history of the PA_core
+	// Note that the first time around PA==PA_core so that we can use either gLTPA_cat or gLTPA_cat_core
+       Histo_LTPA_cat[0]=gLTPA_cat;
+       Histo_LTPA_cat[1]=gLTPA_cat;
+       Histo_LTPA_cat[2]=gLTPA_cat;
+       Histo_LTPA_cat[3]=gLTPA_cat;
+
+	   Histo_bike_errands[0]=gBike_errands;
+	   Histo_bike_errands[1]=gBike_errands;
+	   Histo_bike_errands[2]=gBike_errands;
+	   Histo_bike_errands[3]=gBike_errands;
+
+	   Histo_walk_errands[0]=gWalk_errands;
+	   Histo_walk_errands[1]=gWalk_errands;
+	   Histo_walk_errands[2]=gWalk_errands;
+	   Histo_walk_errands[3]=gWalk_errands;
+
+	   Histo_pa_usual_day[0]=gPA_usual_day;
+	   Histo_pa_usual_day[1]=gPA_usual_day;
+	   Histo_pa_usual_day[2]=gPA_usual_day;
+	   Histo_pa_usual_day[3]=gPA_usual_day;
+
+			  
+	   pa_bootstrap_index =PA_BootstrapOffset + PA_BootstrapIndexMultiplier*(GetCaseSample() % (SIZE(BOOTSTRAP_INDEX_39)-PA_BootstrapOffset));
+
+	   hook_PhysicalActivityFirstUpdate();			
+}
+
+void hook_ApplyPhysicalActivityRegressionEquations() {};
+
+void Person::ApplyPhysicalActivityRegressionEquations() 
+{
+	int		PA_ar_order;
+
+    PA_ar_order = (truncated_age-(lifespan_age_start+timing_first_update))/2;
+	PA_ar_order = min( PA_ar_order, PA_MaxAutoRegressiveOrder-1 );
+	PA_ar_order = min( PA_ar_order, SIZE( AR_ORDER_INDEX_4 )  - 1 );
+
+
+	 //BEGIN Update PA_core based on its past values and the auto-regressive model
+
+	 double	p_next_bike[SIZE(BIKE_ERRANDS)];//={1.0,1.0};
+	 double	p_next_walk[SIZE(WALK_ERRANDS)];//={1.0,1.0,0.0,1.0};	
+	 double	p_next_usual_day[SIZE(PA_USUAL_DAY)];//={1.0,2.0,4.0,3.0};
+	 double	p_next_LTPA_cat[SIZE(LTPA_4CAT)];//={1.0,0.0};
+  
+
+    for (int i=0; i<SIZE( BIKE_ERRANDS ); i++ )
+	{ 
+	   p_next_bike[i]= ComputePhysicalActivityLinearPredictor(BikeErrandsMainLinearPred[pa_bootstrap_index][PA_ar_order][i] , BIKE_ERRANDS_CalendarTimeCap);
+	   p_next_bike[i]= exp(p_next_bike[i]);
+	}
+	gBike_errands_core=(BIKE_ERRANDS) pps_sampling(RandUniform( 109), p_next_bike, SIZE(BIKE_ERRANDS));
+	
+
+    for (int i=0; i<SIZE( WALK_ERRANDS ); i++ )
+	{
+	   p_next_walk[i]= ComputePhysicalActivityLinearPredictor(WalkErrandsMainLinearPred[pa_bootstrap_index][PA_ar_order][i] , WALK_ERRANDS_CalendarTimeCap);
+	   p_next_walk[i]= exp(p_next_walk[i]);
+	}
+	gWalk_errands_core=(WALK_ERRANDS) pps_sampling(RandUniform( 110), p_next_walk, SIZE(WALK_ERRANDS));
+	
+	  
+    for (int i=0; i<SIZE( PA_USUAL_DAY ); i++ )
+	{
+	   p_next_usual_day[i]= ComputePhysicalActivityLinearPredictor(UsualDayMainLinearPred[pa_bootstrap_index][PA_ar_order][i] , PA_USUAL_DAY_CalendarTimeCap);
+	   p_next_usual_day[i]= exp(p_next_usual_day[i]);
+	}
+	gPA_usual_day_core=(PA_USUAL_DAY) pps_sampling(RandUniform( 111), p_next_usual_day, SIZE(PA_USUAL_DAY));
+	
+    
+    for (int i=0; i<SIZE( LTPA_4CAT ); i++ )
+	{
+	   p_next_LTPA_cat[i]= ComputePhysicalActivityLinearPredictor(LeisureTimeActivityLinearPred[pa_bootstrap_index][PA_ar_order][i], LTPA_4CAT_CalendarTimeCap);
+	   p_next_LTPA_cat[i]= exp(p_next_LTPA_cat[i]);
+	}
+	gLTPA_cat_core=(LTPA_4CAT) pps_sampling(RandUniform( 112), p_next_LTPA_cat, SIZE(LTPA_4CAT));
+
+    //END Update PA_core based on its past values and the auto-regressive model
+
+	// Debug script
+	if( EcrireDebugLogEntry == 95 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND] )
+	{
+		char line[999];
+		snprintf( line, 999, "%i, %15.1f, %15.1f, %i, %i, %15.1f, %15.1f, %15.1f, %15.1f \n", int( case_id ), double( case_seed ), double(time), int( lifespan_age_start ), int( truncated_age ), double( p_next_bike[1] ), double( p_next_walk[1] ), double( p_next_usual_day[1] ), double( p_next_LTPA_cat[1] ) );
+		WriteDebugLogEntry( line );
+	}
+
+	hook_ApplyPhysicalActivityRegressionEquations();
+};
+
+void hook_UpdatePhysicalActivity() {};
+
+void Person::UpdatePhysicalActivity()  
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if ((truncated_age-lifespan_age_start) == timing_first_update) // need to initialize history (could be done in Person::Start?)
+	{
+		PhysicalActivityFirstUpdate();
+	}
+	
+	if (due_for_biennial_update)
+	{
+		cauchy_met_iid = qcauchy(RandUniform(9),0,1);
+
+		gLTPA_cat_before_update     = gLTPA_cat;
+		gBike_errands_before_update = gBike_errands;
+		gWalk_errands_before_update = gWalk_errands;
+		gPA_usual_day_before_update = gPA_usual_day;
+		
+		ApplyPhysicalActivityRegressionEquations();  //Updates gBike_errands_core, gWalk_errands_core, gPA_usual_day_core, gLTPA_cat_core
+
+		// Debug script
+		if( EcrireDebugLogEntry == 94 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND] )
+		{
+			char line[999];
+			snprintf( line, 999, "%i, %15.1f, %15.1f, %i, %i, %15.1f, %15.1f, %15.1f, %15.1f \n", int( case_id ), double( case_seed ), double(time), int( lifespan_age_start ), int( truncated_age ), double( gBike_errands_core ), double( gWalk_errands_core ), double( gPA_usual_day_core ), double( gLTPA_cat_core ) );
+			WriteDebugLogEntry( line );
+		}
+		
+		// Copy PA_core into PA
+		gBike_errands=gBike_errands_core;
+		gWalk_errands=gWalk_errands_core;
+		gPA_usual_day=gPA_usual_day_core;
+		gLTPA_cat    =gLTPA_cat_core    ;   
+		
+		// Let intervention alter PA 
+		int intervention_group = -1;
+		int nElement = 0; 
+		while ( nElement < SIZE( PA_INTERVENTION_ELEMENT )  && intervention_group < 0 )
+		{
+			if (        year >= PaDispatcher[PAIR_YEAR_START][nElement]       && year     <= PaDispatcher[PAIR_YEAR_END][nElement] && 
+				integer_age  >= PaDispatcher[PAIR_AGE_START][nElement] && integer_age     <= PaDispatcher[PAIR_AGE_END][nElement] &&
+				gBMI_PHAC    >= PaDispatcher[PAIR_BMI_LOWER_BOUND][nElement] && gBMI_PHAC <= PaDispatcher[PAIR_BMI_UPPER_BOUND][nElement] &&
+				( sex == PaDispatcher[PAIR_SEX][nElement] || PaDispatcher[PAIR_SEX][nElement] == 2 ) 
+				)
+			{
+				// Record the proper element 
+				intervention_group = (int) PaDispatcher[PAIR_ASSIGN_IG][nElement];
+			}
+			nElement++;
+		}	
+
+		if( PA_intervention && intervention_group >= 0 )
+		{
+			int entier_for_lookup;
+			PA_INTERVENTION_GROUP intervention_group2 = (PA_INTERVENTION_GROUP) intervention_group;
+			// Lookup_BIKE_ERRANDS_transition( RandUniform( 113), intervention_group - 1, gBike_errands, &entier_for_lookup  );
+			Lookup_BIKE_ERRANDS_transition( RandUniform( 113), RANGE_POS(PA_INTERVENTION_GROUP, intervention_group2), gBike_errands, &entier_for_lookup  );
+			gBike_errands=(BIKE_ERRANDS) entier_for_lookup ;
+			
+			Lookup_WALK_ERRANDS_transition( RandUniform( 114), RANGE_POS(PA_INTERVENTION_GROUP, intervention_group2), gWalk_errands, &entier_for_lookup  );
+			gWalk_errands=(WALK_ERRANDS) entier_for_lookup ;
+			
+			Lookup_PA_USUAL_DAY_transition( RandUniform( 115), RANGE_POS(PA_INTERVENTION_GROUP, intervention_group2), gPA_usual_day, &entier_for_lookup  );
+			gPA_usual_day=(PA_USUAL_DAY) entier_for_lookup ;
+			
+			Lookup_LTPA_4CAT_transition( RandUniform( 116), RANGE_POS(PA_INTERVENTION_GROUP, intervention_group2), gLTPA_cat, &entier_for_lookup  );
+			gLTPA_cat=(LTPA_4CAT) entier_for_lookup ;
+			
+			// If Isolate_core_PA is FALSE, Copy PA into PA_core
+			if(!Isolate_core_PA)
+			{
+				gBike_errands_core=gBike_errands;
+				gWalk_errands_core=gWalk_errands;
+				gPA_usual_day_core=gPA_usual_day;
+				gLTPA_cat_core    =gLTPA_cat    ;   
+			}
+		}
+		
+		// Update PA_core history
+
+		for (int i=SIZE( AR_ORDER_INDEX_4 )-1; i>0; i-- )
+		{
+			Histo_LTPA_cat[i]=Histo_LTPA_cat[i-1];
+			Histo_bike_errands[i]=Histo_bike_errands[i-1];
+			Histo_walk_errands[i]=Histo_walk_errands[i-1];
+			Histo_pa_usual_day[i]=Histo_pa_usual_day[i-1];
+		}
+		Histo_LTPA_cat[0]=gLTPA_cat_core;
+		Histo_bike_errands[0]=gBike_errands_core;
+		Histo_walk_errands[0]=gWalk_errands_core;
+		Histo_pa_usual_day[0]=gPA_usual_day_core; 
+		
+
+	}//EN if (due_for_biennial_update)
+
+	hook_UpdatePhysicalActivity();
+}	
+
+void hook_InitializePhysicalActivity() {};
+
+void Person::InitializePhysicalActivity() 
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	cauchy_met_static = qcauchy(RandUniform(143),0,1); // will not change in the course of the simulation
+	cauchy_met_iid    = qcauchy(RandUniform(144),0,1);
+
+	hook_InitializePhysicalActivity();
+};
+

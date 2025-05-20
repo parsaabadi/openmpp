@@ -1,0 +1,320 @@
+﻿#include "pohem.h"
+//FILE_LABEL (EN) STROKE_CVDPoRT
+/* FILE_NOTE(EN)
+
+This file implements cardiovascular (STROKE) disease incidence calculation using the CVDPoRT algorithm.
+*/
+
+// Customized "include"
+// Structure of MPP Files
+// classifications, ranges, partitions-- Classifications for CVDPoRT are contained in the AMI_CVDPORT.mpp
+// Parameters
+// Person state variable declarations
+// (functions)
+// Person Events
+// Presimulation code
+
+parameter_group pgSTROKE_CVDPoRT{		//EN Stroke modelled with CVDPoRT
+	CvdportStrokeBaseline,
+	CvdportStrokeLogBaseCumulativeHazard,
+	CvdportStrokeMainTermsMeans,
+	CvdportStrokeMainTermsCoefficients,
+	CvdportStrokeInteractionCoefficients,
+	CvdportStrokeAgeSplineLocationCoef,
+	CvdportStrokeAgeSplineCompanion,
+	CvdportStrokePackYearsSplineLocationCoef,
+	CvdportStrokePackYearsSplineCompanion,
+	CvdportStrokeDrinksSplineLocationCoef,
+	CvdportStrokeDrinksSplineCompanion,
+	CvdportStrokeMetsSplineLocationCoef,
+	CvdportStrokeMetsSplineCompanion,
+	CvdportStrokeBmiSplineLocationCoef,
+	CvdportStrokeBmiSplineCompanion,
+	CVDportStrokeAlterationSpecs,
+	CVDportStrokeAlterationSpecsBeforeSlope,
+	CVDportStrokeAlterationSpecsAfterSlope,
+	CVDportStrokeTemporalBendingPoint,
+	CVDportStrokeAlterationSpecsAppliesToPrevalenceFixSR,
+	pgSTROKE_CVDPoRT_Calibration_Inputs
+
+};
+
+
+
+classification CVDPORT_STROKE_STATE{	//EN CVDPoRT Stroke state
+	CVDPORT_STROKE_NO,						//EN No Stroke
+	CVDPORT_STROKE_YES                   //EN Stroke
+
+};
+// Stroke
+
+parameters{
+
+double  CvdportStrokeLogBaseCumulativeHazard[SEX][COORDINATES_X_Y][SCATTER_PLOT_ELEMENTS];//EN CVDPoRT-Stroke log baseline cumulative hazard
+double  CvdportStrokeBaseline[SEX]; //EN CVDPoRT-Stroke 5 year baseline cumulative hazard
+double	CvdportStrokeMainTermsMeans[SEX][CVDPORT_MAIN_TERMS]; //EN CVDPoRT-Stroke main non-spline terms means 
+double	CvdportStrokeMainTermsCoefficients[SEX][CVDPORT_MAIN_TERMS]; //EN CVDPoRT-Stroke main non-spline terms coefficients
+double	CvdportStrokeInteractionCoefficients[SEX][CVDPORT_INTERACTION_TERMS]; //EN CVDPoRT-Stroke interaction terms
+
+double  CvdportStrokeAgeSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN CVDPoRT-Stroke age cubic spline coefficients 
+double  CvdportStrokeAgeSplineCompanion[SEX][CUBIC_SPLINE_COMPANION];                                             //EN CVDPoRT-Stroke age cubic spline companion 
+
+double  CvdportStrokePackYearsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN CVDPoRT-Stroke pack years cubic spline coefficients 
+double  CvdportStrokePackYearsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION];                                             //EN CVDPoRT-Stroke pack years cubic spline companion 
+
+double  CvdportStrokeDrinksSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN CVDPoRT-Stroke drinks last week cubic spline coefficients 
+double  CvdportStrokeDrinksSplineCompanion[SEX][CUBIC_SPLINE_COMPANION];                                             //EN CVDPoRT-Stroke drinks last week cubic spline companion 
+
+double  CvdportStrokeMetsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN CVDPoRT-Stroke METs cubic spline coefficients 
+double  CvdportStrokeMetsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION];                                             //EN CVDPoRT-Stroke METs cubic spline companion 
+
+double  CvdportStrokeBmiSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN CVDPoRT-Stroke BMI cubic spline coefficients 
+double  CvdportStrokeBmiSplineCompanion[SEX][CUBIC_SPLINE_COMPANION];                                             //EN CVDPoRT-Stroke BMI cubic spline companion 
+
+double  CVDportStrokeAlterationSpecs[SEX][FROM_25_TO_90_BY_5];    //EN Alteration of CVDPoRT-Stroke log hazard by sex and age
+logical CVDportStrokeAlterationSpecsAppliesToPrevalenceFixSR ;    //EN Use altered CVDPoRT-Stroke log hazard in correction for initial stroke prevalence
+
+int  CVDportStrokeTemporalBendingPoint; //EN Label for CVDportStrokeTemporalBendingPoint
+
+double  CVDportStrokeAlterationSpecsBeforeSlope[SEX][FROM_25_TO_90_BY_5];    //EN Label for CVDportStrokeAlterationSpecsBeforeSlope
+double  CVDportStrokeAlterationSpecsAfterSlope[SEX][FROM_25_TO_90_BY_5];    //EN Label for CVDportStrokeAlterationSpecsAfterSlope
+
+model_generated double mgCvdportStrokeSumMainTermsCoefMeanCovariate[SEX];
+model_generated double mgCvdportStrokeSumInteractionCoefMeanCovariate[SEX];
+
+};
+
+//hide(pgSTROKE_CVDPoRT);
+
+actor Person            // Core Individual
+{
+double gBMI4_cvdport_stroke =  gBMI_PHAC ;
+
+
+double cvdport_stroke_spline_age = UpdateCvdportStrokeSplineAge(lifespan_age, sex, stroke);
+double cvdport_stroke_spline_bmi = UpdateCvdportStrokeSplineBmi(gBMI4_cvdport_stroke, sex, stroke);
+double cvdport_stroke_spline_pack_years = UpdateCvdportStrokeSplinePackYears(total_packyears_smoked, sex, stroke);
+double cvdport_stroke_spline_alcohol = UpdateCvdportStrokeSplineAlcohol(number_drinks_past_week, sex, stroke); // icitte will need to make number_drinks_past_week dynamic
+double cvdport_stroke_spline_met = UpdateCvdportStrokeSplineMet(physical_activity_met, sex, stroke);
+
+CVDPORT_STROKE_STATE stroke                ; //EN Stroke (CVDPoRT Stroke)
+CVDPORT_STROKE_STATE stroke_initial        ; //EN Stroke status at start
+CVDPORT_STROKE_STATE stroke_initial_altered; //EN Stroke status altered at start (static afterwards)
+
+
+
+event   timeCvdportStrokeDiseaseEvent, CvdportStrokeDiseaseEvent; // , 0;  //  default low priority    
+void	ReadFromStartPopStroke();
+hook    ReadFromStartPopStroke, ReadFromStartPop, 74; // 74 = execution number, the higher the value, the later the execution
+};
+
+
+void hook_ReadFromStartPopStroke() {};
+
+void Person::ReadFromStartPopStroke()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4 == 4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1];
+
+	stroke                 = (CVDPORT_STROKE_STATE) int(record_to_be_read[cDb_Stroke]);
+	stroke_initial         = (CVDPORT_STROKE_STATE) int(record_to_be_read[cDb_Stroke]);
+	stroke_initial_altered = (CVDPORT_STROKE_STATE) int(record_to_be_read[cDb_Stroke]);
+	
+
+	hook_ReadFromStartPopStroke();
+};
+
+// This code udpates the splines
+
+double UpdateCvdportStrokeSplineAge(int    x, SEX sexe, CVDPORT_STROKE_STATE stroke)
+{
+
+	return  stroke == CVDPORT_STROKE_YES ? 0.0 :
+		     CubicSpline((double)x,	(double*)CvdportStrokeAgeSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION],
+				 (double*)CvdportStrokeAgeSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT],
+				 (double*)CvdportStrokeAgeSplineCompanion[sexe]);
+};
+
+double UpdateCvdportStrokeSplineBmi(double x, SEX sexe, CVDPORT_STROKE_STATE stroke)
+{
+	
+	return  stroke == CVDPORT_STROKE_YES ? 0.0 : 
+		    CubicSpline((double)x, (double*)CvdportStrokeBmiSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION],
+				(double*)CvdportStrokeBmiSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT],
+				(double*)CvdportStrokeBmiSplineCompanion[sexe]);
+};
+
+double UpdateCvdportStrokeSplinePackYears(double x, SEX sexe, CVDPORT_STROKE_STATE stroke)
+{
+	
+	return  stroke == CVDPORT_STROKE_YES ? 0.0 : 
+		    CubicSpline((double)x, (double*)CvdportStrokePackYearsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION],
+				(double*)CvdportStrokePackYearsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT],
+				(double*)CvdportStrokePackYearsSplineCompanion[sexe]);
+};
+
+double UpdateCvdportStrokeSplineAlcohol(int    x, SEX sexe, CVDPORT_STROKE_STATE stroke)
+{
+
+	return   stroke == CVDPORT_STROKE_YES ? 0.0 : 
+		     CubicSpline((double)x, (double*)CvdportStrokeDrinksSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION],
+				 (double*)CvdportStrokeDrinksSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT],
+				 (double*)CvdportStrokeDrinksSplineCompanion[sexe]);
+};
+
+double UpdateCvdportStrokeSplineMet(double x, SEX sexe, CVDPORT_STROKE_STATE stroke)
+{
+	return   stroke == CVDPORT_STROKE_YES ? 0.0 : 
+		      CubicSpline((double)x, (double*)CvdportStrokeMetsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION],
+				  (double*)CvdportStrokeMetsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT],
+				  (double*)CvdportStrokeMetsSplineCompanion[sexe]);
+};
+
+
+
+
+TIME Person::timeCvdportStrokeDiseaseEvent()
+{
+	TIME time_next = TIME_INFINITE;
+
+	if (stroke == CVDPORT_STROKE_NO)
+
+	{ 
+	
+		const double *main_coefs = CvdportStrokeMainTermsCoefficients[sex];
+		const double *interactions = CvdportStrokeInteractionCoefficients[sex];
+
+		double hazard;
+		//BEGIN Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+		hazard = interactions[CVDPORT_INTER_AGE_SMOKER_CURRENT] * (smoking_status4 == LIGHT_smoker || smoking_status4 == HEAVY_smoker)
+			+ interactions[CVDPORT_INTER_AGE_SMOKER_FORMER_LT5] * (smoking_status4 == FORMER_smoker)*(time_since_quit_smoking < 4)
+			+ interactions[CVDPORT_INTER_AGE_SMOKER_FORMER_GT5] * (smoking_status4 == FORMER_smoker)*(time_since_quit_smoking >= 4)
+			+ interactions[CVDPORT_INTER_AGE_PACK_YEARS] * total_packyears_smoked
+			+ interactions[CVDPORT_INTER_AGE_DRINK_FORMER] * (gAlcohol5 == ALCOHOL_FORMER)
+			+ interactions[CVDPORT_INTER_AGE_DRINKS_LAST_WEEK] * number_drinks_past_week
+			+ interactions[CVDPORT_INTER_AGE_PA_MET] * physical_activity_met
+			+ interactions[CVDPORT_INTER_AGE_BMI] * gBMI4_cvdport_stroke
+			+ interactions[CVDPORT_INTER_AGE_HYPERTENSION] * (gBP_PA == HIGH_BP_YES)
+			+ interactions[CVDPORT_INTER_AGE_DIABETES] * (gDiabetes_use == DIAB_YES);
+			
+
+			hazard = hazard - mgCvdportStrokeSumInteractionCoefMeanCovariate[sex];   // got ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )  so far
+		hazard *= (lifespan_age - CvdportStrokeAgeSplineCompanion[sex][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM]);  //CvdportStrokeAgeSplineCompanion[sex][..] contains mean age
+		//END Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+
+		//BEGIN Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+		hazard = hazard
+			+ main_coefs[CVDPORT_MAIN_SMOKER_CURRENT] * (smoking_status4 == LIGHT_smoker || smoking_status4 == HEAVY_smoker)
+			+ main_coefs[CVDPORT_MAIN_SMOKER_FORMER_LT5] * (smoking_status4 == FORMER_smoker)*(time_since_quit_smoking <  4)
+			+ main_coefs[CVDPORT_MAIN_SMOKER_FORMER_GT5] * (smoking_status4 == FORMER_smoker)*(time_since_quit_smoking >= 4)
+			+ main_coefs[CVDPORT_MAIN_DRINK_FORMER] * (gAlcohol5 == ALCOHOL_FORMER)
+			+ main_coefs[CVDPORT_MAIN_EDUC_HIGH_SCHOOL_GRAD] * (gEducation == EDUC2)
+			+ main_coefs[CVDPORT_MAIN_EDUC_SOME_PS] * (gEducation == EDUC3)
+			+ main_coefs[CVDPORT_MAIN_EDUC_PS_GRAD] * (gEducation == EDUC4)
+			+ main_coefs[CVDPORT_MAIN_HYPERTENSION] * (gBP_PA == HIGH_BP_YES)
+			+ main_coefs[CVDPORT_MAIN_DIABETES] * (gDiabetes_use == DIAB_YES); // added sum_k   coef_k  * Xk   so far
+
+		hazard = hazard - mgCvdportStrokeSumMainTermsCoefMeanCovariate[sex];   // substract sum_k   coef_k  * mean_Xk    so step 2 is done
+		//END   Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+
+		//BEGIN Step 3: add on splines to complete the computation of CVDPoRT's score  
+		hazard = hazard
+			+ cvdport_stroke_spline_age
+			+ cvdport_stroke_spline_bmi
+			+ cvdport_stroke_spline_pack_years
+			+ cvdport_stroke_spline_alcohol
+			+ cvdport_stroke_spline_met;
+
+		hazard = hazard + CVDportStrokeAlterationSpecs[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)  ];		
+		hazard = hazard + CVDportStrokeAlterationSpecsBeforeSlope[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)] * (year - CVDportStrokeTemporalBendingPoint) * (year < CVDportStrokeTemporalBendingPoint);
+		hazard = hazard + CVDportStrokeAlterationSpecsAfterSlope[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)] * (year - CVDportStrokeTemporalBendingPoint) * (year > CVDportStrokeTemporalBendingPoint);
+
+		//END   Step 3: add on splines to complete the computation of CVDPoRT's score  (at this point, local variable hazard contains CVDPoRT's score)
+
+		hazard = exp(hazard); //  hazard = baseline * exp(score) with baseline handled below.
+
+		if(CvdportStrokeBaseline[sex] >=0 )
+			hazard *= CvdportStrokeBaseline[sex] / 5.0; //baseline = 5 year cumulative hazard / 5. 
+		else
+		{
+			double log_cum_haz_age, log_cum_haz_agep1;
+			
+			log_cum_haz_age   = PieceLinearLookup(lifespan_age  , CvdportStrokeLogBaseCumulativeHazard[sex][COORDINATES_X],
+				                                                  CvdportStrokeLogBaseCumulativeHazard[sex][COORDINATES_Y] , SIZE(SCATTER_PLOT_ELEMENTS));
+            log_cum_haz_agep1 = PieceLinearLookup(lifespan_age+1, CvdportStrokeLogBaseCumulativeHazard[sex][COORDINATES_X],
+				                                                  CvdportStrokeLogBaseCumulativeHazard[sex][COORDINATES_Y] , SIZE(SCATTER_PLOT_ELEMENTS));
+
+			hazard *= (exp(log_cum_haz_agep1) - exp(log_cum_haz_age)); //baseline hazard over [age,age+1] = H(age+1)-H(age)
+		}
+
+		time_next = WAIT(-TIME(log(RandUniform(149)) / hazard));
+		/*
+		if (case_id<1000)
+		{
+			char line[199];
+			snprintf(line, 199, "%i, %15.1f, %15.9f, %15.9f  \n", (int)case_id, (double)case_seed, WAIT(0), hazard);
+			WriteDebugLogEntry(line);
+		}
+		*/
+	
+	}
+
+		return time_next;
+};
+
+void hook_CvdportStrokeDiseaseEvent() {};
+
+void Person::CvdportStrokeDiseaseEvent()
+{
+	stroke = CVDPORT_STROKE_YES;
+
+	hook_CvdportStrokeDiseaseEvent();
+};
+
+
+
+void PreSimulation()
+{
+	//BEGIN check alignment of CVDPORT_INTERACTION_TERMS and CVDPORT_MAIN_TERMS
+	if (CVDPORT_INTER_AGE_SMOKER_CURRENT != CVDPORT_MAIN_SMOKER_CURRENT) ModelExit("CVDPORT_INTER_AGE_SMOKER_CURRENT      != CVDPORT_MAIN_SMOKER_CURRENT     .");
+	if (CVDPORT_INTER_AGE_SMOKER_FORMER_LT5 != CVDPORT_MAIN_SMOKER_FORMER_LT5) ModelExit("CVDPORT_INTER_AGE_SMOKER_FORMER_LT5   != CVDPORT_MAIN_SMOKER_FORMER_LT5  .");
+	if (CVDPORT_INTER_AGE_SMOKER_FORMER_GT5 != CVDPORT_MAIN_SMOKER_FORMER_GT5) ModelExit("CVDPORT_INTER_AGE_SMOKER_FORMER_GT5   != CVDPORT_MAIN_SMOKER_FORMER_GT5  .");
+	if (CVDPORT_INTER_AGE_DRINK_FORMER != CVDPORT_MAIN_DRINK_FORMER) ModelExit("CVDPORT_INTER_AGE_DRINK_FORMER        != CVDPORT_MAIN_DRINK_FORMER       .");
+	if (CVDPORT_INTER_AGE_HYPERTENSION != CVDPORT_MAIN_HYPERTENSION) ModelExit("CVDPORT_INTER_AGE_HYPERTENSION        != CVDPORT_MAIN_HYPERTENSION       .");
+	if (CVDPORT_INTER_AGE_DIABETES != CVDPORT_MAIN_DIABETES) ModelExit("CVDPORT_INTER_AGE_DIABETES            != CVDPORT_MAIN_DIABETES           .");
+
+	/*These are the fake interaction terms*/
+	if (CVDPORT_INTER_AGE_EDUC_HIGH_SCHOOL_GRAD != CVDPORT_MAIN_EDUC_HIGH_SCHOOL_GRAD) ModelExit("CVDPORT_INTER_AGE_EDUC_HIGH_SCHOOL_GRAD        != CVDPORT_MAIN_EDUC_HIGH_SCHOOL_GRAD       .");
+	if (CVDPORT_INTER_AGE_EDUC_SOME_PS != CVDPORT_MAIN_EDUC_SOME_PS) ModelExit("CVDPORT_INTER_AGE_EDUC_SOME_PS        != CVDPORT_MAIN_EDUC_SOME_PS       .");
+	if (CVDPORT_INTER_AGE_EDUC_PS_GRAD != CVDPORT_MAIN_EDUC_PS_GRAD) ModelExit("CVDPORT_INTER_AGE_EDUC_PS_GRAD            != CVDPORT_MAIN_EDUC_PS_GRAD           .");
+
+
+	//END   check alignment of CVDPORT_INTERACTION_TERMS and CVDPORT_MAIN_TERMS
+
+
+	for (int sex_looper = 0; sex_looper<SIZE(SEX); sex_looper++)
+	{
+		//BEGIN get mgCvdportStrokeSumMainTermsCoefMeanCovariate[sex_looper]
+		mgCvdportStrokeSumMainTermsCoefMeanCovariate[sex_looper] = 0;
+		for (int x_looper = 0; x_looper<SIZE(CVDPORT_MAIN_TERMS); x_looper++)
+			mgCvdportStrokeSumMainTermsCoefMeanCovariate[sex_looper] += CvdportStrokeMainTermsCoefficients[sex_looper][x_looper] * CvdportStrokeMainTermsMeans[sex_looper][x_looper];
+		//END   get mgCvdportStrokeSumMainTermsCoefMeanCovariate[sex_looper]
+
+		//BEGIN get mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] 
+		mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] = 0;
+		for (int x_looper = 0; x_looper<SIZE(CVDPORT_MAIN_TERMS); x_looper++)  // NOTA BONE alignment of CVDPORT_INTERACTION_TERMS and CVDPORT_MAIN_TERMS and used here
+			mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] += CvdportStrokeInteractionCoefficients[sex_looper][x_looper] * CvdportStrokeMainTermsMeans[sex_looper][x_looper];
+
+		//Need to add on PackYears, DrinksLastWeek, MET, BMI not covered above
+		mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] += CvdportStrokeInteractionCoefficients[sex_looper][CVDPORT_INTER_AGE_PACK_YEARS] * CvdportStrokePackYearsSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+		mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] += CvdportStrokeInteractionCoefficients[sex_looper][CVDPORT_INTER_AGE_DRINKS_LAST_WEEK] * CvdportStrokeDrinksSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+		mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] += CvdportStrokeInteractionCoefficients[sex_looper][CVDPORT_INTER_AGE_PA_MET] * CvdportStrokeMetsSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+		mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper] += CvdportStrokeInteractionCoefficients[sex_looper][CVDPORT_INTER_AGE_BMI] * CvdportStrokeBmiSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+
+		//END   get mgCvdportStrokeSumInteractionCoefMeanCovariate[sex_looper]
+
+	}
+
+
+};

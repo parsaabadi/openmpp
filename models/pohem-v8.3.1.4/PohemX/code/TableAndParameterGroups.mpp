@@ -1,0 +1,95 @@
+//LABEL (TableAndParameterGroups, EN) Parameter and table groups module
+
+/*NOTE(TableAndParameterGroups, EN)
+	This module contains table groups to control the order of display in the interface.
+*/
+
+// Table and parameter groupings here to control order in Modgen interface. 
+
+parameter_group PG01_Favorite_Parameters  {	//EN Favorite Parameters
+pgKeyDemographyControls,
+pgDPP,
+pgDEMENTIA,
+pgDEMENTIA_Calibration_Inputs
+};
+
+parameter_group PG02_All_Parameters  {	//EN All Parameters
+	pgStartPop,
+	pgIntervention_Parameters,
+	TG04_Special_Tabulation_Parameters,
+	pgSES_All,
+	pgHealthRisks,
+	pgDiseases,
+	pgHUI,
+	pgMortality,
+	pgCalibration,
+	PG_Tabulation_Parameters
+
+	//pgDebug
+};
+
+
+table_group TG01_Favorite_Tables {	//EN Favorite Tables
+	tRisk_Factors_CrossSectional,
+	tRisk_Factors_Longitudinal,
+	tHealth_Outcomes_CrossSectional,
+	tHealth_Outcomes_Longitudinal,
+	tCohort_LifeLong,
+	//tDiseaseEvents,
+	tgDPPTables,
+	//tgMENDTables,
+	tHUI_allyears
+};
+
+table_group TG02_All_Tables {	//EN All Tables
+  tgPopulationTables,
+  tgSEP_Tables,
+  tgRiskFactor_Tables, 
+  tgDiseaseTables,
+  Scenario_Settings_Tables ,
+  Debug_Tables
+};
+/*
+table_group TG03_Consider_Deletion_Tables{	//EN Candidates for removal
+  tPA,
+  tPA_by_age_start,
+  tCC_count_autoreg,
+  tCC,
+  tCC_by_age_start,
+  tMeasuredSrAdultBMI, 
+  tBMIcat, 
+  tEducation_CohortView5,
+  tIncome_CohortView5,
+  tEducation_CrossSectionalView5,
+  tIncome_CrossSectional5,
+ // tDiseaseEventsBMI,  this is candidates for removal.  Commented out here because table itself is commented out.
+  tLife_Expectancy
+};
+hide(TG03_Consider_Deletion_Tables);
+*/
+
+table_group Debug_Tables { //EN CS Debug Tables
+	tChanges,
+	tDebugDiabetes,
+	tDiabetesReassign
+};
+
+// Hide tables not needed by the users- DH Dec 4th 2019 getting the mode slimmed down for POHEM training session #1
+
+hide (Debug_Tables);
+//hide(tChol);
+hide(tHDL);
+hide(tBP);
+hide(utPresimView);
+hide(tDbBMI);
+hide(tDbEDU);
+hide(tRiskFactorBMI);
+
+
+// Hide parameters not needed by the users- DH Dec 4th 2019 getting the mode slimmed down for POHEM training session #1
+
+hide(pgAMIinterventions);
+hide(TG04_Special_Tabulation_Parameters);
+hide(pgRiskFactorDistributions);
+hide(pgLookupAndTransitionTables);
+//hide(pgBpTreatment);

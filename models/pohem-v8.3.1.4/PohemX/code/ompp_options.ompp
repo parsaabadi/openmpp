@@ -1,0 +1,57 @@
+// Copyright (c) 2024-2024 OpenM++ Contributors
+// This code is licensed under the MIT license (see LICENSE.txt for details)
+
+//LABEL(ompp_options.ompp, EN) OpenM++ model options
+//LABEL(ompp_options.ompp, FR) Options de modèle d'OpenM++
+
+/* NOTE(ompp_options.ompp, EN)
+    This module contains some commonly modified OpenM++ model options.
+*/
+/* NOTE(ompp_options.ompp, FR)
+    Ce module contient des options de modèle d'OpenM++ souvent modifiées.
+*/
+
+#include "omc/optional_IDE_helper.h" // help an IDE editor recognize model symbols
+
+#if 0 // Hide non-C++ syntactic island from IDE
+
+// 
+// Model Documentation options:
+//  (These have no effect if Model Documentation is disabled in build settings.)
+//
+
+options authored_documentation = off;    // Uncomment to suppress the autonomous authored component.
+options generated_documentation = off;   // Uncomment to suppress the generated Symbol Reference component.
+
+// 
+// Selected Symbol Reference options:
+//
+
+// The following options are required due to model code dependencies on Modgen implementation
+options time_infinite_is_32767 = on;
+options time_undef_is_minus_one = on;
+
+// The following optimization option eliminates censored events from the event queue.
+// It is associated with a call to set_censor_time() in Person::Start
+options censor_event_time = on;
+
+// The following option uses heuristic short names to improve usefulness of exported results
+options use_heuristic_short_names = on;
+options short_name_max_length = 32;
+
+options symref_developer_edition = on;       // Uncomment to produce the Developer Edition instead of the User Edition.
+options symref_parameter_major_groups = off; // Uncomment for models with small parameter hierarchies.
+options symref_table_major_groups = off;     // Uncomment for models with small table hierarchies.
+
+options microdata_output = off;
+options microdata_write_on_enter = off;
+options microdata_write_on_exit = off;
+options microdata_write_on_event = off;
+
+// This option was introduced in OpenM++ 1.17.3 (https://github.com/openmpp/main/releases/tag/v1.17.3)
+// If on, this option will verify that indices of multi-dimensional parameters and indices of entity array members in model code 
+// respect the bounds of the enumerations used as dimensions. If an invalid index is encountered during a run, the run fails with a runtime error.
+// If index_errors is on, model build may take noticeably more time. A possible subsequent implementation of index_errors may be more efficient.
+options index_errors = off;
+
+#endif // Hide non-C++ syntactic island from IDE

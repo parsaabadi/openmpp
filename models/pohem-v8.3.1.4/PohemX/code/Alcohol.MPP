@@ -1,0 +1,581 @@
+#include "pohem.h"
+
+// FILE_LABEL (EN) Alcohol
+/* FILE_NOTE(EN)
+To be filled later
+*/
+
+/*
+#############################################
+#                                           #
+# STATES and INITIALIZATIONS                #
+#                                           #
+#############################################
+*/
+
+// Core individual
+
+actor Person{
+	// General states
+
+	//Three amigos set 1
+	logical		always_never_so_far_no_intervention;
+	int			number_drinks_past_week_extra1_no_intervention; //EN Number of drinks past week (-1 abstainer)
+	int			number_drinks_past_week_extra2_no_intervention = UpdateAlcoholAmigosSet1(number_drinks_past_week_extra1_no_intervention); //EN Number of drinks past week (-1 former, -2 never)
+	
+	//Three amigos set 2 (Leader is number_drinks_past_week_extra1.  Derived are always_never_so_far and number_drinks_past_week_extra2.)
+	logical		always_never_so_far;
+	int			number_drinks_past_week_extra1; //EN Number of drinks past week (-1 abstainer)
+	int			number_drinks_past_week_extra2 = UpdateAlcoholAmigosSet2(number_drinks_past_week_extra1); //EN Number of drinks past week (-1 former, -2 never)
+
+	int			number_drinks_past_week_extra2_start; //EN Number of drinks past week when actor started (-1 former, -2 never)
+	ALCOHOL5	gAlcohol5_start = GetAlcohol5(number_drinks_past_week_extra2_start, sex); //EN Self-reported Alcohol when actor started (5 categories)
+	ALCOHOL5	gAlcohol5_no_intervention = GetAlcohol5(number_drinks_past_week_extra2_no_intervention, sex); //EN Self-reported Alcohol (5 categories)
+	ALCOHOL5	gAlcohol5 = GetAlcohol5(number_drinks_past_week_extra2, sex); //EN Self-reported Alcohol (5 categories)
+	
+	int			number_drinks_past_week = max(0, int(number_drinks_past_week_extra1)); //EN Number of drinks past week
+
+	double      cauchy_alcohol_transition_static; //EN propensity to go to low categories when subject to alcohol transition/intervention
+
+	// States related to alcohol quantiles
+	double		alcohol_quantile_startpop; //EN initial alcohol quantile
+	double		alcohol_quantile; //EN alcohol quantile
+	double		alcohol_arma_11[ARMAPLUS_11_ENTRIES]; //EN ARMAplus(1,1) stochastic process used to generate alcohol quantile
+	double		alcohol_siloed_unif[SILOED_UNIF_PROCESS];
+
+	// Functions (alphabetical order)
+	void		ApplyAlcoholIntervention();
+	void		DebugAlcohol();
+	
+	void		InitializeAlcohol();
+	int			InvertAlcoholCumulativeHazard(double cumulative_target);
+	void		ReadFromStartPopAlcohol();
+	int			UpdateAlcoholAmigosSet1(int local_number_drinks_extra1); // Used to update number_drinks_past_week_extra2_no_intervention and always_never_so_far_no_intervention (followers of leader number_drinks_past_week_extra1_no_intervention)
+	int			UpdateAlcoholAmigosSet2(int local_number_drinks_extra1); // Used to update number_drinks_past_week_extra2                 and always_never_so_far                 (followers of leader number_drinks_past_week_extra1)
+	void		UpdateNumberDrinksPastWeekExtra(); // Updates number_drinks_past_week_extra1_no_intervention and number_drinks_past_week_extra1
+
+	// Hooks (order of priority)
+	hook		ReadFromStartPopAlcohol, ReadFromStartPop, 0; // 0 = execution number, the higher the value, the later the execution
+	hook		UpdateNumberDrinksPastWeekExtra, RiskFactorsUpdatesEmptyHub, 50; 
+	hook		ApplyAlcoholIntervention, RiskFactorsUpdatesEmptyHub, 51;
+	hook		InitializeAlcohol, InitializationEmptyHub, 75; 
+	hook		DebugAlcohol, RiskFactorsUpdatesEmptyHub, 76;
+};
+
+/*
+#############################################
+#                                           #
+# PARAMETERS						        #
+#                                           #
+#############################################
+*/
+
+parameters{
+	// Cross-sectional model main terms and interaction terms
+	double					AlcoholXSHMMainTerms[SEX][ALCOHOL_XSHM_SEGMENT][ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_MAIN_TERMS]; //EN Main terms (cross-sectional model)
+	double					AlcoholXSHMAgeByRegionInteractionTerms[SEX][AGE_GROUP_from30_to80_by10][ALCOHOL_XSHM_SEGMENT][ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_AGE_BY_REGION_INTERACTION_TERMS]; //EN Age x region interaction terms (cross-sectional model)
+	double					AlcoholXSHMAgeByImmigrantStatusInteractionTerms[SEX][AGE_GROUP_from30_to80_by10][ALCOHOL_XSHM_SEGMENT][ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_AGE_BY_IMMIGRANT_STATUS_INTERACTION_TERMS]; //EN Age x immigrant status interaction terms (cross-sectional model)
+	double					AlcoholXSHMEthnicityBySmokerStatusInteractionTerms[SEX][ETHNICITY][ALCOHOL_XSHM_SEGMENT][ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_ETHNICITY_BY_SMOKER_STATUS_INTERACTION_TERMS]; //EN Ethnicity x smoker status interaction terms (cross-sectional model)
+	double					AlcoholXSHMEthnicityByImmigrantStatusInteractionTerms[SEX][ETHNICITY][ALCOHOL_XSHM_SEGMENT][ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_ETHNICITY_BY_IMMIGRANT_STATUS_INTERACTION_TERMS]; //EN Ethnicity x immigrant status interaction terms (cross-sectional model)
+
+	// Longitudinal model parameters
+	double	AlcoholSiloProbs[SEX][UNIFORM_SILOS]; //EN Probability of silos for the siloed uniform process used in alcohol model  
+	double	AlcoholArmaplus11[SEX][UNIFORM_SILOS][ARMAPLUS_11_PARAMETERS]; //EN ARMAplus(1,1) parameters used in alcohol model
+
+	// Alcohol dispatcher parameters
+	logical					AlcoholInterventionSwitch; //EN Alcohol intervention switch
+	logical					AllowedToRequestFormerInsteadOfNever; //EN Allowed to substitute request to move to Never into request to move to Former
+	double                  AlcoholTransitionCorrelation;  //EN Longitudinal correlation in alcohol intervention
+	double					AlcoholDispatcher[ALCOHOL_INTERVENTION_RECRUITMENT][ALCOHOL_INTERVENTION_ELEMENT]; //EN Alcohol dispatcher
+	cumrate					ALCOHOL5_transition[ALCOHOL_INTERVENTION_GROUP][ALCOHOL5][ALCOHOL5]; //EN Transition matrix to implement intervention on type of drinker 
+	int						NumberDrinksPastWeekRangeHeavyDrinkersOnly[SEX][cLOWER_UPPER_BOUNDS]; //EN Range for number of drinks in past week (heavy drinkers only) 
+
+	// Other parameters
+	logical					AlcoholUpdateAtStart; //EN Alcohol updated with model at actor creation
+	model_generated double	UnderlyingUniformWhereaboutsForAlcohol[DB_RECORDS][cLOWER_UPPER_BOUNDS];
+};
+
+/*
+#############################################
+#                                           #
+# PARAMETER GROUPS                          #
+#                                           #
+#############################################
+*/
+
+parameter_group pgAlcoholInterventions{ //EN Alcohol interventions
+  AlcoholInterventionSwitch,
+  AlcoholDispatcher,
+  ALCOHOL5_transition,
+  NumberDrinksPastWeekRangeHeavyDrinkersOnly ,
+  AllowedToRequestFormerInsteadOfNever,
+  AlcoholTransitionCorrelation
+};
+
+parameter_group pgAlcoholParameters{ //EN Alcohol
+	AlcoholXSHMMainTerms,
+	AlcoholXSHMAgeByRegionInteractionTerms,
+	AlcoholXSHMAgeByImmigrantStatusInteractionTerms,
+	AlcoholXSHMEthnicityBySmokerStatusInteractionTerms,
+	AlcoholXSHMEthnicityByImmigrantStatusInteractionTerms,
+	AlcoholUpdateAtStart,
+	AlcoholSiloProbs,
+	AlcoholArmaplus11,
+	pgAlcoholInterventions
+};
+
+/*
+#############################################
+#                                           #
+# CLASSIFICATIONS                           #
+#                                           #
+# Note: the ALCOHOL5 classification is in   #
+# RiskFactors.mpp                           #
+#                                           #
+#############################################
+*/
+
+classification ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_MAIN_TERMS { //EN Main terms
+	ALCOHOL_XSHM_SEGMENT_END, //EN Segment end
+	ALCOHOL_XSHM_INTERCEPT, //EN Intercept
+	ALCOHOL_XSHM_AGE_2029, //EN Age: 20-29
+	ALCOHOL_XSHM_AGE_3039, //EN Age: 30-39
+	ALCOHOL_XSHM_AGE_4049, //EN Age: 40-49
+	ALCOHOL_XSHM_AGE_5059, //EN Age: 50-59
+	ALCOHOL_XSHM_AGE_6069, //EN Age: 60-69
+	ALCOHOL_XSHM_AGE_7079, //EN Age: 70-79
+	ALCOHOL_XSHM_AGE_80PLUS, //EN Age: 80+
+	ALCOHOL_XSHM_RACE_WHITE, //EN Race: white
+	ALCOHOL_XSHM_RACE_NONWHITE, //EN Race: non-white
+	ALCOHOL_XSHM_EDUC1, //EN Education: less than secondary
+	ALCOHOL_XSHM_EDUC2, //EN Education: secondary grad 
+	ALCOHOL_XSHM_EDUC3, //EN Education: other post-secondary
+	ALCOHOL_XSHM_EDUC4, //EN Education: post-secondary grad
+	ALCOHOL_XSHM_INC_Q1, //EN Income: quartile 1 (poorest)
+	ALCOHOL_XSHM_INC_Q2, //EN Income: quartile 2 (lower middle)
+	ALCOHOL_XSHM_INC_Q3, //EN Income: quartile 3 (upper middle)
+	ALCOHOL_XSHM_INC_Q4, //EN Income: quartile 4 (richest)
+	ALCOHOL_XSHM_REGION1, //EN Region: Atlantic provinces
+	ALCOHOL_XSHM_REGION2, //EN Region: Quebec
+	ALCOHOL_XSHM_REGION3, //EN Region: Ontario
+	ALCOHOL_XSHM_REGION4, //EN Region: Prairie provinces (Manitoba, Saskatchewan, Alberta)
+	ALCOHOL_XSHM_REGION5, //EN Region: British Columbia
+	ALCOHOL_XSHM_IMMIG_YES, //EN Immigrant: yes
+	ALCOHOL_XSHM_IMMIG_NO, //EN Immigrant: no
+	ALCOHOL_XSHM_BMI_CAT0, //EN BMI: < 18.5
+	ALCOHOL_XSHM_BMI_CAT1, //EN BMI: 18.5 to < 25
+	ALCOHOL_XSHM_BMI_CAT2, //EN BMI: 25 to < 30
+	ALCOHOL_XSHM_BMI_CAT3, //EN BMI: >= 30
+	ALCOHOL_XSHM_METS_CAT0, //EN METS: 0
+	ALCOHOL_XSHM_METS_CAT1, //EN METS: > 0 to < 1.5
+	ALCOHOL_XSHM_METS_CAT2, //EN METS: 1.5 to < 3
+	ALCOHOL_XSHM_METS_CAT3, //EN METS: >= 3
+	ALCOHOL_XSHM_SMOKE0, //EN Smoker: never
+	ALCOHOL_XSHM_SMOKE1, //EN Smoker: former
+	ALCOHOL_XSHM_SMOKE2, //EN Smoker: current
+	ALCOHOL_XSHM_DIABETES, //EN Diabetes (yes)
+	ALCOHOL_XSHM_ARTHRITIS, //EN Arthritis (yes)
+	ALCOHOL_XSHM_CANCER, //EN Cancer (yes)
+	ALCOHOL_XSHM_HIGH_BP, //EN High blood pressure (yes)
+	ALCOHOL_XSHM_HEART_DISEASE, //EN Heart disease (yes)
+	ALCOHOL_XSHM_STROKE //EN Stroke (yes)
+};
+
+classification ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_AGE_BY_REGION_INTERACTION_TERMS { //EN Segment end and regions
+	ALCOHOL_XSHM_AGE_BY_REGION_SEGMENT_END, //EN Segment end
+	ALCOHOL_XSHM_AGE_BY_REGION1, //EN Atlantic provinces
+	ALCOHOL_XSHM_AGE_BY_REGION2, //EN Quebec
+	ALCOHOL_XSHM_AGE_BY_REGION3, //EN Ontario
+	ALCOHOL_XSHM_AGE_BY_REGION4, //EN Prairie provinces (Manitoba, Saskatchewan, Alberta)
+	ALCOHOL_XSHM_AGE_BY_REGION5 //EN British Columbia
+};
+
+classification ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_AGE_BY_IMMIGRANT_STATUS_INTERACTION_TERMS { //EN Segment end and immigrant status
+	ALCOHOL_XSHM_AGE_BY_IMMIGRANT_STATUS_SEGMENT_END, //EN Segment end
+	ALCOHOL_XSHM_AGE_BY_IMMIG_YES, //EN Immigrant: yes
+	ALCOHOL_XSHM_AGE_BY_IMMIG_NO //EN Immigrant: no
+};
+
+classification ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_ETHNICITY_BY_SMOKER_STATUS_INTERACTION_TERMS { //EN Segment end and smoker status
+	ALCOHOL_XSHM_ETHNICITY_BY_SMOKER_STATUS_SEGMENT_END, //EN Segment end
+	ALCOHOL_XSHM_ETHNICITY_BY_SMOKE0, //EN Smoker: never
+	ALCOHOL_XSHM_ETHNICITY_BY_SMOKE1, //EN Smoker: former
+	ALCOHOL_XSHM_ETHNICITY_BY_SMOKE2 //EN Smoker: current
+};
+
+classification ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL_ETHNICITY_BY_IMMIGRANT_STATUS_INTERACTION_TERMS { //EN Segment end and immigrant status
+	ALCOHOL_XSHM_ETHNICITY_BY_IMMIGRANT_STATUS_SEGMENT_END, //EN Segment end
+	ALCOHOL_XSHM_ETHNICITY_BY_IMMIG_YES, //EN Immigrant: yes
+	ALCOHOL_XSHM_ETHNICITY_BY_IMMIG_NO //EN Immigrant: no
+};
+
+classification ALCOHOL_INTERVENTION_RECRUITMENT { //EN Alcohol intervention conditions
+	ALCOHOL_IR_SEX, //EN Sex (0 = female, 1 = male, 2 = both) 
+	ALCOHOL_IR_AGE_START, //EN Age start
+	ALCOHOL_IR_AGE_END, //EN Age end
+	ALCOHOL_IR_YEAR_START, //EN Year start
+	ALCOHOL_IR_YEAR_END, //EN Year end
+	ALCOHOL_IR_BMI_LOWER_BOUND, //EN BMI lower bound
+	ALCOHOL_IR_BMI_UPPER_BOUND, //EN BMI upper bound
+	ALCOHOL_IR_ASSIGN_IG //EN Intervention group (1, 2, ..., 5)
+};
+
+/*
+#############################################
+#                                           #
+# RANGES                                    #
+#                                           #
+#############################################
+*/
+
+// Segments of the spline curve in the cross-sectional model
+range ALCOHOL_XSHM_SEGMENT{ 1, 21 }; //EN Segments
+
+// Alcohol dispatcher structures
+range ALCOHOL_INTERVENTION_ELEMENT{ 0, 19 }; //EN Alcohol intervention elements
+range ALCOHOL_INTERVENTION_GROUP{ 1, 5 }; //EN Alcohol intervention group
+
+
+partition DRINKSLASTWEEKCAT{ 0, 5, 10, 15 }; //EN Parition for drinks-last-week categories
+
+/*
+#############################################
+#                                           #
+# FUNCTIONS (in alphabetical order)         #
+#   ... except for PreSimulation put last   #
+#                                           #
+#############################################
+*/
+
+void Person::ApplyAlcoholIntervention() {
+	//This function computes number_drinks_past_week_extra1.
+	//This depends on number_drinks_past_week_extra1_no_intervention/gAlcohol5_no_intervention
+	// Define variables prior to iteration through alcohol dispatcher
+	int alcohol_intervention_group = -1;
+	int alcohol_element = 0;
+
+	// Iterate through interventions
+	// Find the first valid intervention and then stop.  Note that while is bypassed if AlcoholInterventionSwitch is TRUE (results in alcohol_intervention_group = -1 )
+	while (AlcoholInterventionSwitch && alcohol_element < SIZE(ALCOHOL_INTERVENTION_ELEMENT) && alcohol_intervention_group < 0) {
+		if (
+			year >= AlcoholDispatcher[ALCOHOL_IR_YEAR_START][alcohol_element] &&
+			year <= AlcoholDispatcher[ALCOHOL_IR_YEAR_END][alcohol_element] &&
+			integer_age >= AlcoholDispatcher[ALCOHOL_IR_AGE_START][alcohol_element] &&
+			integer_age <= AlcoholDispatcher[ALCOHOL_IR_AGE_END][alcohol_element] &&
+			gBMI_PHAC >= AlcoholDispatcher[ALCOHOL_IR_BMI_LOWER_BOUND][alcohol_element] &&
+			gBMI_PHAC <= AlcoholDispatcher[ALCOHOL_IR_BMI_UPPER_BOUND][alcohol_element] &&
+			(
+				sex == AlcoholDispatcher[ALCOHOL_IR_SEX][alcohol_element] ||
+				AlcoholDispatcher[ALCOHOL_IR_SEX][alcohol_element] == 2
+				)
+		) {
+			// Record the proper element 
+			alcohol_intervention_group = (int)AlcoholDispatcher[ALCOHOL_IR_ASSIGN_IG][alcohol_element];
+		}
+		alcohol_element++;
+	}
+
+	// If the alcohol intervention switch is on and a valid intervention was found in the previous while loop, then proceed
+	if ( alcohol_intervention_group >= 0) {
+		int integer_for_lookup;
+		ALCOHOL_INTERVENTION_GROUP alcohol_intervention_group2 = (ALCOHOL_INTERVENTION_GROUP)alcohol_intervention_group;
+		double rho = AlcoholTransitionCorrelation;
+
+		Lookup_ALCOHOL5_transition(
+		//  RandUniform(346),
+			pcauchy( rho*cauchy_alcohol_transition_static +(1-std::abs(rho))* qcauchy( RandUniform(346) , 0.0, 1.0) , 0.0 , 1.0 ),  // this is RandUniform(346) if rho = 0
+			RANGE_POS(ALCOHOL_INTERVENTION_GROUP, alcohol_intervention_group2),
+			gAlcohol5_no_intervention,
+			&integer_for_lookup
+		);
+		ALCOHOL5 gAlcohol5_wanted = (ALCOHOL5)integer_for_lookup;
+
+		if (AllowedToRequestFormerInsteadOfNever && gAlcohol5_wanted == ALCOHOL_NEVER && gAlcohol5 != ALCOHOL_NEVER)
+			gAlcohol5_wanted = ALCOHOL_FORMER;
+
+		// If gAlcohol5 is changing due to the alcohol intervention, redefine number_drinks_past_week_extra1 so that it aligns with gAlcohol5
+		if (gAlcohol5_wanted != gAlcohol5_no_intervention) {
+			
+			logical number_drinks_past_week_is_increasing = (gAlcohol5_wanted > gAlcohol5_no_intervention );
+            double unif = RandUniform(347);
+
+			switch (gAlcohol5_wanted) { // Set number_drinks_past_week_extra1 accordingly.  Note that this automatically alters gAlcohol5.
+				case ALCOHOL_NEVER:
+					number_drinks_past_week_extra1 = -1;  //This will lead to gAlcohol5 = FORMER or NEVER depending on number_drinks_past_week_extra2 path so far.  If gAlcohol5 = FORMER, then request cannot be fulfilled
+					break;
+				case ALCOHOL_FORMER:
+					number_drinks_past_week_extra1 =  0;
+					number_drinks_past_week_extra1 = -1;  //Setting to 0 then -1 ensures that gAlcohol5 will be former even for those who always had number_drinks_past_week_extra2 = -2 (i.e. gAlcohol5 = NEVER)
+					break;
+				case ALCOHOL_LIGHT:
+					number_drinks_past_week_extra1 = 1;
+					break;
+				case ALCOHOL_MODERATE:
+					if (sex == FEMALE) 
+                        number_drinks_past_week_extra1 = int(number_drinks_past_week_is_increasing ? runif(unif, 2, 5 + 1) : runif(unif, 6, 9 + 1)); // uniform over {2,3,4,5} or {6,7,8,9}
+					else 
+                        number_drinks_past_week_extra1 = int(number_drinks_past_week_is_increasing ? runif(unif, 2, 8 + 1) : runif(unif, 9, 14 + 1)); // uniform over {2,3,...,8} or {9,10,...,14}
+					break;
+				case ALCOHOL_HEAVY:
+					number_drinks_past_week_extra1 = int(runif(unif, NumberDrinksPastWeekRangeHeavyDrinkersOnly[sex][LOWER_BOUND], NumberDrinksPastWeekRangeHeavyDrinkersOnly[sex][UPPER_BOUND] + 1));
+					break;
+				default:
+					ModelExit("\n Unexpected value for gAlcohol5_wanted.");
+					break;
+			}  //END switch
+		
+		} //END if(gAlcohol5_wanted != gAlcohol5_no_intervention)
+		else  // No intervention because gAlcohol5_wanted == gAlcohol5_no_intervention
+			number_drinks_past_week_extra1 = number_drinks_past_week_extra1_no_intervention;
+
+		if (gAlcohol5_wanted != gAlcohol5)
+		{
+			char line[199];
+			snprintf(line, 199, "\n Alcohol intervention failed. You possibly asked for a move to Never category for someone who drank previously: case_seed %15.1f",  (double)case_seed );
+			ModelExit(line);
+		}
+			
+	} //End if alcohol_intervention_group >= 0
+	else // No intervention because alcohol_intervention_group == -1 (no applicable element in dispatcher or intervention turned off)
+		number_drinks_past_week_extra1 = number_drinks_past_week_extra1_no_intervention;
+	
+}
+
+void Person::DebugAlcohol() {
+	// Debug script
+	if (EcrireDebugLogEntry == 1234 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND]) {
+		char line[999];
+		snprintf(line, 999, "%i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i \n", int(case_id), int(time), int(sex), int(lifespan_age_start), int(truncated_age), int(number_drinks_past_week_extra2_start), int(number_drinks_past_week_extra1), int(number_drinks_past_week_extra2), int(number_drinks_past_week), int(gAlcohol5_start), int(gAlcohol5));
+		WriteDebugLogEntry(line);
+	}
+}
+
+ALCOHOL5 GetAlcohol5(int drinks_past_week_extra2, SEX sexe) {
+	return GetAlcohol5FromStartPop(drinks_past_week_extra2, sexe);
+}
+
+ALCOHOL5 GetAlcohol5FromStartPop(int alcohol_on_start_pop, SEX sexe) {
+	ALCOHOL5 answer;
+
+	switch (alcohol_on_start_pop) {
+		case -2: answer = ALCOHOL_NEVER; break;
+		case -1: answer = ALCOHOL_FORMER; break;
+		case 0:
+		case 1: answer = ALCOHOL_LIGHT; break; // Less than 2 drinks in the past week (i.e. 0 or 1 drink)
+		default: // More than 1 drink in the past week
+			if (alcohol_on_start_pop < 0) {
+				ModelExit("Unexpected value (less than -2) for cDb_Alcohol on StartPop file.");
+			}
+
+			if (sexe == FEMALE) {
+				answer = alcohol_on_start_pop < 10 ? ALCOHOL_MODERATE : ALCOHOL_HEAVY;
+			} else {
+				answer = alcohol_on_start_pop < 15 ? ALCOHOL_MODERATE : ALCOHOL_HEAVY;
+			}
+	}
+	return answer;
+}
+
+void hook_InitializeAlcohol() {};
+
+void Person::InitializeAlcohol() {
+	cauchy_alcohol_transition_static = qcauchy(RandUniform(6), 0, 1);   // will not change in the course of the simulation
+
+	alcohol_quantile_startpop = runif(
+		RandUniform(156),
+		UnderlyingUniformWhereaboutsForAlcohol[cchs_record][LOWER_BOUND],
+		UnderlyingUniformWhereaboutsForAlcohol[cchs_record][UPPER_BOUND]
+	);
+
+	UNIFORM_SILOS which_silo = (UNIFORM_SILOS)InitializeSiloedUniform(alcohol_siloed_unif, AlcoholSiloProbs[sex], alcohol_quantile_startpop);  // alcohol_siloed_unif entries also get filled properly
+	ARMAPLUS_11_initialize(
+		alcohol_arma_11,
+		AlcoholArmaplus11[sex][which_silo],
+		qnorm(alcohol_siloed_unif[SILOED_UNIF_U01_t], 0.0, 1.0),
+		RandNormal(157),
+		RandNormal(158)
+	);
+
+	alcohol_quantile = alcohol_quantile_startpop; // UpdateSiloedUniform(alcohol_siloed_unif, alcohol_arma_11[ARMAPLUS_11_Y_t]); probably would give the same answer but with more work.
+	hook_InitializeAlcohol();
+}
+
+int Person::InvertAlcoholCumulativeHazard(double cumulative_target) {
+	// Declare variables
+	double cumulative_hazard = 0.0;
+	double predicted_number_of_drinks_last_week = 0.0;
+
+	// Iterate through segments of the cross-sectional model
+	for (int segment_looper = 0; segment_looper < SIZE(ALCOHOL_XSHM_SEGMENT) && AlcoholXSHMMainTerms[sex][segment_looper][ALCOHOL_XSHM_SEGMENT_END] > 0; segment_looper++) {
+		// Note: the age variables in coeff -- and the age dimension in coeff2 and coeff3 -- is zero-indexed, meaning the first age group (20-29) is accessible when zero is specified
+		// However, SPLIT( lifespan_age, FROM_20_TO_80_BY_10 ) is one-indexed (i.e. ranges from 1-7), so zero is never specified
+		// Therefore, SPLIT( lifespan_age, FROM_20_TO_80_BY_10 ) needs to be decremented by one
+
+		// Declare variables
+		const double *coeff = AlcoholXSHMMainTerms[sex][segment_looper];
+		const double *coeff2 = AlcoholXSHMAgeByRegionInteractionTerms[sex][int( SPLIT( lifespan_age, FROM_20_TO_80_BY_10 ) - 1 )][segment_looper];
+		const double *coeff3 = AlcoholXSHMAgeByImmigrantStatusInteractionTerms[sex][int( SPLIT( lifespan_age, FROM_20_TO_80_BY_10 ) - 1 )][segment_looper];
+		const double *coeff4 = AlcoholXSHMEthnicityBySmokerStatusInteractionTerms[sex][int( gEthnicityNonWhite == ETHNICITY_NONWHITE )][segment_looper];
+		const double *coeff5 = AlcoholXSHMEthnicityByImmigrantStatusInteractionTerms[sex][int( gEthnicityNonWhite == ETHNICITY_NONWHITE )][segment_looper];
+		double hazard;
+
+		// Compute hazard
+		hazard = exp(
+			coeff[ALCOHOL_XSHM_INTERCEPT] +
+			coeff[ALCOHOL_XSHM_AGE_2029 + int(SPLIT(lifespan_age, FROM_20_TO_80_BY_10) - 1)] +
+			coeff[ALCOHOL_XSHM_RACE_WHITE] * int(gEthnicityNonWhite == ETHNICITY_WHITE) +
+			coeff[ALCOHOL_XSHM_RACE_NONWHITE] * int(gEthnicityNonWhite == ETHNICITY_NONWHITE) +
+			coeff[ALCOHOL_XSHM_EDUC1 + gEducation] +
+			coeff[ALCOHOL_XSHM_INC_Q1 + gIncomeQuartile] +
+			coeff[ALCOHOL_XSHM_REGION1 + gRegion] +
+			coeff[ALCOHOL_XSHM_IMMIG_YES] * int(gImmigrantEver == IMMIGRANT) +
+			coeff[ALCOHOL_XSHM_IMMIG_NO] * int(gImmigrantEver == NON_IMMIGRANT) +
+			coeff[ALCOHOL_XSHM_BMI_CAT0 + SPLIT(gBMI_PHAC, BMI4CAT)] +
+			coeff[ALCOHOL_XSHM_METS_CAT0 + SPLIT(physical_activity_met, METS4CAT)] +
+			coeff[ALCOHOL_XSHM_SMOKE0 + smoking_cancer_dynamic] +
+			coeff[ALCOHOL_XSHM_DIABETES] * int(gDiabetes_DPoRT == DIAB_YES) +
+			coeff[ALCOHOL_XSHM_ARTHRITIS] * int(gOA == TRUE) +
+			coeff[ALCOHOL_XSHM_CANCER] * int(gCancer == CANCER_YES) +
+			coeff[ALCOHOL_XSHM_HIGH_BP] * int(gBP_PA == HIGH_BP_YES) +
+			coeff[ALCOHOL_XSHM_HEART_DISEASE] * int(acute_myocardial_infract == CVDPORT_AMI_YES) +
+			coeff[ALCOHOL_XSHM_STROKE] * int(stroke == CVDPORT_STROKE_YES) +
+			coeff2[ALCOHOL_XSHM_AGE_BY_REGION1 + gRegion] +
+			coeff3[ALCOHOL_XSHM_AGE_BY_IMMIG_YES] * int(gImmigrantEver == IMMIGRANT) +
+			coeff3[ALCOHOL_XSHM_AGE_BY_IMMIG_NO] * int(gImmigrantEver == NON_IMMIGRANT) +
+			coeff4[ALCOHOL_XSHM_ETHNICITY_BY_SMOKE0 + smoking_cancer_dynamic] +
+			coeff5[ALCOHOL_XSHM_ETHNICITY_BY_IMMIG_YES] * int(gImmigrantEver == IMMIGRANT) +
+			coeff5[ALCOHOL_XSHM_ETHNICITY_BY_IMMIG_NO] * int(gImmigrantEver == NON_IMMIGRANT)
+		);
+
+		// Add to cumulative hazard (sum of all computed hazards from previous segments)
+		predicted_number_of_drinks_last_week = cumulative_hazard + cumulative_target / hazard;
+
+		// Coerce predicted value to segment end value if greater than segment end value
+		if (predicted_number_of_drinks_last_week > coeff[ALCOHOL_XSHM_SEGMENT_END]) {
+			predicted_number_of_drinks_last_week = coeff[ALCOHOL_XSHM_SEGMENT_END];
+		}
+
+		// Adjust cumulative target
+		cumulative_target = cumulative_target - (predicted_number_of_drinks_last_week - cumulative_hazard) * hazard;
+
+		// Coerce cumulative target to zero if below zero
+		if (cumulative_target < 0) {
+			cumulative_target = 0;
+		}
+
+		// Set cumulative hazard to predicted value
+		cumulative_hazard = predicted_number_of_drinks_last_week;
+
+		// Stop loop if segment end equals 999
+		if (coeff[ALCOHOL_XSHM_SEGMENT_END] == 999) {
+			break;
+		}
+	}
+
+	return int(predicted_number_of_drinks_last_week);
+}
+
+
+
+
+void Person::ReadFromStartPopAlcohol() {
+	//MessageWhoWhenWhere( __FUNCTION__, 4 == 4 );
+
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	number_drinks_past_week_extra2_start = int(record_to_be_read[cDb_Alcohol]);
+	always_never_so_far = number_drinks_past_week_extra2_start == -2;
+	always_never_so_far_no_intervention = always_never_so_far;
+
+	//It is important to set always_never_so_far before setting number_drinks_past_week_extra1
+	number_drinks_past_week_extra1 = max(int(number_drinks_past_week_extra2_start),-1);
+	number_drinks_past_week_extra1_no_intervention = number_drinks_past_week_extra1;
+
+};
+
+
+int Person::UpdateAlcoholAmigosSet1(int local_number_drinks_extra1) {
+	//below we could use local_number_drinks_extra1 instead of number_drinks_past_week_extra1...should not matter
+	int local_number_drinks_extra2 = number_drinks_past_week_extra1_no_intervention >= 0 ? int(number_drinks_past_week_extra1_no_intervention) : always_never_so_far_no_intervention ? int(-2) : int(-1);
+	always_never_so_far_no_intervention = always_never_so_far_no_intervention && ( local_number_drinks_extra2 == -2 );
+
+	return local_number_drinks_extra2;
+}
+
+int Person::UpdateAlcoholAmigosSet2(int local_number_drinks_extra1) {
+	//below we could use local_number_drinks_extra1 instead of number_drinks_past_week_extra1...should not matter
+	int local_number_drinks_extra2 = number_drinks_past_week_extra1 >= 0 ? int(number_drinks_past_week_extra1) : always_never_so_far ? int(-2) : int(-1);
+	always_never_so_far = always_never_so_far && ( local_number_drinks_extra2 == -2 );
+
+	return local_number_drinks_extra2;
+}
+
+
+
+void Person::UpdateNumberDrinksPastWeekExtra() {
+	//MessageWhoWhenWhere( __FUNCTION__, TRUE );
+
+
+	// Update alcohol_quantile every two years
+	if (truncated_age > lifespan_age_start && (truncated_age - lifespan_age_start) % 2 == 0) {
+		ARMAPLUS_11_move_forward(alcohol_arma_11, RandNormal(159), RandNormal(160)); // Updates alcohol_arma_11[ARMAPLUS_11_Y_t] among other things
+		alcohol_quantile = UpdateSiloedUniform(alcohol_siloed_unif, alcohol_arma_11[ARMAPLUS_11_Y_t]);
+	}
+
+	// Update number_drinks_past_week_extra1_no_intervention every year (amigos and gAlcohol5_no_intervention will be impacted)
+	if (AlcoholUpdateAtStart || truncated_age > lifespan_age_start)
+	{
+		number_drinks_past_week_extra1_no_intervention = InvertAlcoholCumulativeHazard(-log(1.0 - alcohol_quantile)) - 1;
+	}
+		
+
+
+	/* BEGIN testing InvertAlcoholCumulativeHazard
+	double try_this_quantile;
+	int check_drinks_past_week_extra1;
+	try_this_quantile = 0.001;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.01;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.1;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.5;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.9;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.99;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	try_this_quantile = 0.999;
+	check_drinks_past_week_extra1 = InvertAlcoholCumulativeHazard(-log(1.0 - try_this_quantile)) - 1;
+	END testing InvertAlcoholCumulativeHazard */
+
+	// Debug script
+	if( EcrireDebugLogEntry == 93 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND] ) {
+		char line[999];
+		snprintf( line, 999, "%i, %15.1f, %15.1f, %i, %i, %i, %i, %i, %i, %15.9f, %15.9f, %i \n", int( case_id ), double( case_seed ), double( time ), int( lifespan_age_start ), int( truncated_age ), (int)timing_first_update, (int)number_drinks_past_week_extra1, (int)number_drinks_past_week_extra2, (int)number_drinks_past_week_extra2_start, (double)alcohol_quantile, (double)alcohol_quantile_startpop, (int)gAlcohol5 );
+		WriteDebugLogEntry( line );
+	}
+
+	
+}
+
+
+void PreSimulation() {
+
+	if( NumberDrinksPastWeekRangeHeavyDrinkersOnly[FEMALE][LOWER_BOUND] < 10) ModelExit("\n NumberDrinksPastWeekRangeHeavyDrinkersOnly: the minimum for females must be at least 10.");
+	if( NumberDrinksPastWeekRangeHeavyDrinkersOnly[  MALE][LOWER_BOUND] < 15) ModelExit("\n NumberDrinksPastWeekRangeHeavyDrinkersOnly: the minimum for males must be at least 15.");
+	if (NumberDrinksPastWeekRangeHeavyDrinkersOnly[FEMALE][LOWER_BOUND] > NumberDrinksPastWeekRangeHeavyDrinkersOnly[FEMALE][UPPER_BOUND]) ModelExit("\n NumberDrinksPastWeekRangeHeavyDrinkersOnly: Lower bound > upper bound for females.");
+	if (NumberDrinksPastWeekRangeHeavyDrinkersOnly[  MALE][LOWER_BOUND] > NumberDrinksPastWeekRangeHeavyDrinkersOnly[  MALE][UPPER_BOUND]) ModelExit("\n NumberDrinksPastWeekRangeHeavyDrinkersOnly: Lower bound > upper bound for males.");
+
+	// BEGIN get UnderlyingUniformWhereaboutsForAlcohol
+	int covariates[SIZE(COVARIATE_X)] = { cDb_Sex,cDb_Province,cDb_AgeGrp,cDb_Sex };
+	double in_scope[SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = { -1.0, 9e9,
+		                                                              -1.0, 9e9,
+		                                                              -1.0, 9e9, 
+                                                                      -1.0, 9e9 };
+	int n_records_tot = StoreData(mgStartPopCopy, covariates, cDb_Alcohol, NULL, NULL, in_scope);
+	qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP) * sizeof(double), compare_two_RXYCC_vectors); // sort mgStartPopCopy by sex, province, age and alcohol
+	GetUnderlyingUniformWhereabouts(mgStartPopCopy, UnderlyingUniformWhereaboutsForAlcohol, n_records_tot);
+	// END get UnderlyingUniformWhereaboutsForAlcohol
+}

@@ -1,0 +1,157 @@
+Model Metrics for RiskPaths 3.0.0.0 built 2025-05-15
+
++-----------------------------------+
+| CODE INPUT (model source code)    |
++-----------------+-------+---------+
+| Source          | Files |   Lines |
++-----------------+-------+---------+
+| Model-specific  |    17 |    1633 |
+|   Islands       |       |     330 |
+|   C++           |       |    1303 |
+| Common          |     9 |    1829 |
+|   Islands       |       |      11 |
+|   C++           |       |    1818 |
+| Both            |    26 |    3462 |
+|   Islands       |       |     341 |
+|   C++           |       |    3121 |
++-----------------+-------+---------+
+| Total           |    26 |    3462 |
++-----------------+-------+---------+
+Note: Does not include parameter data.
+
++-----------------------------------------+
+| CODE OUTPUT (generated C++)             |
++-----------------------+-------+---------+
+| Description           | Files |   Lines |
++-----------------------+-------+---------+
+| Header (.h)           |     3 |    1516 |
+| Implementation (.cpp) |     1 |    3753 |
++-----------------------+-------+---------+
+| Total                 |     4 |    5269 |
++-----------------------+-------+---------+
+Note: Table does not include C++ initializers for burned-in parameter data.
+
++----------------------------------+
+| MODEL INPUT (parameters)         |
++---------------+-------+----------+
+| Kind          | Count |    Cells |
++---------------+-------+----------+
+| Visible       |     0 |        0 |
+| Hidden        |     0 |        0 |
+| Burned-in     |     9 |      151 |
+| Derived       |     0 |        0 |
++---------------+-------+----------+
+| Total         |     9 |      151 |
++---------------+-------+----------+
+Note: Burned-in includes fixed and suppressed parameters.
+
++----------------------------------+
+| MODEL OUTPUT (tables)            |
++---------------+-------+----------+
+| Kind          | Count |    Cells |
++---------------+-------+----------+
+| Entity        |       |          |
+|   Visible     |     7 |      353 |
+|   Hidden      |     0 |        0 |
+| Derived       |       |          |
+|   Visible     |     0 |        0 |
+|   Hidden      |     0 |        0 |
+| Both          |       |          |
+|   Visible     |     7 |      353 |
+|   Hidden      |     0 |        0 |
++---------------+-------+----------+
+| Total         |     7 |      353 |
++---------------+-------+----------+
+Note: Cells includes margins and expression dimension.
+
++-------------------------------------------------+
+| MODEL SYMBOLS                                   |
++-------------------------+-------+-------+-------+
+| Description             | Count | Label |  Note |
++-------------------------+-------+-------+-------+
+| Language (human)        |     2 |     0 |     0 |
+| Enumeration             |       |       |       |
+|   Classification        |     5 |     4 |     0 |
+|     Level               |    21 |    12 |     0 |
+|   Range                 |     1 |     1 |     0 |
+|   Partition             |     4 |     4 |     0 |
+|   Aggregation           |     0 |     0 |     0 |
+| Input/Output            |       |       |       |
+|   Parameter             |     9 |     9 |     2 |
+|     Dimension           |     7 |     7 |     0 |
+|     Group               |     4 |     4 |     0 |
+|   Table                 |     7 |     7 |     0 |
+|     Dimension           |    13 |     6 |     0 |
+|     Expression          |    13 |    13 |     0 |
+|     Group               |     4 |     4 |     0 |
+|   Import                |     0 |     0 |     0 |
+| Entity                  |       |       |       |
+|   Kind                  |     1 |     0 |     0 |
+|   Event                 |     7 |     7 |     7 |
+|   Attribute             |    39 |    20 |     0 |
+|     Built-in            |     7 |     7 |     0 |
+|     Simple              |     5 |     5 |     0 |
+|     Identity            |    13 |     8 |     0 |
+|     Derived             |    14 |       |       |
+|     Link                |     0 |     0 |     0 |
+|     Multilink aggregate |     0 |       |       |
+|   Function              |     2 |     2 |     2 |
+|   Multilink             |     0 |     0 |     0 |
+|   Array                 |     0 |     0 |     0 |
+|   Foreign               |     0 |     0 |     0 |
+| Entity set              |     0 |     0 |     0 |
+|   Dimension             |     0 |     0 |     0 |
++-------------------------+-------+-------+-------+
+| Total                   |   139 |   100 |    11 |
++-------------------------+-------+-------+-------+
+| Supplementary Info      |       |       |       |
+|   Random streams        |     6 |       |       |
+|   Eligible microdata    |    20 |       |       |
++-------------------------+-------+-------+-------+
+Notes: Parameter includes derived parameters.
+       Table > Dimension includes the expression dimension.
+       Entity > Attribute > Identity includes those generated from filters.
+       Entity > Function does not include event time and implement functions.
+
++-------------------------------------------+
+| PUBLISHED SYMBOLS                         |
++-------------------+-------+-------+-------+
+| Description       | Count | Label |  Note |
++-------------------+-------+-------+-------+
+| Language (human)  |     2 |     0 |     0 |
+| Enumeration       |       |       |       |
+|   Classification  |     4 |     3 |     0 |
+|     Level         |    19 |    10 |     0 |
+|   Range           |     1 |     1 |     0 |
+|   Partition       |     2 |     2 |     0 |
+| Input/Output      |       |       |       |
+|   Parameter       |     0 |     0 |     0 |
+|     Dimension     |     0 |     0 |     0 |
+|     Group         |     1 |     1 |     0 |
+|   Table           |     7 |     7 |     0 |
+|     Dimension     |    13 |     6 |     0 |
+|     Expression    |    13 |    13 |     0 |
+|     Group         |     4 |     4 |     0 |
+|   Import          |     0 |     0 |     0 |
++-------------------+-------+-------+-------+
+| Total             |    66 |    47 |     0 |
++-------------------+-------+-------+-------+
+Note: Table > Dimension includes the expression dimension.
+
++----------------------------+-------+
+| MAINTAINED DEPENDENCIES            |
+| (in generated C++ runtime code)    |
++----------------------------+-------+
+| Dependency                 | Count |
++----------------------------+-------+
+| Reciprocal link            |     0 |
+| Attribute maintenance      |       |
+|   Identity                 |    18 |
+|   Derived                  |    23 |
+|   Multilink aggregate      |     0 |
+| Table dimension/filter     |     8 |
+| Set dimension/filter/order |     0 |
+| Event maintenance          |    17 |
++----------------------------+-------+
+| Total                      |    66 |
++----------------------------+-------+

@@ -1,0 +1,138 @@
+parameters {
+
+	 //EN CVDPoRT-Stroke 5 year baseline cumulative hazard
+	double	CvdportStrokeBaseline[SEX] = {
+		0.004431293, 0.003825352, 
+	};
+
+	 //EN CVDPoRT-Stroke log baseline cumulative hazard
+	double	CvdportStrokeLogBaseCumulativeHazard[SEX][COORDINATES_X_Y][SCATTER_PLOT_ELEMENTS] = {
+		// FEMALE - MALE
+		(2) {
+			(2) {
+				(10) 0, 
+			},
+		},
+	};
+
+	 //EN CVDPoRT-Stroke main non-spline terms means
+	double	CvdportStrokeMainTermsMeans[SEX][CVDPORT_MAIN_TERMS] = {
+		0.278737815, 0.061666528, 0.228791757, 0.227010706, 0.19645194, 0.054516786, 0.191759922, 0.078021564, 0.52414634, 
+		0.336973431, 0.071928332, 0.293368891, 0.152378325, 0.163559173, 0.059873861, 0.182809542, 0.077714172, 0.531883425, 
+	};
+
+	 //EN CVDPoRT-Stroke main non-spline terms coefficients
+	double	CvdportStrokeMainTermsCoefficients[SEX][CVDPORT_MAIN_TERMS] = {
+		0.70326, 0.42422, -0.4139, 0.16107, 0.54132, 0.76008, -0.24261, -0.21203, -0.25387, 
+		0.5814, -0.15182, -0.16039, 0.0, 0.58974, 0.53201, -0.12431, -0.09278, -0.19088, 
+	};
+
+	 //EN CVDPoRT-Stroke interaction terms
+	double	CvdportStrokeInteractionCoefficients[SEX][CVDPORT_INTERACTION_TERMS] = {
+		-0.01729, -0.00867, 0.01596, -0.00745, -0.01417, -0.01789, (3) 0.0, -0.0004257, 0.0001471, 0.00228, 0.0002134, 
+		-0.01143, 0.01008, 0.00558, 0.0, -0.01494, -0.00614, (3) 0.0, -0.0001628, 0.0002227, 0.0, -0.0009233, 
+	};
+
+	 //EN CVDPoRT-Stroke age cubic spline coefficients
+	double	CvdportStrokeAgeSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-26.6434, -13.6434, -1.6434, 11.3566, 30.3566, (15) -9, 
+		-0.38733, 1.2702, -1.46091, (17) 0, 
+		// MALE
+		-24.5734, -11.5734, -1.5734, 10.4266, 29.4266, (15) -9, 
+		-0.18828, 0.56354, -0.57164, (17) 0, 
+	};
+
+	 //EN CVDPoRT-Stroke age cubic spline companion
+	double	CvdportStrokeAgeSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 49.64336191, 0.12424, 49.64336191, 
+		-1e9, 1e9, 0.66666666666666667, 47.57344185, 0.13757, 47.57344185, 
+	};
+
+	 //EN CVDPoRT-Stroke pack years cubic spline coefficients
+	double	CvdportStrokePackYearsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-8.505607, -8.498607, 20.494393, (17) -9, 
+		-31.95096, (19) 0, 
+		// MALE
+		-14.28517, -10.43517, 28.71483, (17) -9, 
+		-0.00614, (19) 0, 
+	};
+
+	 //EN CVDPoRT-Stroke pack years cubic spline companion
+	double	CvdportStrokePackYearsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 8.505606758, 0.03392, 8.505606758, 
+		-1e9, 1e9, 0.66666666666666667, 14.28517046, 0.0068, 14.28517046, 
+	};
+
+	 //EN CVDPoRT-Stroke drinks last week cubic spline coefficients
+	double	CvdportStrokeDrinksSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		(20) -9, 
+		(20) 0, 
+		// MALE
+		-5.163506, -3.163506, 9.836494, (17) -9, 
+		-0.00434, (19) 0, 
+	};
+
+	 //EN CVDPoRT-Stroke drinks last week cubic spline companion
+	double	CvdportStrokeDrinksSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 1.942885049, -0.00434, 1.942885049, 
+		-1e9, 1e9, 0.66666666666666667, 5.163505529, 0.0063, 5.163505529, 
+	};
+
+	 //EN CVDPoRT-Stroke METs cubic spline coefficients
+	double	CvdportStrokeMetsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-1.7736, -0.1736, 2.7264, (17) -9, 
+		0.32838, (19) 0, 
+		// MALE
+		(20) -9, 
+		(20) 0, 
+	};
+
+	 //EN CVDPoRT-Stroke METs cubic spline companion
+	double	CvdportStrokeMetsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 1.873634048, -0.27159, 1.873634048, 
+		-1e9, 1e9, 0.66666666666666667, 2.131525545, 0, 2.131525545, 
+	};
+
+	 //EN CVDPoRT-Stroke BMI cubic spline coefficients
+	double	CvdportStrokeBmiSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-5.8078, -1.0018, 7.183, (17) -9, 
+		-0.01902, (19) 0, 
+		// MALE
+		-4.9158, -0.5154, 5.5196, (17) -9, 
+		0.01032, (19) 0, 
+	};
+
+	 //EN CVDPoRT-Stroke BMI cubic spline companion
+	double	CvdportStrokeBmiSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 25.83288111, 0.00823, 25.83288111, 
+		-1e9, 1e9, 0.66666666666666667, 26.81926666, 0.02245, 26.81926666, 
+	};
+
+	 //EN Alteration of CVDPoRT-Stroke log hazard by sex and age
+	double	CVDportStrokeAlterationSpecs[SEX][FROM_25_TO_90_BY_5] = {
+		0, 0.2, 0.1, 0, 0.2, 0.35, 0.3, (2) -0.2, -0.15, -0.1, -0.2, -0.05, (2) 0, 
+		0.2, 0.1, -0.1, (2) 0.05, 0.35, 0.25, 0.15, (2) -0.1, -0.05, (2) -0.1, -0.2, -0.27, 
+	};
+	logical	CVDportStrokeAlterationSpecsAppliesToPrevalenceFixSR = FALSE; //EN Use altered CVDPoRT-Stroke log hazard in correction for initial stroke prevalence
+	int	CVDportStrokeTemporalBendingPoint = 2016; //EN Label for CVDportStrokeTemporalBendingPoint
+
+	 //EN Label for CVDportStrokeAlterationSpecsBeforeSlope
+	double	CVDportStrokeAlterationSpecsBeforeSlope[SEX][FROM_25_TO_90_BY_5] = {
+		(2) {
+			(15) 0, 
+		},
+	};
+
+	 //EN Label for CVDportStrokeAlterationSpecsAfterSlope
+	double	CVDportStrokeAlterationSpecsAfterSlope[SEX][FROM_25_TO_90_BY_5] = {
+		(2) {
+			(15) 0, 
+		},
+	};
+};
+

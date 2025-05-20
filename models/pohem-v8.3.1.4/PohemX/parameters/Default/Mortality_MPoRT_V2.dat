@@ -1,0 +1,138 @@
+parameters {
+
+	 //EN MPoRT V2 mortality risk: 5 year baseline cumulative hazard
+	double	MportV2Baseline[SEX] = {
+		0.00621, 0.008139, 
+	};
+
+	 //EN MPoRT V2 mortality risk: log baseline cumulative hazard
+	double	MportV2LogBaseCumulativeHazard[SEX][COORDINATES_X_Y][SCATTER_PLOT_ELEMENTS] = {
+		// FEMALE - MALE
+		(2) {
+			(2) {
+				(10) 0, 
+			},
+		},
+	};
+
+	 //EN MPoRT V2 mortality risk: main non-spline terms means
+	double	MportV2MainTermsMeans[SEX][MPORT_V2_MAIN_TERMS] = {
+		0.210621, 0.0949346, 0.2988136, 0.1567167, 0.1912154, 0.1977786, 0.0640225, 0.2434684, 0.0745824, 0.0174282, 0.0725525, 0.0298708, 0.0049644, 
+		0.2577804, 0.1137479, 0.3740262, 0.115705, 0.186614, 0.1810128, 0.0662993, 0.2232337, 0.0928756, 0.0193142, 0.0896308, 0.0316624, 0.0067342, 
+	};
+
+	 //EN MPoRT V2 mortality risk: main non-spline terms coefficients
+	double	MportV2MainTermsCoefficients[SEX][MPORT_V2_MAIN_TERMS] = {
+		0.334379174, 0.183879678, -0.100337027, 0.181465872, 0.144770078, 0.045291195, 0.011207365, 0.137793481, 0.456030352, 0.571557898, 0.631359707, 1.614413634, 1.325522, 
+		0.768367009, 0.376243136, 0.072728464, 0.221549583, 0.188256157, 0.039117813, 0.036473003, 0.157294174, 0.41420994, 0.398308719, 0.667450568, 1.291738666, 0.709337, 
+	};
+
+	 //EN MPoRT V2 mortality risk: interaction terms
+	double	MportV2InteractionCoefficients[SEX][MPORT_V2_INTERACTION_TERMS] = {
+		-0.00277481, 0.002499011, 0.002215083, -0.00178976, -0.000192286, 0.003231432, 0.003204902, -0.004194519, -0.006567629, -0.010440163, -0.010527824, -0.042052221, -0.02323, -0.000216421, -0.000566729, 0.00015476, -0.000248673, 
+		-0.007847085, -0.004164546, 0.000515772, -0.004609502, -0.002569352, 0.001356368, 0.002134925, -0.004644739, -0.004171823, -0.004511427, -0.014471643, -0.032549797, -0.00393, -0.000155952, -0.0000285, -0.000443017, -0.000084, 
+	};
+
+	 //EN MPoRT V2 mortality risk: age cubic spline coefficients
+	double	MportV2AgeSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-28.1712945, -14.1712945, -0.1712945, 12.8287055, 29.8287055, (15) -9, 
+		-0.049273613, 0.210067145, -0.274827306, (17) 0, 
+		// MALE
+		-27.630622, -12.630622, -0.630622, 12.369378, 29.369378, (15) -9, 
+		0.021449239, 0.030653876, -0.114514942, (17) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: age cubic spline companion
+	double	MportV2AgeSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 52.1712945, 0.079617627, 52.1712945, 
+		-1e9, 1e9, 0.66666666666666667, 50.630622, 0.06963646, 50.630622, 
+	};
+
+	 //EN MPoRT V2 mortality risk: pack years cubic spline coefficients
+	double	MportV2PackYearsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-8.552258, -6.052258, 20.197742, (17) -9, 
+		-0.126628893, (19) 0, 
+		// MALE
+		-14.403283, -9.403283, 28.096717, (17) -9, 
+		-0.012586524, (19) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: pack years cubic spline companion
+	double	MportV2PackYearsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 8.5522579, 0.043378465, 8.5522579, 
+		-1e9, 1e9, 0.66666666666666667, 14.4032829, 0.010399055, 14.4032829, 
+	};
+
+	 //EN MPoRT V2 mortality risk: drinks last week cubic spline coefficients
+	double	MportV2DrinksSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-2.1419706, -1.1419706, -0.1419706, 4.8580294, (16) -9, 
+		1.633939941, -3.227887317, (18) 0, 
+		// MALE
+		-5.545936, -3.545936, 9.454064, (17) -9, 
+		0.121978939, (19) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: drinks last week cubic spline companion
+	double	MportV2DrinksSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 2.1419706, -0.194845986, 2.1419706, 
+		-1e9, 1e9, 0.66666666666666667, 5.5459356, -0.037596996, 5.5459356, 
+	};
+
+	 //EN MPoRT V2 mortality risk: METs cubic spline coefficients
+	double	MportV2MetsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-1.7600395, -0.1600395, 2.6399605, (17) -9, 
+		0.263940219, (19) 0, 
+		// MALE
+		-2.1110374, -0.3110374, 3.0889626, (17) -9, 
+		0.182581521, (19) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: METs cubic spline companion
+	double	MportV2MetsSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 1.8600395, -0.270693903, 1.8600395, 
+		-1e9, 1e9, 0.66666666666666667, 2.2110374, -0.178390018, 2.2110374, 
+	};
+
+	 //EN MPoRT V2 mortality risk: BMI cubic spline coefficients
+	double	MportV2BmiSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		-5.852673, -1.042673, 7.085145, (17) -9, 
+		0.099378799, (19) 0, 
+		// MALE
+		-4.9317723, -0.5432423, 5.5982277, (17) -9, 
+		0.09224227, (19) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: BMI cubic spline companion
+	double	MportV2BmiSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, 25.9326726, -0.086045216, 25.9326726, 
+		-1e9, 1e9, 0.66666666666666667, 26.9017723, -0.0762977, 26.9017723, 
+	};
+
+	 //EN MPoRT V2 mortality risk: Cdn resident percent cubic spline coefficients
+	double	MportV2ImmigSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// FEMALE
+		(20) -9, 
+		(20) 0, 
+		// MALE
+		-0.31181313, -0.01812626, 0.08021196, (17) -9, 
+		-0.075702255, (19) 0, 
+	};
+
+	 //EN MPoRT V2 mortality risk: Cdn resident percent cubic spline companion
+	double	MportV2ImmigSplineCompanion[SEX][CUBIC_SPLINE_COMPANION] = {
+		-1e9, 1e9, 0.66666666666666667, (3) 0, 
+		-1e9, 1e9, 0.66666666666666667, 0.9090354, 0.264814366, 0.9090354, 
+	};
+
+	 //EN Alteration of mortality log hazard by sex and age (for MPoRT V2 engine)
+	double	MportV2AlterationSpecs[SEX][FROM_25_TO_90_BY_5] = {
+		0.5, 0.2, 0.330906347, 0.189260148, 0.127267014, 0.084446301, 0.083305448, 0.000428401, -0.06896716, -0.1, -0.13, -0.25, -0.3, -0.25, 0, 
+		0.7, 0.6, 0.452500482, 0.251909186, 0.169249041, 0.09, (2) 0, -0.02, -0.15, (2) -0.3, -0.4, -0.35, -0.5, 
+	};
+};
+

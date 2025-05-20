@@ -1,0 +1,59 @@
+parameters {
+    /* NOTE ( AgeBaselineForm1, EN )
+    */
+    //EN Age baseline for first union formation
+    double AgeBaselineForm1[AGEINT_STATE] = {
+        (12) 0.0
+    };
+
+    /* NOTE ( AgeBaselinePreg1, EN )
+    */
+    //EN Age baseline for first pregnancy
+    double AgeBaselinePreg1[AGEINT_STATE] = {
+        (12) 0.0
+    };
+
+    /* NOTE ( CanDie, EN )
+    */
+    //EN Switch mortality on/off
+    bool CanDie = false;
+
+    /* NOTE ( ProbMort, EN )
+    */
+    //EN Death probabilities
+    double ProbMort[LIFE] = {
+        (101) 0.0
+    };
+
+    /* NOTE ( SeparationDurationBaseline, EN )
+    */
+    //EN Separation Duration Baseline of 2nd Formation
+    double SeparationDurationBaseline[DISSOLUTION_DURATION] = {
+        (5) 0.0
+    };
+
+    /* NOTE ( SimulationCases, EN )
+    */
+    //EN Number of cases in run (over all members)
+    llong SimulationCases = 0;
+
+    /* NOTE ( SimulationSeed, EN )
+    */
+    //EN Simulation starting seed
+    llong SimulationSeed = 0;
+
+    /* NOTE ( UnionDurationBaseline, EN )
+    */
+    //EN Union Duration Baseline of Dissolution
+    double UnionDurationBaseline[UNION_ORDER][UNION_DURATION] = {
+        (12) 0.0
+    };
+
+    /* NOTE ( UnionStatusPreg1, EN )
+    */
+    //EN Relative risks of union status on first pregnancy
+    double UnionStatusPreg1[UNION_STATE] = {
+        (6) 0.0
+    };
+
+};

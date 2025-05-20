@@ -1,0 +1,191 @@
+#include "pohem.h"
+
+
+partition  FROM_1_TO_3_BY_1 {1,2,3};
+partition  FROM_1_TO_5_BY_1 {1,2,3,4,5};
+
+classification CC_COUNT_MAIN_LINEAR_PREDICTOR {     
+	CC_COUNT_MAIN_LP_INTERCEPT, //EN Intercept
+	CC_COUNT_MAIN_LP_MALE,  //EN Male
+    CC_COUNT_MAIN_LP_ETHNICITY_WHITE, //EN Ethnicitiy white
+	CC_COUNT_MAIN_LP_ETHNICITY_NONWHITE, //EN Ethnicitiy non-white
+	CC_COUNT_MAIN_LP_ATLANTIC, //EN Region: Atlantic
+	CC_COUNT_MAIN_LP_QUEBEC,   //EN Region: Quebec
+	CC_COUNT_MAIN_LP_ONTARIO,  //EN Region: Ontario
+	CC_COUNT_MAIN_LP_PRAIRIES, //EN Region: Prairies
+	CC_COUNT_MAIN_LP_BCregion, //EN Region: British Columbia
+	CC_COUNT_MAIN_LP_EDUC1, //EN Education: < than secondary
+	CC_COUNT_MAIN_LP_EDUC2, //EN Education: secondary graduate  
+	CC_COUNT_MAIN_LP_EDUC3, //EN Education: other post-secondary  
+	CC_COUNT_MAIN_LP_EDUC4, //EN Education: post-secondary graduate
+	CC_COUNT_MAIN_LP_INCOME_Q1,	//EN Income quartile 1 (poorest)
+	CC_COUNT_MAIN_LP_INCOME_Q2,	//EN Income quartile 2 (lower middle)
+	CC_COUNT_MAIN_LP_INCOME_Q3,	//EN Income quartile 3 (upper middle)
+	CC_COUNT_MAIN_LP_INCOME_Q4,   //EN Income quartile 4 (richest)
+	CC_COUNT_MAIN_LP_AGE_GROUP10_LT20,   //EN 10 year age group : [0,20[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_20_30,  //EN 10 year age group : [20,30[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_30_40,  //EN 10 year age group : [30,40[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_40_50,  //EN 10 year age group : [40,50[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_50_60,  //EN 10 year age group : [50,60[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_60_70,  //EN 10 year age group : [60,70[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_70_80,  //EN 10 year age group : [70,80[
+	CC_COUNT_MAIN_LP_AGE_GROUP10_80plus, //EN 10 year age group : 80+
+	CC_COUNT_MAIN_LP_BMI_CAT1, //EN BMI < 18.5
+	CC_COUNT_MAIN_LP_BMI_CAT2, //EN 18.5 <= BMI < 25
+	CC_COUNT_MAIN_LP_BMI_CAT3, //EN 25 <= BMI < 30
+	CC_COUNT_MAIN_LP_BMI_CAT4, //EN BMI >= 30
+    CC_COUNT_MAIN_LP_ALCOHOL_NEVER,    //EN Alcohol: Never drank alcohol
+    CC_COUNT_MAIN_LP_ALCOHOL_FORMER,   //EN Alcohol: Former drinker
+    CC_COUNT_MAIN_LP_ALCOHOL_LIGHT ,   //EN Alcohol: Less than 2 drinks per week
+    CC_COUNT_MAIN_LP_ALCOHOL_MODERATE, //EN Alcohol: 2-14 (2-9) drinks per week for male (female)
+    CC_COUNT_MAIN_LP_ALCOHOL_HEAVY,    //EN Alcohol: More than 14 (9) drinks per week for male (female)
+	CC_COUNT_MAIN_LP_NEVER_SMOKER,			//EN Never Smoker
+	CC_COUNT_MAIN_LP_FORMER_SMOKER,			//EN Former Smoker
+	CC_COUNT_MAIN_LP_CURRENT_SMOKER,			//EN Current Smoker
+	CC_COUNT_MAIN_LP_DIAB_YES	,					//EN Diabetes reported
+	CC_COUNT_MAIN_LP_HEART_DISEASE_YES,			//EN Heart disease reported
+	CC_COUNT_MAIN_LP_HYPERTENSION_YES,			//EN Hypertension reported
+	CC_COUNT_MAIN_LP_CANCER_YES,			        //EN Cancer reported
+	CC_COUNT_MAIN_LP_OSTEOARTHRITIS_YES,			//EN OsteoArthritis reported
+	CC_COUNT_MAIN_LP_USUAL_DAY_SIT,                         //EN Usual day : Sit
+	CC_COUNT_MAIN_LP_USUAL_DAY_STAND_WALK ,                 //EN Usual day : Stand or walk quite a lot 
+	CC_COUNT_MAIN_LP_USUAL_DAY_LIFT,                        //EN Usual day : Usually lift or carry light loads 
+	CC_COUNT_MAIN_LP_USUAL_DAY_HEAVY_WORK  ,                //EN Usual day : Do heavy work or carry very heavy loads
+	CC_COUNT_MAIN_LP_LTPA_NO,                     //EN physical activity from leisure time : No 
+	CC_COUNT_MAIN_LP_LTPA_0_30 ,                  //EN physical activity from leisure time : 0-30 minutes/day 
+	CC_COUNT_MAIN_LP_LTPA_30_60,                  //EN physical activity from leisure time : 30-60 minutes/day 
+	CC_COUNT_MAIN_LP_LTPA_60_plus,                //EN physical activity from leisure time : 60+ minutes/day 
+	CC_COUNT_MAIN_LP_WALK_NO,                     //EN Walk for errands : None 
+	CC_COUNT_MAIN_LP_WALK_0_5 ,                   //EN Walk for errands : 0 to 5 hrs/week
+	CC_COUNT_MAIN_LP_WALK_6_10,                   //EN Walk for errands : 6 to 10 hrs/week 
+	CC_COUNT_MAIN_LP_WALK_11_plus                //EN Walk for errands : 11+ hrs/week 
+};
+	
+
+parameter_group pgCC_COUNT_PA { // Model built on CCHS for number of chronic conditions excluding the following 5: BP, HD, OA, Cancer, Diabetes 
+	ChronicConditionCountMeanMainLinearPred,
+	ChronicConditionCountVarEpsilonMainLinearPred
+};
+
+
+parameters 
+{  
+double ChronicConditionCountMeanMainLinearPred      [CC_COUNT_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for log mean of chronic condition counts (excluding HBP, DB, HD, CA, OA)
+double ChronicConditionCountVarEpsilonMainLinearPred[CC_COUNT_MAIN_LINEAR_PREDICTOR]; //EN Regression coefficients for log variance of random effect for chronic condition counts (excluding HBP, DB, HD, CA, OA)
+};
+
+
+
+actor Person            // Core Individual
+{
+	int  gCC_count_ex5;                                                  //EN Self-reported chronic conditions counts excluding the following 5: BP, HD, OA, Cancer, Diabetes 
+	int  gCC_count_ex4=gCC_count_ex5 + gOA;                              //EN Self-reported chronic conditions counts excluding the following 4: BP, HD, Cancer, Diabetes 
+    int  gCC_count_ex4_cap3= split(gCC_count_ex4, FROM_1_TO_3_BY_1) ;    //EN Self-reported chronic conditions counts (capped at 3) excluding the following 4: BP, HD, Cancer, Diabetes 
+	int  gCC_count_ex5_cap3= split(gCC_count_ex5, FROM_1_TO_3_BY_1) ;    //EN Self-reported chronic conditions counts (capped at 3) excluding the following 5: BP, HD, OA, Cancer, Diabetes 
+    int  gCC_count_ex5_cap5= split(gCC_count_ex5, FROM_1_TO_5_BY_1) ;    //EN Self-reported chronic conditions counts (capped at 5) excluding the following 5: BP, HD, OA, Cancer, Diabetes 
+	int  gCC_count_ex5_lag;                                              //EN Previous self-reported Chronic Conditions counts excluding the following 5: BP, HD, OA, Cancer, Diabetes 
+
+	double CC_count_quantile_of_random_effect;
+	double CC_count_mean ;
+	double CC_count_EPV ; // Extra-Poisson variation
+
+
+	void  UpdateCC_count_distribution(); // get CC_count_mean and CC_count_EPV
+	void  UpdateCC_count();  
+	hook  UpdateCC_count, HealthNonHazardUpdatesEmptyHub, 0; // 0 = execution number, the higher the value, the later the execution
+	//hook  UpdateCC_count, Update_all_CC_hazard;
+ 
+
+    void  Initialize_CC_count_stuff(); // initialize CC_count_mean , CC_count_EPV and CC_count_quantile_of_random_effect
+	hook  Initialize_CC_count_stuff, Initialize_CC_stuff;
+	//hook  Initialize_CC_count_stuff, Start;  //wrong because Initialize_CC_count_stuff needs a properly initialised CC_BootstrapIndex
+
+	double ComputeChronicConditionCountLinearPredictor(const double * Coefficients);
+
+	void  ReadFromStartPopChronicConditionsCount();
+	hook  ReadFromStartPopChronicConditionsCount,ReadFromStartPop, 60; // 60 = execution number, the higher the value, the later the execution
+
+};
+
+
+
+void  Person::ReadFromStartPopChronicConditionsCount()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gCC_count_ex5     =    int(record_to_be_read[cDb_PA_cc_ex5]);
+};
+
+
+double Person::ComputeChronicConditionCountLinearPredictor(const double * Coefficients)
+{
+	return
+		Coefficients[CC_COUNT_MAIN_LP_INTERCEPT                                                            ] 
+ 	  + Coefficients[CC_COUNT_MAIN_LP_MALE                                                                 ] * (sex==MALE)
+	  + Coefficients[CC_COUNT_MAIN_LP_BMI_CAT1           + SPLIT(gBMI4CC, BMI4CAT)                         ]
+	  + Coefficients[CC_COUNT_MAIN_LP_AGE_GROUP10_LT20   + SPLIT(truncated_age,HUI_AGE_GROUP)              ]
+	  + Coefficients[CC_COUNT_MAIN_LP_OSTEOARTHRITIS_YES                                                   ] * (gOA==TRUE) 
+	  + Coefficients[CC_COUNT_MAIN_LP_HYPERTENSION_YES                                                     ] * (gBP_PA == HIGH_BP_YES)
+	  + Coefficients[CC_COUNT_MAIN_LP_DIAB_YES                                                             ] * (gDiabetes_PA ==  DIAB_YES)
+	  + Coefficients[CC_COUNT_MAIN_LP_HEART_DISEASE_YES                                                    ] * (gHeartDisease_PA == HEART_DISEASE_YES)
+	  + Coefficients[CC_COUNT_MAIN_LP_CANCER_YES                                                           ] * (gCancer == CANCER_YES)
+	  + Coefficients[CC_COUNT_MAIN_LP_ATLANTIC           + gRegion                                         ]
+	  + Coefficients[CC_COUNT_MAIN_LP_EDUC1              + gEducation                                      ]
+	  + Coefficients[CC_COUNT_MAIN_LP_INCOME_Q1          + gIncomeQuartile                                 ]
+	  + Coefficients[CC_COUNT_MAIN_LP_USUAL_DAY_SIT      + gPA_usual_day                                   ]
+	  + Coefficients[CC_COUNT_MAIN_LP_LTPA_NO            + gLTPA_cat                                       ]
+	  + Coefficients[CC_COUNT_MAIN_LP_ALCOHOL_NEVER      + gAlcohol5                                       ]
+	  + Coefficients[CC_COUNT_MAIN_LP_NEVER_SMOKER       + smoking_cancer_dynamic                                      ]
+	  + Coefficients[CC_COUNT_MAIN_LP_WALK_NO            + gWalk_errands                                   ] 
+	  + Coefficients[CC_COUNT_MAIN_LP_ETHNICITY_WHITE    + gEthnicityNonWhite                              ]
+	  ;
+
+}
+
+
+
+
+void hook_UpdateCC_count_distribution() {};
+
+void Person::UpdateCC_count_distribution()
+{
+	CC_count_mean =	exp(ComputeChronicConditionCountLinearPredictor(ChronicConditionCountMeanMainLinearPred));
+	CC_count_EPV  =	exp(ComputeChronicConditionCountLinearPredictor(ChronicConditionCountVarEpsilonMainLinearPred));
+
+	hook_UpdateCC_count_distribution();
+}
+
+void hook_Initialize_CC_count_stuff() {};
+
+void Person::Initialize_CC_count_stuff()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	double random_effect;
+
+	UpdateCC_count_distribution();
+	random_effect = qgamma( RandUniform(95), gCC_count_ex5+1.0/CC_count_EPV, 1.0/(CC_count_mean+1.0/CC_count_EPV) );
+	CC_count_quantile_of_random_effect = pgamma( random_effect, 1.0/CC_count_EPV, CC_count_EPV );
+	
+	gCC_count_ex5_lag=gCC_count_ex5;
+
+	hook_Initialize_CC_count_stuff();
+}
+
+void hook_UpdateCC_count() {};
+
+void Person::UpdateCC_count() 
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	UpdateCC_count_distribution();
+	gCC_count_ex5_lag=gCC_count_ex5;
+	gCC_count_ex5= (int) rpois(CC_count_mean* qgamma( CC_count_quantile_of_random_effect, 1.0/CC_count_EPV, CC_count_EPV )) ; 
+
+	hook_UpdateCC_count();
+}
+
+
+

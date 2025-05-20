@@ -1,0 +1,330 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Diabetes 
+/* FILE_NOTE(EN) 
+	This file implements incidence of diabetes using the DPoRT algorithm. 
+*/
+
+
+//EN Customized "include"
+//EN Structure of MPP Files
+//EN classifications, ranges, partitions
+//EN Parameters
+//EN Person state variable declarations
+//EN (functions)
+//EN Person Events
+//EN Presimulation code
+
+range Diabetes_SURVIVAL_INTERVALS {-1, 120}; //EN 10 years of monthly points
+	// new bmi categories
+partition BMI_diabetes { 0, 23, 25, 30, 35};
+partition AGE_DIABETES_GROUP {45, 65};  //EN Age group
+partition AGE65 { 65 };  //EN Age group
+partition FROM20_80 { 20, 80 }; //EN Age group
+
+/* bmi missing is allowed in the risk algorithm, but so far we haven't allowed this as a valid value
+for a POHEM person... need to think how to handle this */
+classification BMI_DIABETES_STATE {         // Body Mass Index State used in Diabetes algorithm
+	DB_BMI_MISSING,								// BMI value missing
+	DB_BMI_LOW,									// BMI <23
+	DB_BMI_NORMAL,                              // BMI [23,25)
+	DB_BMI_OVER,								// BMI [25,30)
+	DB_BMI_OBESE,                               // BMI >=30
+	DB_BMI_MORBID								// BMI >=35
+};
+classification DIABETES_BETA {	// Diabetes risk algorithm coefficients (scale and betas)
+	DB_Scale,	
+	DB_Beta0,
+	DB_Hypertensive,
+	DB_Nonwhite,
+	DB_ImmigrantEver,
+	DB_PostSecondary,
+	DB_HeartDisease,
+	DB_Smoker
+};
+
+classification DIABETES_RR_MORTALITY {	//EN Diabetes relative risk PD class
+	DB_RR_MORT_INTERCEPT,	//EN Intercept
+	DB_RR_MORT_BETA_SEX,	//EN Beta sex
+	DB_RR_MORT_BETA_AGE0	//EN Beta age
+};
+
+classification DIABETES_RECENCY {	//EN Diabetes recency
+	DIAB_RECENT,
+	DIAB_REMOTE
+};
+
+parameter_group pgDiabetes {		//EN Diabetes
+	UseDport,
+	TimeHorizonForDport,
+	DportAlterationSpecs,
+	DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR,
+	pgDiabetes_DPoRT_coefficients,
+	pgDiabetes_Mortality_Inputs,
+	pgDiabetes_Calibration_Inputs, 
+	pDiabetes_SURVIVAL_INTERVAL
+};
+parameter_group pgDiabetes_DPoRT_coefficients {		//EN DPoRT coefficients
+	pDiabetes_Mean,
+	pDiabetes_Mean_BMI_Age,
+	pDiabetes_Beta, 
+	pDiabetes_Beta_BMI_Age
+};
+
+parameter_group pgDiabetes_Mortality_Inputs {		//EN Diabetes mortality parameters
+	pDiabetes_RR_Mortality,
+	DiabetesMortalityRelRiskAgeSplineLocationCoef,
+	DiabetesMortalityRelRiskAgeSplineCompanion,
+	DiabetesMortalityRelRiskYearSplineLocationCoef,
+	DiabetesMortalityRelRiskYearSplineCompanion
+};
+parameters {
+	/* NOTE ( pDiabetes_SURVIVAL_INTERVAL , EN )
+	Discrete time interval from Diabetes events used to reconstruct survival curves via tables
+	> 1 month interval is 0.08333333333333330 years
+	> 3 months interval is 0.25 years
+	> 6 month interval is 0.5 years
+	> 1 year interval is 1 year
+	> The shorter the interval, the slower the simulation will be.
+	*/
+	double	pDiabetes_SURVIVAL_INTERVAL; //EN Diabetes event clock tick unit (0.083 is 1 month)
+
+	//DPoRT
+	double	pDiabetes_Mean[SEX][DIABETES_BETA]; 
+	double	pDiabetes_Mean_BMI_Age[SEX][BMI_DIABETES_STATE][AGE_DIABETES_GROUP]; 
+	double	pDiabetes_Beta[SEX][DIABETES_BETA]; 
+	double	pDiabetes_Beta_BMI_Age[SEX][BMI_DIABETES_STATE][AGE_DIABETES_GROUP]; 
+	model_generated double  pDiabetes_Corrected_Intercept[SEX];
+	double  TimeHorizonForDport; //EN Time horizon used in the implementation of DPoRT
+
+	//DPoRT alterations
+	double pDiabetesRRMetformin; //EN Relative risk of metformin on risk of developing diabetes
+	double  DportAlterationSpecs[SEX][FROM_25_TO_90_BY_5];        //EN Alteration of DPoRT linear predictor by sex and age
+	logical DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR; //EN Use altered DPoRT linear predictor in correction for diabetes prevalence
+	
+	//Mortality of diabetics
+	double	pDiabetes_RR_Mortality[DIABETES_RECENCY][DIABETES_RR_MORTALITY]; //EN Diabetes mortality relative risk: non-spline coefficients
+
+	double  DiabetesMortalityRelRiskAgeSplineLocationCoef[DIABETES_RECENCY][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN Diabetes mortality relative risk: age cubic spline coefficients 
+	double  DiabetesMortalityRelRiskAgeSplineCompanion   [DIABETES_RECENCY][CUBIC_SPLINE_COMPANION];                                             //EN Diabetes mortality relative risk: age cubic spline companion 
+
+	double  DiabetesMortalityRelRiskYearSplineLocationCoef[DIABETES_RECENCY][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX]; //EN Diabetes mortality relative risk: year cubic spline coefficients 
+	double  DiabetesMortalityRelRiskYearSplineCompanion   [DIABETES_RECENCY][CUBIC_SPLINE_COMPANION];                                            //EN Diabetes mortality relative risk: year cubic spline companion 
+
+	model_generated double DiabetesMortalityRelRiskAgeSpline   [DIABETES_RECENCY][LIFE];
+	model_generated double DiabetesMortalityRelRiskYearSpline  [DIABETES_RECENCY][RANGE_FROM_2001_TO_2021];
+};
+
+
+actor Person            // Core Individual
+{
+	double Diabetes_Prob = {0.0}; 
+	DIAB_STATE		 gDiabetes_DPoRT ;	
+
+	//event	timeDiabetesRecency, DiabetesRecency;
+	//event	timeDiabetesClock, DiabetesClock;
+	event	timeDiabetesEvent,  DiabetesEvent;  
+
+	double  DportPredictor(double time_horizon_in_years);
+	void	DiabetesCheck();
+	hook	DiabetesCheck, HealthHazardUpdatesEmptyHub, 0; // 0 = execution number, the higher the value, the later the execution
+
+	double	Diabetes_hazard = {0.0};
+
+
+	//EN Mortality function
+	
+	int     recency_chunk =  duration_counter(gDiabetes_use, DIAB_YES ,2.0,1)  ; //Due to bug in modgen 11 software, this dummy states is required for duration_trigger to work properly below
+	DIABETES_RECENCY gDiabetes_Recency = gDiabetes_Initial_Altered == DIAB_YES || duration_trigger(gDiabetes_use, DIAB_YES ,2.0) ? DIAB_REMOTE  : DIAB_RECENT ;
+
+
+	
+	double	gDiabetes_rr_mortality= ( gDiabetes_use == DIAB_YES && integer_age >=20 ) 
+		? 	( pDiabetes_RR_Mortality[gDiabetes_Recency][DB_RR_MORT_INTERCEPT]
+			+ pDiabetes_RR_Mortality[gDiabetes_Recency][DB_RR_MORT_BETA_SEX] * double( sex )
+			+ pDiabetes_RR_Mortality[gDiabetes_Recency][DB_RR_MORT_BETA_AGE0] * min(integer_age, 96)
+			+ DiabetesMortalityRelRiskAgeSpline[gDiabetes_Recency][integer_age] 
+			+ DiabetesMortalityRelRiskYearSpline[gDiabetes_Recency][RANGE_POS(RANGE_FROM_2001_TO_2021,calendar_year)] 
+			)
+		: 1.0;
+		
+
+	//EN Define Diabetes clock for generating survival outputs
+	//Diabetes_SURVIVAL_INTERVALS gDiabetesClock = {0};		// Time survived from time of Index OA
+
+	void	ReadFromStartPopDiabetes();
+	hook    ReadFromStartPopDiabetes,ReadFromStartPop, 70; // 70 = execution number, the higher the value, the later the execution 
+};
+
+
+void hook_ReadFromStartPopDiabetes() {};
+
+void Person::ReadFromStartPopDiabetes() 
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gDiabetes_Initial          = ( DIAB_STATE            ) int(record_to_be_read[cDb_SP_DM]);	
+	gDiabetes_Initial_Altered  = ( DIAB_STATE            ) int(record_to_be_read[cDb_SP_DM]);	
+	gDiabetes_DPoRT            = ( DIAB_STATE            ) int(record_to_be_read[cDb_SP_DM]);	
+	
+	hook_ReadFromStartPopDiabetes();
+};
+
+
+//=================================
+//EN Incidence of Diabetes
+//EN DPoRT (Rosella-Manuel Diabetes Risk Algorithm 2007-10-22)
+//=================================
+
+double Person::DportPredictor(double time_horizon_in_years)
+{
+	double mu,  u ;
+	double answer;
+
+	// prepare new categorical variables
+	int nHypertensive  = bp_chhs == BP_MEDHI || bp_chhs == BP_HIGH  ? 1 : 0 ;
+	int nPostSecondary = gEducation == EDUC3 || gEducation == EDUC4 ? 1 : 0 ;
+
+	mu = pDiabetes_Corrected_Intercept[sex]
+			+ pDiabetes_Beta[sex][DB_Hypertensive] * (double) nHypertensive
+			+ pDiabetes_Beta[sex][DB_Nonwhite] * (double) gEthnicityNonWhite 
+			+ pDiabetes_Beta[sex][DB_ImmigrantEver] * (double) gImmigrantEver  
+			+ pDiabetes_Beta[sex][DB_PostSecondary] * (double) nPostSecondary
+			+ pDiabetes_Beta[sex][DB_HeartDisease] * (double) gHeartDisease	 //QQQ updated during simulation?
+			+ pDiabetes_Beta[sex][DB_Smoker] * (double) ((int) gSmoker) //QQQ updated during simulation? 
+			+ pDiabetes_Beta_BMI_Age[sex][SPLIT(gBMI, BMI_diabetes)][SPLIT(truncated_age, AGE_DIABETES_GROUP)]
+			+ DportAlterationSpecs[sex][SPLIT(truncated_age, FROM_25_TO_90_BY_5)];
+
+	if(time_horizon_in_years < 0.0)
+		answer = mu;
+	else
+	{
+		u = (log(365.25*time_horizon_in_years) - mu)/pDiabetes_Beta[sex][DB_Scale];		
+		answer = (1.0 - exp(-exp(u)));	// probability of developing diabetes within time_horizon_in_years years 
+	}
+	
+	return answer;
+
+}
+
+void hook_DiabetesCheck() {};
+
+void Person::DiabetesCheck()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+//	int gEthnicityNonWhite = {0}; // needs to be added to CCHS QQQ
+
+	if ( pDisease[DM_DIABETES][ROW_1] && gDiabetes_DPoRT == DIAB_NO )
+	{
+		Diabetes_Prob = DportPredictor(TimeHorizonForDport);				// 10 year probability of developing diabetes
+		Diabetes_hazard = (-log( 1.0 - Diabetes_Prob))/TimeHorizonForDport;	// annualized hazard of developing diabetes
+		Diabetes_hazard = Diabetes_hazard * (adherent_metformin ? pDiabetesRRMetformin : 1.0);
+	//	Diabetes_hazard *= gRR_FFF_on_Diabetes;	//EN Additional risk factor modifiers (as relative risks)
+
+
+	}
+
+	hook_DiabetesCheck();
+}
+TIME Person::timeDiabetesEvent()
+{
+	TIME event_time = {TIME_INFINITE};
+
+	// continuous time implementation
+	if ( Diabetes_hazard > 0 && gDiabetes_DPoRT == DIAB_NO) 
+	{
+		event_time = WAIT( - TIME( log( RandUniform(18) ) / Diabetes_hazard ) ); 
+	}
+	return event_time;
+};
+
+void hook_DiabetesEvent() {};
+
+void Person::DiabetesEvent()
+{
+	Diabetes_hazard = 0; // the initial event is over - Continuous mode
+	gDiabetes_DPoRT = DIAB_YES;
+
+	hook_DiabetesEvent();
+}
+
+//=================================
+
+
+
+void PreSimulation()
+
+{
+	if( !(MIN(RANGE_FROM_2001_TO_2021) <= DiabetesMortalityRelRiskYearSplineCompanion[DIAB_RECENT][CUBIC_SPLINE_COMPANION_MAX] && 
+		                                  DiabetesMortalityRelRiskYearSplineCompanion[DIAB_RECENT][CUBIC_SPLINE_COMPANION_MAX] <= MAX(RANGE_FROM_2001_TO_2021)   ) )
+		ModelExit("\n DiabetesMortalityRelRiskYearSplineCompanion" "[DIAB_RECENT][CUBIC_SPLINE_COMPANION_MAX] not within bounds of RANGE_FROM_2001_TO_2021.");
+
+	if( !(MIN(RANGE_FROM_2001_TO_2021) <= DiabetesMortalityRelRiskYearSplineCompanion[DIAB_REMOTE][CUBIC_SPLINE_COMPANION_MAX] && 
+		                                  DiabetesMortalityRelRiskYearSplineCompanion[DIAB_REMOTE][CUBIC_SPLINE_COMPANION_MAX] <= MAX(RANGE_FROM_2001_TO_2021)   ) )
+		ModelExit("\n DiabetesMortalityRelRiskYearSplineCompanion" "[DIAB_REMOTE][CUBIC_SPLINE_COMPANION_MAX] not within bounds of RANGE_FROM_2001_TO_2021.");
+	
+
+	for(int diab_recency_looper=0 ; diab_recency_looper < SIZE(DIABETES_RECENCY) ; diab_recency_looper++)
+	{
+		for(int age_looper=0; age_looper<SIZE(LIFE) ; age_looper++)
+		{
+			DiabetesMortalityRelRiskAgeSpline [diab_recency_looper][ age_looper] 
+			           = CubicSpline((double)age_looper, (double*)DiabetesMortalityRelRiskAgeSplineLocationCoef[diab_recency_looper][CUBIC_SPLINE_KNOTS_LOCATION]    , 
+						   (double*)DiabetesMortalityRelRiskAgeSplineLocationCoef[diab_recency_looper][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+						   (double*)DiabetesMortalityRelRiskAgeSplineCompanion   [diab_recency_looper]      ) ;
+		}
+
+		for(int year_looper=MIN(RANGE_FROM_2001_TO_2021); year_looper<=MAX(RANGE_FROM_2001_TO_2021) ; year_looper++)
+		{
+			DiabetesMortalityRelRiskYearSpline[diab_recency_looper][RANGE_POS(RANGE_FROM_2001_TO_2021,year_looper)] 
+			           = CubicSpline((double)year_looper, (double*)DiabetesMortalityRelRiskYearSplineLocationCoef[diab_recency_looper][CUBIC_SPLINE_KNOTS_LOCATION]    ,
+						   (double*)DiabetesMortalityRelRiskYearSplineLocationCoef[diab_recency_looper][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+						   (double*)DiabetesMortalityRelRiskYearSplineCompanion   [diab_recency_looper]      ) ;
+		}
+
+
+	}
+	
+
+
+
+	int AgeBound;
+
+		for(int nSex = 0; nSex < SIZE(SEX); nSex++)
+		{
+			pDiabetes_Corrected_Intercept[nSex]=pDiabetes_Beta[nSex][DB_Beta0]
+			      - pDiabetes_Beta[nSex][DB_Hypertensive]  * pDiabetes_Mean[nSex][DB_Hypertensive] 
+			      - pDiabetes_Beta[nSex][DB_Nonwhite]      * pDiabetes_Mean[nSex][DB_Nonwhite] 
+			      - pDiabetes_Beta[nSex][DB_PostSecondary] * pDiabetes_Mean[nSex][DB_PostSecondary] 
+			      - pDiabetes_Beta[nSex][DB_ImmigrantEver] * pDiabetes_Mean[nSex][DB_ImmigrantEver] 
+			      - pDiabetes_Beta[nSex][DB_HeartDisease]  * pDiabetes_Mean[nSex][DB_HeartDisease] 
+		          - pDiabetes_Beta[nSex][DB_Smoker]        * pDiabetes_Mean[nSex][DB_Smoker] ;
+
+				  // in DPoRT function there is only two age groups for males. Means for age-BMI interactions defined
+				  // for all age groups and when all are used the means for the last group of Age BMI interaction is 
+				  // subtracted twice. Should try to explain this better.--MT?
+
+				  if (nSex==0) // Female 
+					  { 
+						  AgeBound=3;
+				       }
+						  
+				  else  // sex=1 Male
+					   { 
+						  AgeBound=2;
+				       }
+						 						  
+						  
+		     for ( int nBMI=0; nBMI< SIZE(BMI_diabetes); nBMI++) 
+			     for ( int nAge=0; nAge<AgeBound; nAge++) 
+				    pDiabetes_Corrected_Intercept[nSex] -= 
+					    pDiabetes_Beta_BMI_Age[nSex][nBMI][nAge] *  pDiabetes_Mean_BMI_Age[nSex][nBMI][nAge];
+
+			
+		}
+
+}
+

@@ -1,0 +1,14 @@
+table Person tSmokingPackYears	//EN Average smoking pack-years by age at start, year and sex
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year) ]
+{
+	sex+ *														//EN Sex
+	smoking_status3+ *											//EN Smoking status
+	{
+		
+		weighted_duration(total_packyears_smoked)/duration(),	//EN Average pack-years decimals=2
+		weighted_duration(total_packs_smoked)/duration(),		//EN Average packs smoked
+		duration()												//EN Person-years
+	}
+	*	report_calendar_year		//EN year
+	*	split(lifespan_age_start, AGE_GROUP_RF5)+	//EN Age at start
+};

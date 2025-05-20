@@ -1,0 +1,207 @@
+//FILE_LABEL (EN) Tables of output for Risk Factors
+/* FILE_NOTE(EN) 
+	 Tables of output for Risk Factors.
+*/
+
+// Choose one definition for the age group for risk factors and recompile
+//partition AGE_GROUP_RF { 50};	// This one is just to minimize the dimension and size of mdb
+
+partition AGE_GROUP_RF20 { 20, 40, 60, 80 }; //EN Age groups 
+partition AGE_GROUP_RF20_79 { 20, 80 }; //EN Age groups 
+partition AGE_GROUP_RF { 30, 40, 50, 60, 70, 80 };	//EN Age groups 
+partition AGE_GROUP_RF18_74 {18, 75};  //EN Age groups 
+partition AGE_GROUP_RF5 { 18, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80 };	//EN Age groups 
+partition AGE_GROUP_AMI_RISK { 40, 50 };										//EN Age groups 
+partition AGE_GROUP_6_12_18_20 {6, 12, 18, 20};   //EN Age groups 
+
+
+table_group tgRiskFactor_Tables { //EN Risk factors
+	tRisk_Factors_CrossSectional,
+	tRisk_Factors_Longitudinal,
+	tRegularSmokers,
+	tSmokingPackYears,
+	tHDL,
+	tBP,
+	tBMIcat,
+	tMeasuredSrYouthBMI,
+	tRiskFactorBMI,
+	tRiskFactorDiabAgeSex,
+    tRiskFactorDiab,
+    tPA,
+    tPA_by_age_start
+};
+
+
+
+
+table Person tRegularSmokers	//EN Current regular smokers by year, sex and age
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year) ]
+{
+	sex+ *	//EN Sex
+	{
+		duration( smoking_status3, SMOKING_STATE3_NEVER)   / duration(),		//EN proportion of never smokers  decimals=2
+		duration( smoking_status3, SMOKING_STATE3_FORMER)  / duration(),		//EN proportion of former smokers  decimals=2
+		duration( smoking_status3, SMOKING_STATE3_CURRENT) / duration(),		//EN proportion of current smokers  decimals=2
+		duration()	//EN number of people (person-years)
+	}
+	*	report_calendar_year					//EN Year
+	*	split(truncated_age, AGE_GROUP_RF5)+	//EN Age group
+};
+
+table Person tHDL			//EN High-density lipids (HDL)
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year) ]
+{
+	sex+ *
+	{
+		nz_delta( duration( hdl, HDL_LOW) ) / unit,		//EN Low HDL <35 mg/dl decimals=2
+		nz_delta( duration( hdl, HDL_MEDLOW) )/ unit,	//EN Medium-Low HDL 35 to <45 mg/dl decimals=2
+		nz_delta( duration( hdl, HDL_MED) ) / unit,		//EN Medium HDL 45 to <50 mg/dl decimals=2
+		nz_delta( duration( hdl, HDL_MEDHI) ) / unit,	//EN Medium-Hi HDL 50 to <60 mg/dl decimals=2
+		nz_delta( duration( hdl, HDL_HIGH) ) / unit		//EN High HDL >=60 mg/dl decimals=2
+	}
+	*	report_calendar_year		//EN Year
+};
+
+
+table Person tBP			//EN BP transitions
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year) ]
+{
+	sex+ *	//EN Sex
+	{
+		nz_delta( duration( bp_chhs, BP_LOW) ) / unit,	//EN Low BP decimals=2
+		nz_delta( duration( bp_chhs, BP_MEDLOW) )/ unit,	//EN Medium-Low BP decimals=2
+		nz_delta( duration( bp_chhs, BP_MED) ) / unit,	//EN Medium BP decimals=2
+		nz_delta( duration( bp_chhs, BP_MEDHI) ) / unit,	//EN Medium-High BP decimals=2
+		nz_delta( duration( bp_chhs, BP_HIGH) ) / unit	//EN High BP decimals=2
+	}
+	*	report_calendar_year		//EN Year
+};
+
+table Person tBMIcat		//EN BMI distribution 
+// (decommission forthcoming - should instead use table  Adult BMI distribution and average (self-reported or measured) by sex, age, year )
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year) ]
+{
+	sex+ *		//EN Sex
+	{
+		nz_delta( duration(bmi_PHAC, BMI_CAT_1) ) / unit,	//EN BMI self-reported <18.5 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_2) ) / unit,	//EN BMI self-reported 18.5 to <25 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_3) ) / unit,	//EN BMI self-reported 25 to <30 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_4) ) / unit,	//EN BMI self-reported >=30 decimals=4 
+	    unit    //EN Total count of persons
+	}
+	*	report_calendar_year 	//EN Year
+};
+
+table Person tMeasuredSrAdultBMI //EN  Adult BMI distribution and average (self-reported or measured) by sex, age, year
+[in_tabulation_scope && alive && WITHIN(REPORT_YEAR, year)]
+{
+	sex +	//EN Sex
+	*
+	split( lifespan_age, FROM20_80)+  //EN Age (current)
+	*
+	report_calendar_year +	//EN Year
+    *
+	{
+		duration(bmi_PHAC, BMI_CAT_1) / duration()   ,	              //EN Underweight: self-reported BMI <18.5 decimals=4
+		duration(bmi_PHAC, BMI_CAT_2) / duration()   ,	              //EN Normal weight: self-reported BMI 18.5 to <25 decimals=4
+		duration(bmi_PHAC, BMI_CAT_3) / duration()   ,	              //EN Overweight: self-reported BMI 25 to <30 decimals=4
+		duration(bmi_PHAC, BMI_CAT_4) / duration()	 ,                //EN Obese: self-reported BMI >=30 decimals=4 
+		weighted_duration(gBMI_PHAC)  / duration()   ,                //EN Average BMI (self-reported) decimals=2 
+
+		duration(),                                                   //EN People count (person-years)
+
+		duration(bmi4cat_measured_PHAC, UNDERWEIGHT)   / duration(),  //EN Underweight: measured BMI <18.5 decimals=4
+		duration(bmi4cat_measured_PHAC, NORMAL_WEIGHT) / duration(),  //EN Normal weight: measured BMI 18.5 to <25 decimals=4
+		duration(bmi4cat_measured_PHAC, OVERWEIGHT)    / duration(),  //EN Overweight: measured BMI 25 to <30 decimals=4
+		duration(bmi4cat_measured_PHAC, OBESE)         / duration(),  //EN Obese: measured BMI >=30 decimals=4 
+		weighted_duration(gBMImeasured_PHAC)           / duration()   //EN Average BMI (measured) decimals=2
+	}
+
+};
+
+table Person tMeasuredSrYouthBMI  //EN  Youth BMI distribution and average (self-reported or measured) by sex, age, year
+ [in_tabulation_scope && alive && bmi_history_report_calendar_year == bmi_history_year  && lifespan_age_start == mgYoungestAge  && bmi_history_age < mgYoungestAge]
+{
+	sex +	//EN Sex
+	*
+	split(bmi_history_age, AGE_GROUP_RF20_79)+  //EN Age 
+	*
+	bmi_history_report_calendar_year +	//EN Year
+	*
+	{
+		event(silly_accumulator_sr_normal)     / unit   ,	  //EN Normal weight: self-reported BMI below WHO cutoff #1 decimals=4
+		event(silly_accumulator_sr_overweight) / unit   ,	  //EN Overweight: self-reported BMI between WHO cutoffs decimals=4
+		event(silly_accumulator_sr_obese )     / unit	 ,    //EN Obese: self-reported BMI above WHO cutoff #2 decimals=4 
+		event(silly_accumulator_sr_bmi   )     / unit	 ,    //EN Average BMI (self-reported)  decimals=2 
+
+		unit,                                                   //EN People count 
+		event(silly_accumulator_age) / unit   ,                 //EN Average age  decimals=2
+	
+		event(silly_accumulator_normal   )  / unit   ,	  //EN Normal weight: measured BMI below WHO cutoff #1 decimals=4
+		event(silly_accumulator_overweight) / unit   ,	  //EN Overweight: measured BMI between WHO cutoffs decimals=4
+		event(silly_accumulator_obese   )   / unit	 ,    //EN Obese: measured BMI above WHO cutoff #2 decimals=4 
+		event(silly_accumulator_bmi )       / unit	      //EN Average BMI (measured)  decimals=2
+
+	}
+
+};
+
+// for other BMI tables -- see Tab.RiskFactors.Extras.mpp
+
+
+
+table Person tPA //EN PA distribution (cross-sectional view)
+[in_tabulation_scope &&  alive && WITHIN(REPORT_YEAR, year)] 
+{
+	sex +	//EN Sex
+	*
+	split(truncated_age,FROM20_80) +	//EN Age (current)
+	*
+	report_calendar_year +	//EN Year
+	*
+	{
+		duration(gWalk_errands, WALK_NO) / duration(),	    //EN Do not walk for errands decimals=4
+		duration(gWalk_errands, WALK_0_5) / duration(),	    //EN Walk for errands (0,5] decimals=4
+		duration(gWalk_errands, WALK_6_10) / duration(),	//EN Walk for errands (5,10] decimals=4
+		duration(gWalk_errands, WALK_11_plus) / duration(),	//EN Walk for errands >=11 decimals=4 
+		duration(gPA_usual_day, SIT) / duration(),	        //EN SIT decimals=4
+		duration(gPA_usual_day, STAND_WALK) / duration(),	//EN STAND decimals=4
+		duration(gPA_usual_day, LIFT) / duration(),	        //EN LIFT decimals=4
+		duration(gPA_usual_day, HEAVY_WORK) / duration(),	//EN HEAVY WORK decimals=4 
+		duration(gLTPA_cat, LTPA_NO) / duration(),	        //EN No active leisure time decimals=4
+		duration(gLTPA_cat, LTPA_0_30) / duration(),	    //EN 0-30 minutes/day of physical activity from leisure time decimals=4
+		duration(gLTPA_cat, LTPA_30_60) / duration(),	    //EN 30-60 minutes/day of physical activity from leisure time decimals=4
+		duration(gLTPA_cat, LTPA_60_plus) / duration(),    //EN 60+ minutes/day of physical activity from leisure time decimals=4
+		duration(gBike_errands, BIKE_NO) / duration(),	    //EN Do not bike for errands decimals=4
+		duration(gBike_errands, BIKE_YES) / duration(),	    //EN Bikes for errands decimals=4 
+		duration() //EN total count of persons (person-years)
+	}
+};
+
+table Person tPA_by_age_start //EN PA distribution (cohort view)
+[in_tabulation_scope &&  alive && WITHIN(REPORT_YEAR, year) && calendar_year_start == 2001] 
+{
+	sex +	//EN Sex
+	*
+	split(lifespan_age_start,FROM20_80) +	// Age at start
+	*
+	report_calendar_year +	//EN Year
+	*
+    {
+		duration(gWalk_errands, WALK_NO) / duration(),	    //EN Do not walk for errands decimals=4
+		duration(gWalk_errands, WALK_0_5) / duration(),	    //EN Walk for errands (0,5] decimals=4
+		duration(gWalk_errands, WALK_6_10) / duration(),	//EN Walk for errands (5,10] decimals=4
+		duration(gWalk_errands, WALK_11_plus) / duration(),	//EN Walk for errands >=11 decimals=4 
+		duration(gPA_usual_day, SIT) / duration(),	        //EN SIT decimals=4
+		duration(gPA_usual_day, STAND_WALK) / duration(),	//EN STAND decimals=4
+		duration(gPA_usual_day, LIFT) / duration(),	        //EN LIFT decimals=4
+		duration(gPA_usual_day, HEAVY_WORK) / duration(),	//EN HEAVY WORK decimals=4 
+		duration(gLTPA_cat, LTPA_NO) / duration(),	        //EN No active leisure time decimals=4
+		duration(gLTPA_cat, LTPA_0_30) / duration(),	    //EN 0-30 minutes/day of physical activity from leisure time decimals=4
+		duration(gLTPA_cat, LTPA_30_60) / duration(),	    //EN 30-60 minutes/day of physical activity from leisure time decimals=4
+		duration(gLTPA_cat, LTPA_60_plus) / duration(),    //EN 60+ minutes/day of physical activity from leisure time decimals=4
+		duration(gBike_errands, BIKE_NO) / duration(),	    //EN Do not bike for errands decimals=4
+		duration(gBike_errands, BIKE_YES) / duration(),	    //EN Bikes for errands decimals=4 
+		duration()  //EN total count of persons (person-years)
+	}
+};

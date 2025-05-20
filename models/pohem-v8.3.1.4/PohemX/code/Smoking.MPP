@@ -1,0 +1,312 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Change in Smoking
+/* FILE_NOTE(EN) 
+	This file updates the Smoking status (regular smoker or not) at two year intervals. 
+	It implements a fourth order hierarchical Markov chain based on observed changes
+	between successive cycles of the longitudinal National Population Health Survey (1994-2002). 
+	(Note: 2004 data available, but not used due to diminishing sample size).
+	This module can be deactived using Intervention Parameters for Smoking 
+	(see parameter "Risk Factor Control Panel").
+*/
+
+classification SMOKER1 {	//EN Smoking
+	cNOT_REGULAR_SMOKER,	//EN Not heavy/daily smoker (current or recent quitter) 
+	cREGULAR_SMOKER			//EN Heavy/daily smoker (current or recent quitter) 
+};
+classification SMOKF98_INDEX{	//EN Smoking state
+	iNOT_REGULAR_SMOKER,		//EN Non-smoker
+	iREGULAR_SMOKER				//EN Smoker
+};
+/*
+This classification is the same as SMOKING_STATE3.  Consider dropping SMOKING_STATE3 (and SMOKING_STATE3_NEVER, SMOKING_STATE3_FORMER, SMOKING_STATE3_CURRENT) in favor of SMOKING_STATE3
+classification SMOKER_NFC{	//EN Smoking
+	SMOKER_NFC_NEVER,			//EN Never Smoker
+	SMOKER_NFC_FORMER,			//EN Former Smoker
+	SMOKER_NFC_CURRENT			//EN Current Smoker
+};
+*/
+classification FORMER_SMOKER {
+	FORMER_SMOKER_LIGHT_01,     //EN Former light smoker quit less than 1 year ago
+	FORMER_SMOKER_LIGHT_12,     //EN Former light smoker quit 1 to 2 years ago
+	FORMER_SMOKER_LIGHT_35,     //EN Former light smoker quit 3 to 5 years ago
+	FORMER_SMOKER_LIGHT_5PLUS,  //EN Former light smoker quit more than 5 years ago
+	FORMER_SMOKER_HEAVY_01,     //EN Former heavy smoker quit less than 1 year ago
+	FORMER_SMOKER_HEAVY_12,     //EN Former heavy smoker quit 1 to 2 years ago
+	FORMER_SMOKER_HEAVY_35,     //EN Former heavy smoker quit 3 to 5 years ago
+	FORMER_SMOKER_HEAVY_5PLUS   //EN Former heavy smoker quit more than 5 years ago
+};
+
+// range SMOKF98_INDEX     { 0, 1 };      // categories of smoking for Framingham98 from Wilson
+partition AGE_GROUP_SMOKING	{ 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75 }; //EN Age groups
+range     RANGE_FROM_0_TO_20  {0, 20}; //EN Years
+
+parameters {
+
+	cumrate TimeSinceQuitDistribution[FORMER_SMOKER][RANGE_FROM_0_TO_20]; //EN Time since quit smoking for former smoker
+
+	/* NOTE ( SmokTrans, EN )
+	Fifth order hierarchical Markov chain of smoking status (Yes/No) 
+	from longitudinal NPHS 1994, 1996, 1998, 2000, 2002, 2004.
+	>At t=0: smoking initialized from StartPop; 
+	>At t=2: smoking status updated based on transition observed from NPHS 1994 to 1996, given value at t=0; 
+	>At t=4: smoking status updated based on transition observed from NPHS 1994 to 1996 to 1998, given value at t=0 and t=2
+	and so on.
+	>Dimensions: Age, Sex, and Smoking status (N/Y) at each wave of NPHS (1994, 1996, 1998, 2000, 2002, 2004) 
+	which correspond to time points t=0, 2, 4, 6, 8, 10, respectively relative to start year of simulation.
+
+	Note: Due to sample size constraints, code only uses this as a 4th order H-M chain.
+	*/
+	//EN Evolution of smoking status
+	double SmokTrans[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+
+	/* NOTE ( cumSmokTrans5, EN )
+	Used to project smoking when 1 past value of smoking is known.
+	We supply the value at t=0, and return the value at t=2
+	This is a copy of SmokTrans, but defined as cumrate[4].
+	The future smoking status indicated by the last 4 dimension are irrelevant in this case.
+	*/
+	model_generated cumrate[5] cumSmokTrans5[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+
+	/* NOTE ( cumSmokTrans4, EN )
+	Used to project smoking when 2 past value of smoking is known.
+	We supply the values at t=0 and t=2, and return the value at t=4
+	This is a copy of SmokTrans, but defined as cumrate[4].
+	The future smoking status indicated by the last 3 dimension are irrelevant in this case.
+	*/
+	model_generated cumrate[4] cumSmokTrans4[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+
+	/* NOTE ( cumSmokTrans3, EN )
+	Used to project smoking when 3 past value of smoking is known.
+	We supply the values at t=0 and t=2 and t=4, and return the value at t=6
+	This is a copy of SmokTrans, but defined as cumrate[3].
+	The future smoking status indicated by the last 2 dimension are irrelevant in this case.
+	*/
+	model_generated cumrate[3] cumSmokTrans3[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+
+	/* NOTE ( cumSmokTrans2, EN )
+	Used to project smoking when 4 past value of smoking is known.
+	We supply the values at t=0 and t=2 and t=4 and t=6, and return the value at t=8
+	This is a copy of SmokTrans, but defined as cumrate[2].
+	The future smoking status indicated by the last 1 dimension are irrelevant in this case.
+	*/
+	model_generated cumrate[2] cumSmokTrans2[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+
+	/* NOTE ( cumSmokTrans1, EN )
+	Used to project smoking when 5 past value of smoking is known.
+	We supply the values at t=0 and t=2 and t=4 and t=6 and t=8, and return the value at t=10
+	This is a copy of SmokTrans, but defined as cumrate[1].
+	*/
+	model_generated cumrate[1] cumSmokTrans1[AGE_GROUP_SMOKING][SEX][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1][SMOKER1];
+};
+actor Person            // Core Individual
+{
+//	SMOKER1		gSmoking_NPHS_Prev;	//EN Previous smoking status for AMI risk (2-4 years ago)
+	SMOKER1		gSmoking_NPHS;			//EN Smoking status (NPHS)
+	SMOKER1		gSmoking_NPHS_Prev_t2;	//EN Previous smoking status for AMI risk (2-4 years ago)
+	SMOKER1		gSmoking_NPHS_Prev_t4;	//EN Previous smoking status for AMI risk (4-6 years ago)
+	SMOKER1		gSmoking_NPHS_Prev_t6;	//EN Previous smoking status for AMI risk (6-8 years ago)
+	SMOKER1		gSmoking_NPHS_Prev_t8;	//EN Previous smoking status for AMI risk (8-10 years ago)
+	// Reporting Global to validitate smoke transitions
+	int		gSmokPattern = {0};	// pattern is complete after three transitions ie 2005
+	//end Reporting Global to validate smoke transitions
+	logical  gSmoking_NPHS_ever_changed = undergone_change(gSmoking_NPHS);
+	SMOKING_STATE3  smoking_cancer_dynamic =  !gSmoking_NPHS_ever_changed     ? gSmokingCurrent
+		                             :  gSmoking_NPHS==cREGULAR_SMOKER ? SMOKING_STATE3_CURRENT : SMOKING_STATE3_FORMER;         //EN Self-reported smoking (3 categories)
+
+	//BEGIN static states (however gSmokingRegular is subject to intervention)
+	logical             ever_was_heavy_smoker_before_pohem ; //EN Ever was heavy smoker prior to entry in simulation
+	int                 smoking_current_former8;    //EN Smoking status with details for former smokers
+	SMOKER1				gSmokingRegular;	//EN Smoking status: heavy/daily (current or recent quitter) or not
+	SMOKING_STATE3				gSmokingCurrent;	//EN Self-reported smoking (3 categories) static
+	double				gSmokePackyears;		//EN derived packyears 
+	//END static states (however gSmokingRegular is subject to intervention)
+
+	event	timeUpdateSmokingEvent, UpdateSmokingEvent;
+
+	void	ReadFromStartPopSmoking();
+	hook	ReadFromStartPopSmoking, ReadFromStartPop, 8; // 8 = execution number, the higher the value, the later the execution
+
+	void    Smoking_Initialize();
+	hook    Smoking_Initialize, InitializationEmptyHub, 70; // 70 = execution number, the higher the value, the later the execution
+};
+
+TIME Person::timeUpdateSmokingEvent()
+{	
+	return WAIT( 2.0 );
+}
+
+/* Bill Feb 2007 : while merging ccort p4 RiskFactors.mpp into our OA model 
+(essentially to bring the bmi model up to date with NPHS 2004 modeling, 
+I disabled the use of most recent NPHS info for smoking since the sample size 
+is getting very small */
+
+void hook_UpdateSmokingEvent() {};
+
+void Person::UpdateSmokingEvent()
+{
+	int nSmok, nSmokX, nSmokX2, nSmokX3, nSmokX4, nAgePrev, nAgeGroupPrev;
+	int	nphsSmok_cyc;
+
+	// first condition allows SMOKING model to be turned off (for Interventions and tests)
+	if ( pRISK_FACTOR_CONTROL_PANEL[cSMOKING][RF_EVOLUTION_MODEL] )
+	{
+		// Model of smoking evolution applies outside of the fixed age range specified here (currently cannot "restart" it)
+		if (( truncated_age < pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE[cSMOKING][LOWER_BOUND] ) ||
+	 	  ( truncated_age >= pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE[cSMOKING][UPPER_BOUND] )) 
+	{
+	// Model of Smoking Evolution
+	if ( truncated_age < MAX( LIFE ) ) {
+		if (truncated_age - lifespan_age_start == 2 ) { // Smoking history only known for 1 past time point (2 years ago)
+			nphsSmok_cyc=2;
+			nAgePrev = truncated_age - 2; // ie age at start
+			nAgeGroupPrev = SPLIT( nAgePrev, AGE_GROUP_SMOKING);
+			if ( ! Lookup_cumSmokTrans5( RandUniform( 2 ), nAgeGroupPrev, sex,  
+										gSmoking_NPHS, &nSmok, &nSmokX, &nSmokX2, &nSmokX3, &nSmokX4) )
+				{ nSmok = gSmoking_NPHS;
+				}
+		}
+		else  if ((truncated_age-lifespan_age_start) == 4) {
+			nphsSmok_cyc=3;
+			nAgePrev = truncated_age - 4; // ie age at start
+			nAgeGroupPrev = SPLIT( nAgePrev, AGE_GROUP_SMOKING);
+			if ( ! Lookup_cumSmokTrans4( RandUniform( 3 ), nAgeGroupPrev, sex,  
+									gSmoking_NPHS_Prev_t2, gSmoking_NPHS, &nSmok, &nSmokX, &nSmokX2, &nSmokX3) )
+				{ nSmok = gSmoking_NPHS;
+				}
+		}
+
+		else if ((truncated_age-lifespan_age_start) == 6) {
+			nphsSmok_cyc=4;
+			nAgePrev = truncated_age - 6; // ie age at start
+			nAgeGroupPrev = SPLIT( nAgePrev, AGE_GROUP_SMOKING);
+			if ( ! Lookup_cumSmokTrans3( RandUniform( 12 ), nAgeGroupPrev, sex, 
+				gSmoking_NPHS_Prev_t4, gSmoking_NPHS_Prev_t2, gSmoking_NPHS, &nSmok, &nSmokX, &nSmokX2) )
+				{ 
+					nSmok = gSmoking_NPHS;
+				}
+		}
+		else { // if ((truncated_age-lifespan_age_start) == 8) { // Bill disabling last cycle for sample size
+			nphsSmok_cyc=5;
+			nAgePrev = truncated_age - 8; // ie age at start
+			nAgeGroupPrev = SPLIT( nAgePrev, AGE_GROUP_SMOKING);
+			if ( ! Lookup_cumSmokTrans2( RandUniform( 13 ), nAgeGroupPrev, sex, 
+									gSmoking_NPHS_Prev_t6, gSmoking_NPHS_Prev_t4, gSmoking_NPHS_Prev_t2, gSmoking_NPHS, &nSmok, &nSmokX) )
+				{ nSmok = gSmoking_NPHS;
+				}
+		}
+		/*	Bill is disabling this because I don't think we can trust the sample size after this many cycles
+			it is a hierarchical markov chain of yes/no smoking prob across all receding cycles
+		else {
+			nAgePrev = truncated_age - 10; // ie age at start
+			nAgeGroupPrev = SPLIT( nAgePrev, AGE_GROUP_SMOKING);
+			if ( ! Lookup_cumSmokTrans1( RandUniform( 18 ), nAgeGroupPrev, sex,  
+									gSmoking_NPHS_Prev_t8, gSmoking_NPHS_Prev_t6, gSmoking_NPHS_Prev_t4, gSmoking_NPHS_Prev_t2, gSmoking_NPHS, &nSmok) )
+				{ nSmok = gSmoking_NPHS;
+				}
+		*/
+
+		// Reporting Global to validate smoke transitions
+		if ( truncated_age - lifespan_age_start == 8 ) {
+			gSmokPattern = 1000000	+ int(gSmoking_NPHS_Prev_t8) * 100000
+									+ int(gSmoking_NPHS_Prev_t6) * 10000
+									+ int(gSmoking_NPHS_Prev_t4) * 1000
+									+ int(gSmoking_NPHS_Prev_t2) * 100
+									+ int(gSmoking_NPHS) * 10	+ int(nSmok);
+		}
+		// end Reporting Global to validate smoke transitions
+
+		if (nphsSmok_cyc==2) {
+			gSmoking_NPHS_Prev_t2 = gSmoking_NPHS;
+			gSmoking_NPHS = (SMOKER1) nSmok;
+		}
+		else if (nphsSmok_cyc==3) {
+			gSmoking_NPHS_Prev_t4 = gSmoking_NPHS_Prev_t2;
+			gSmoking_NPHS_Prev_t2 = gSmoking_NPHS;
+			gSmoking_NPHS = (SMOKER1) nSmok;
+		}
+		else if (nphsSmok_cyc==4) {
+			gSmoking_NPHS_Prev_t6 = gSmoking_NPHS_Prev_t4;
+			gSmoking_NPHS_Prev_t4 = gSmoking_NPHS_Prev_t2;
+			gSmoking_NPHS_Prev_t2 = gSmoking_NPHS;
+			gSmoking_NPHS = (SMOKER1) nSmok;
+		}
+		else if (nphsSmok_cyc == 5) {
+			gSmoking_NPHS_Prev_t8 = gSmoking_NPHS_Prev_t6;
+			gSmoking_NPHS_Prev_t6 = gSmoking_NPHS_Prev_t4;
+			gSmoking_NPHS_Prev_t4 = gSmoking_NPHS_Prev_t2;
+			gSmoking_NPHS_Prev_t2 = gSmoking_NPHS;
+			gSmoking_NPHS = (SMOKER1)nSmok;
+		}
+		}
+		}
+	}
+
+	hook_UpdateSmokingEvent();
+};
+
+void Person::Smoking_Initialize()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	//gSmoking_NPHS =  gSmokingRegular; //This is now done in ReadFromStartPopSmoking
+
+	if(gSmokingCurrent == SMOKING_STATE3_FORMER)
+	{
+		int lookup_result;
+		Lookup_TimeSinceQuitDistribution( RandUniform(145), smoking_current_former8 - 2, &lookup_result);
+		time_since_quit_smoking_before_pohem = lookup_result;
+	}
+	
+	hook_Smoking_Initialize();
+};
+
+void  Person::ReadFromStartPopSmoking()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gSmokePackyears		 =	(double	 	)     record_to_be_read[cDb_SmokingPackYears];	
+	gSmokingRegular		 = ( SMOKER1    ) int(record_to_be_read[cDb_SmokingRegular  ]);	//EN Smoker status
+	gSmoking_NPHS =  gSmokingRegular; // icitte this should be done here, not in Smoking_Initialize
+
+
+	smoking_current_former8 = int(record_to_be_read[cDb_SmokingCurrentFormer8  ]);	
+
+	//BEGIN set gSmokingCurrent and ever_was_heavy_smoker_before_pohem
+	switch (smoking_current_former8)  
+	{
+		case 0:	gSmokingCurrent = SMOKING_STATE3_NEVER;    ever_was_heavy_smoker_before_pohem=FALSE;  break;
+		case 1:	gSmokingCurrent = SMOKING_STATE3_CURRENT;    ever_was_heavy_smoker_before_pohem= (gSmokingRegular==cREGULAR_SMOKER);  break;
+		case 2:
+		case 3:
+		case 4:
+		case 5: gSmokingCurrent = SMOKING_STATE3_FORMER;    ever_was_heavy_smoker_before_pohem=FALSE;  break;  //same assignments for case 2,3,4,5 .
+		case 6:
+		case 7:
+		case 8:
+		case 9: gSmokingCurrent = SMOKING_STATE3_FORMER;    ever_was_heavy_smoker_before_pohem=TRUE ;  break; //same assignments for case 6,7,8,9 .
+
+		default: ModelExit("Unexpected value in StartPop file for cDb_SmokingCurrentFormer8.");
+	};	
+	//END set gSmokingCurrent and ever_was_heavy_smoker_before_pohem
+};
+
+void PreSimulation()
+{
+	// THESE MEMMOVE STATEMENTS ARE ESSENTIAL - THEY ARE NOT "0" INTIALIZERS - DO NOT DELETE
+
+	// The following are needed to transform the input parameters defined as Doubles
+	// into cumrate parameters for Lookup_ funcationality. It is done this way to allow multiple 
+	// cumrates from a single distribution.
+
+	// copy input parameter SmokTrans to the five possible cumulative versions (to facilitate easy lookup)
+	// [AGE_GROUP_SMOKING]*[SEX]*[SMOKER1]*[SMOKER1]*[SMOKER1]*[SMOKER1]*[SMOKER1]*[SMOKER1]=
+	//	14*2*2*2*2*2*2*2 = 1792
+	memmove(&cumSmokTrans5[0][0][0][0][0][0][0][0], &SmokTrans[0][0][0][0][0][0][0][0], 1792 * sizeof(double));
+	memmove(&cumSmokTrans4[0][0][0][0][0][0][0][0], &SmokTrans[0][0][0][0][0][0][0][0], 1792 * sizeof(double));
+	memmove(&cumSmokTrans3[0][0][0][0][0][0][0][0], &SmokTrans[0][0][0][0][0][0][0][0], 1792 * sizeof(double));
+	memmove(&cumSmokTrans2[0][0][0][0][0][0][0][0], &SmokTrans[0][0][0][0][0][0][0][0], 1792 * sizeof(double));
+	memmove(&cumSmokTrans1[0][0][0][0][0][0][0][0], &SmokTrans[0][0][0][0][0][0][0][0], 1792 * sizeof(double));
+};

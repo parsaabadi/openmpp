@@ -1,0 +1,261 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) AMI_CVDPoRT_PrevalenceStart
+/* FILE_NOTE(EN) 
+This module assigns AMI prevalence status at start of the simulation. Here AMI refers to past AMI (AMI suffered in the past).
+Essentially, there is a mis-alignment between self-reported AMI prevalence in our starting population (CCHS) and our target AMI prevalence in 2001 (CCDSS). 
+Sometimes there is an under-reporting of AMI as compared with our target data, but sometimes there is over-reporting. The differences vary by age, sex and province. 
+
+This module reassigns AMI so that (i) target rates are met and (ii) minimal alteration is done to the CCHS information read in.
+When re-assigning, the risk of AMI may be taken into consideration.  So if more AMI is needed in a given  age/sex/province cell, we will tend to take a person with no AMI according
+to CCHS but with elevated risk of (future) AMI as a candidate for flipping (from no AMI to AMI) at initiation.  
+This behavior is achieved by using WeightForUnderlyingAmiCvdportishUniform=1.  
+
+This is mostly copy/paste from DiabetesPrevalenceStart.mpp which may have more details here and there.
+
+*/
+
+
+parameter_group pgAMI_CVDPoRT_Calibration_Inputs { //EN AMI CVDPoRT calibration parameters
+	AmiCvdportInitialAlterationPopulationScope ,
+	AmiCvdportInitialAlterationYearScope ,      
+	WeightForUnderlyingAmiCvdportishUniform, 
+	AmiCvdportPrevalenceTarget2001
+};
+
+
+parameters {
+	//Alteration of AMI status found on StartPop file (CCHS)
+	logical AmiCvdportInitialAlterationPopulationScope [cPopulationSource];    //EN Initial AMI alteration : In scope populations
+	int     AmiCvdportInitialAlterationYearScope       [cLOWER_UPPER_BOUNDS];  //EN Initial AMI alteration : In scope years
+	double  WeightForUnderlyingAmiCvdportishUniform;                           //EN Initial AMI alteration : Correspondence with AMI risk
+	double  AmiCvdportPrevalenceTarget2001[SEX][FROM_20_TO_80_BY_5][PROVINCE]; //EN Initial AMI alteration : Prevalence by age, sex and province for year 2001 
+
+	model_generated double UnderlyingUniformWhereaboutsForSrAmi          [DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+	model_generated double UnderlyingUniformWhereaboutsForAmiCvdportish  [DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+};
+
+actor Person            // Core Individual
+{
+	void    AmiCvdportAlterInitialValue();
+	hook    AmiCvdportAlterInitialValue, InitializationEmptyHub, 41; // 41 = execution number, the higher the value, the later the execution
+};
+
+void	Person::AmiCvdportAlterInitialValue()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if ( std::abs(WeightForUnderlyingAmiCvdportishUniform) <= 1.0 && AmiCvdportInitialAlterationPopulationScope [ population_source ]  &&
+		 AmiCvdportInitialAlterationYearScope [LOWER_BOUND] <= calendar_year && calendar_year <= AmiCvdportInitialAlterationYearScope [UPPER_BOUND] ) 
+	{   
+		double weight = WeightForUnderlyingAmiCvdportishUniform;
+		const double *underlying_uniform_whereabouts_for_risk    = UnderlyingUniformWhereaboutsForAmiCvdportish  [cchs_record] ;
+		const double *underlying_uniform_whereabouts_for_disease = UnderlyingUniformWhereaboutsForSrAmi          [cchs_record] ;
+
+		//BEGIN this piece of code is shared by AmiCvdportAlterInitialValue and StrokeCvdportAlterInitialValue  (with different random seed though).  Could be a function.
+
+		double gods_unif_for_disease , gods_unif_for_risk, unif_for_disease_draw, cauchy_noise ;
+
+		cauchy_noise = qcauchy(RandUniform(134),0,1);
+		gods_unif_for_risk = runif( RandUniform(135) , underlying_uniform_whereabouts_for_risk[LOWER_BOUND] , underlying_uniform_whereabouts_for_risk[UPPER_BOUND] );
+		unif_for_disease_draw = pcauchy( weight*qcauchy(gods_unif_for_risk,0,1) + (1-std::abs(weight))*cauchy_noise ,0,1);
+		/* NOTES
+		     A few interesting special cases of the above
+		       weight =  1 ==> unif_for_disease_draw =   gods_unif_for_risk  which turns out to be the proper things to use
+		       weight =  0 ==> unif_for_disease_draw =   RandUniform(139)    which is OKish (OK but does not take person's risk )
+		       weight = -1 ==> unif_for_disease_draw = 1-gods_unif_for_risk  which is bad (improper use of person's risk )
+             In any case (any weight),  unif_for_disease_draw ~ U(0,1)
+		*/
+
+		gods_unif_for_disease       = runif(unif_for_disease_draw,underlying_uniform_whereabouts_for_disease[LOWER_BOUND],underlying_uniform_whereabouts_for_disease[UPPER_BOUND]);
+		//This is U(0,1) and perceived as the uniform variates used by God to simulate the respondent's SR disease.
+
+
+		//God assigns NO for small U(0,1) and YES otherwise.  We do the reverse below.  We thus need to flip God's uniform variate.
+		gods_unif_for_disease = 1.0 - gods_unif_for_disease;
+
+		//END this piece of code is shared by AmiCvdportAlterInitialValue and StrokeCvdportAlterInitialValue  (with different random seed though).  Could be a function.
+
+		acute_myocardial_infract_initial_altered = gods_unif_for_disease < AmiCvdportPrevalenceTarget2001[sex][SPLIT(truncated_age, FROM_20_TO_80_BY_5)][province] ? CVDPORT_AMI_YES : CVDPORT_AMI_NO;  
+		acute_myocardial_infract  = acute_myocardial_infract_initial_altered;
+
+	}
+	
+	
+};
+
+
+
+
+void PreSimulation()
+{
+	int    covariates[SIZE(COVARIATE_X)] ;
+	int n_records_tot ;
+
+	double in_scope  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = {  -1.0, 9e9,
+					                                                     -1.0, 9e9,  
+				                                                         -1.0, 9e9, 
+						                                                 -1.0, 9e9  } ;
+
+	/* BEGIN get underlying uniform for SR AMI  */
+
+	covariates[0] =  cDb_Sex         ; 
+	covariates[1] =  cDb_Province    ; 
+	covariates[2] =      -1          ;  // will be replaced by mgStartPopAlternativeX computed below (age group)
+	covariates[3] =  cDb_Sex         ; 
+
+	for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+		if(mgCumStartPopWeight[record_looper] > 0.0)
+			mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+
+
+	n_records_tot = StoreData(mgStartPopCopy  ,covariates,cDb_HeartAttack,mgStartPopAlternativeX,NULL,in_scope );  //Compute Xgroup from covariates and Y=cDb_HeartAttack and copy them to mgStartPopCopy with respondent weight and ID (row number).
+		
+	qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+	GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForSrAmi, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+   /* END get underlying uniform for SR AMI */
+
+ 
+
+
+   /* BEGIN get underlying uniform for AMI-CVDPoRT-like risk     */
+
+	covariates[0] =  cDb_Sex         ; 
+	covariates[1] =  cDb_Province    ; 
+	covariates[2] =      -1          ;  // will be replaced by mgStartPopAlternativeX computed below (age group)
+	covariates[3] =  cDb_HeartAttack ; 
+	
+
+	for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+		if(mgCumStartPopWeight[record_looper] > 0.0)
+		{
+			mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+			mgStartPopAlternativeY[record_looper] = AmiCvdportishRisk(pStartPop[record_looper]) ;
+			if (EcrireDebugLogEntry == 2)
+			{
+				if(record_looper==0)
+					WriteDebugLogEntry("case_id,cchs_record,sex,age,province,disease_init,disease_altered,risk\n");
+
+				char line[199];
+				snprintf(line,199,"%i, %i, %i, %i, %i, %i, %i, %0.9f \n", -9, record_looper, -9, -9, -9, -9, -9, mgStartPopAlternativeY[record_looper]);               
+				WriteDebugLogEntry(line);
+			}
+		}
+
+	n_records_tot = StoreData(mgStartPopCopy  ,covariates,-1,mgStartPopAlternativeX,mgStartPopAlternativeY,in_scope );  //Compute Xgroup from covariates and Y=AmiCvdportish and copy them to mgStartPopCopy with respondent weight and ID (row number).
+
+	qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+	GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForAmiCvdportish, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+  /*  get underlying uniform for AMI-CVDPoRT-like risk */                 
+  
+};
+
+
+//This function requires mgCvdportAmiSumInteractionCoefMeanCovariate and mgCvdportAmiSumMainTermsCoefMeanCovariate.
+//So AMI_CVDPoRT.mpp's PreSimulation needs to run before  AMI_CVDPoRT_PrevalenceStart.mpp's PreSimulation.
+//It is OK according to debugger.  The fact that PreSimulations are run in alphabetical order of file names plays in our favor ( AMI_CVDPoRT < AMI_CVDPoRT_PrevalenceStart )
+double AmiCvdportishRisk(const double person_characteristics[SIZE(DB_FIELDS)])  // (double *person_characteristics)  should work as well 
+{
+	EDUCATION      local_gEducation           = ( EDUCATION   ) int(person_characteristics[cDb_Education        ]);
+	SEX            local_sex                  = ( SEX         ) int(person_characteristics[cDb_Sex              ]);		
+	HIGH_BP_STATE  local_hypertension         = (HIGH_BP_STATE) int(person_characteristics[cDb_SP_HBP           ]);
+	DIAB_STATE     local_diabetes             = (DIAB_STATE   ) int(person_characteristics[cDb_SP_DM            ]);
+	double         local_gBMI                 =                     person_characteristics[cDb_BMI              ] ;
+	double         local_total_packyears      =                     person_characteristics[cDb_SmokingPackYears ] ;
+	int            local_AgeGrp               =                 int(person_characteristics[cDb_AgeGrp           ]);
+
+	int            local_alcohol_on_start_pop =                 int(person_characteristics[cDb_Alcohol          ]) ;
+	ALCOHOL5       local_gAlcohol5                = GetAlcohol5FromStartPop(local_alcohol_on_start_pop,local_sex);
+	double         local_number_drinks_past_week  = double(max(0,local_alcohol_on_start_pop));
+
+	int            local_age             = 5*local_AgeGrp + 7 ; // 3 --> 22, 4 --> 27	
+
+	// Extra work needed to get the following 3 states.  Not done
+	SMOKING_STATE4 local_smoking_status4         = (SMOKING_STATE4) 0;
+	int            local_time_since_quit_smoking = 0;
+	double         local_mets                    = 0;
+
+	// BEGIN only this part differs between AmiCvdportishRisk and StrokeCvdportishRisk
+	double sum_of_splines =
+	   CubicSpline((double)local_age    , (double*)CvdportAmiAgeSplineLocationCoef      [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)CvdportAmiAgeSplineLocationCoef      [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)CvdportAmiAgeSplineCompanion[local_sex])
+	 + CubicSpline((double)local_gBMI           , (double*)CvdportAmiBmiSplineLocationCoef      [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)CvdportAmiBmiSplineLocationCoef      [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)CvdportAmiBmiSplineCompanion[local_sex])
+	 + CubicSpline((double)local_total_packyears, (double*)CvdportAmiPackYearsSplineLocationCoef[local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)CvdportAmiPackYearsSplineLocationCoef[local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)CvdportAmiPackYearsSplineCompanion[local_sex])
+	 + CubicSpline((double)local_number_drinks_past_week, (double*)CvdportAmiDrinksSplineLocationCoef   [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)CvdportAmiDrinksSplineLocationCoef   [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)CvdportAmiDrinksSplineCompanion[local_sex])
+	 + CubicSpline((double)local_mets           , (double*)CvdportAmiMetsSplineLocationCoef     [local_sex][CUBIC_SPLINE_KNOTS_LOCATION], (double*)CvdportAmiMetsSplineLocationCoef     [local_sex][CUBIC_SPLINE_KNOTS_COEFFICIENT], (double*)CvdportAmiMetsSplineCompanion[local_sex]);
+
+
+	const double *main_coefs      = CvdportAmiMainTermsCoefficients  [local_sex];
+	const double *interactions    = CvdportAmiInteractionCoefficients[local_sex];
+	const double *five_year_base  = CvdportAmiBaseline;
+	const double *cum_haz_curve_x = CvdportAmiLogBaseCumulativeHazard[local_sex][COORDINATES_X];
+	const double *cum_haz_curve_y = CvdportAmiLogBaseCumulativeHazard[local_sex][COORDINATES_Y];
+	double mean_age         = CvdportAmiAgeSplineCompanion[local_sex][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM];
+	double sum_maincoef_mean  = mgCvdportAmiSumMainTermsCoefMeanCovariate  [local_sex]; //sum_k   coef_k  * mean_Xk   for main coefficients
+	double sum_intercoef_mean = mgCvdportAmiSumInteractionCoefMeanCovariate[local_sex]; //sum_k   coef_k  * mean_Xk   for interaction coefficients
+	const double *alteration_specs = CVDportAmiAlterationSpecs  [local_sex];
+	if(!CVDportAmiAlterationSpecsAppliesToPrevalenceFixSR)
+		alteration_specs = NULL;
+
+	// END only this part differs between AmiCvdportishRisk and StrokeCvdportishRisk
+
+	double hazard;
+	//BEGIN Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+	hazard = interactions[CVDPORT_INTER_AGE_SMOKER_CURRENT] * (local_smoking_status4 == LIGHT_smoker || local_smoking_status4 == HEAVY_smoker)
+			+ interactions[CVDPORT_INTER_AGE_SMOKER_FORMER_LT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking < 4)
+			+ interactions[CVDPORT_INTER_AGE_SMOKER_FORMER_GT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking >= 4)
+			+ interactions[CVDPORT_INTER_AGE_PACK_YEARS] * local_total_packyears
+			+ interactions[CVDPORT_INTER_AGE_DRINK_FORMER] * (local_gAlcohol5 == ALCOHOL_FORMER)
+			+ interactions[CVDPORT_INTER_AGE_DRINKS_LAST_WEEK] * local_number_drinks_past_week
+			+ interactions[CVDPORT_INTER_AGE_PA_MET] * local_mets
+			+ interactions[CVDPORT_INTER_AGE_BMI] * local_gBMI  
+			+ interactions[CVDPORT_INTER_AGE_HYPERTENSION] * (local_hypertension == HIGH_BP_YES)
+			+ interactions[CVDPORT_INTER_AGE_DIABETES] * (local_diabetes == DIAB_YES);
+			
+	hazard = hazard - sum_intercoef_mean;   // got ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )  so far
+	hazard *= (local_age - mean_age);  
+	//END Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+
+	//BEGIN Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+	hazard = hazard
+			+ main_coefs[CVDPORT_MAIN_SMOKER_CURRENT] * (local_smoking_status4 == LIGHT_smoker || local_smoking_status4 == HEAVY_smoker)
+			+ main_coefs[CVDPORT_MAIN_SMOKER_FORMER_LT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking <  4)
+			+ main_coefs[CVDPORT_MAIN_SMOKER_FORMER_GT5] * (local_smoking_status4 == FORMER_smoker)*(local_time_since_quit_smoking >= 4)
+			+ main_coefs[CVDPORT_MAIN_DRINK_FORMER] * (local_gAlcohol5 == ALCOHOL_FORMER)
+			+ main_coefs[CVDPORT_MAIN_EDUC_HIGH_SCHOOL_GRAD] * (local_gEducation == EDUC2)
+			+ main_coefs[CVDPORT_MAIN_EDUC_SOME_PS] * (local_gEducation == EDUC3)
+			+ main_coefs[CVDPORT_MAIN_EDUC_PS_GRAD] * (local_gEducation == EDUC4)
+			+ main_coefs[CVDPORT_MAIN_HYPERTENSION] * (local_hypertension == HIGH_BP_YES)
+			+ main_coefs[CVDPORT_MAIN_DIABETES] * (local_diabetes == DIAB_YES); // added sum_k   coef_k  * Xk   so far
+
+	hazard = hazard - sum_maincoef_mean;   // substract sum_k   coef_k  * mean_Xk    so step 2 is done
+	 //END   Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+
+	//BEGIN Step 3: add on splines and alteration_specs to complete the computation of CVDPoRT's score 
+	hazard = hazard + sum_of_splines;
+	hazard = hazard + (alteration_specs == NULL ? 0.0 : alteration_specs[SPLIT(local_age, FROM_25_TO_90_BY_5)  ]);
+			
+	//END   Step 3: add on splines and alteration_specs to complete the computation of CVDPoRT's score   (at this point, local variable hazard contains CVDPoRT's score)
+
+	hazard = exp(hazard); //  hazard = baseline * exp(score) with baseline handled below.
+
+	if (five_year_base[local_sex] >= 0)
+		hazard *= five_year_base[local_sex] / 5.0; //baseline = 5 year cumulative hazard / 5. 
+	else
+	{
+		double log_cum_haz_age, log_cum_haz_agep1;
+		
+		log_cum_haz_age   = PieceLinearLookup(local_age  , cum_haz_curve_x, cum_haz_curve_y , SIZE(SCATTER_PLOT_ELEMENTS));
+        log_cum_haz_agep1 = PieceLinearLookup(local_age+1, cum_haz_curve_x, cum_haz_curve_y , SIZE(SCATTER_PLOT_ELEMENTS));
+
+		hazard *= (exp(log_cum_haz_agep1) - exp(log_cum_haz_age)); //baseline hazard over [age,age+1] = H(age+1)-H(age)
+	}
+
+
+	return hazard;
+
+};
+

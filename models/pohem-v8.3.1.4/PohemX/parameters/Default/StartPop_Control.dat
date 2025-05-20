@@ -1,0 +1,74 @@
+parameters {
+	cPopulationStartMethod	pPopulationStartMethod = cSAMPLE; //EN Sample or Full population
+
+	 //EN Open or Closed population
+	logical	pNewArrivalsControl[cPopulationSource] = {
+		(3) TRUE, 
+	};
+	int	pMaxYearNewArrivals = 2051; //EN Last year for generating Future Births and Immigrants
+	logical	pUseInputPopulationToAssignAge = TRUE; //EN Use population structure to assign age from age group
+	START_TIME_METHOD	pStartTimeMethod = cStart_BdayIsJan01; //EN Start person on their birthday and/or on beginning of year.
+	int	pStartYear = 2001; //EN Start year of simulation
+	int	pReportYear = 2015; //EN Used for reporting on or up to a specific year
+
+		 //EN Set actor initial immigrant status to non-immigrant
+	logical	ForceInitialisationToNonImmigrant[cPopulationSource] = {
+		(3) FALSE, 
+	};
+	logical	AimAtAllFutureImmigrants = FALSE; //EN Include all future immigrants
+	logical	AimAtAllFutureYoungAdults = FALSE; //EN Include all future young adults
+	logical	UseNewUnduplicationMethod = FALSE; //EN Use new unduplication method
+
+	 //EN Reweight population data base: field
+	DB_FIELDS	pStartPopReweightDefinitionFields[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT] = {
+		(9) {
+			(5) cDb_Sex, 
+		},
+	};
+
+	 //EN Reweight population data base: acceptance range
+	double	pStartPopReweightDefinitionBounds[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT][cLOWER_UPPER_BOUNDS] = {
+		// STARTPOP_SUBPOPULATION_1 - STARTPOP_SUBPOPULATION_9
+		(9) {
+			(5) {
+				-99, 99, 
+			},
+		},
+	};
+
+	 //EN Reweight population data base: multiplier
+	double	pStartPopReweightMultiplier[STARTPOP_SUBPOPULATIONS][DUMMY_ROW_OR_COLUMN] = {
+		(9) {
+			1, 
+		},
+	};
+
+	 //EN Characteristics of a fictive person to be simulated
+	double	FictivePersonCharacteristics[DUMMY_ROW_OR_COLUMN][DB_FIELDS] = {
+		(46) -1, 
+	};
+
+	 //EN StartPop age group decoder
+	int	pDbAgeDecode[DB_AGE_CODE][DB_AGE_DECODE] = {
+		(2) -1, 
+		12, 17, 
+		18, 19, 
+		20, 24, 
+		25, 29, 
+		30, 34, 
+		35, 39, 
+		40, 44, 
+		45, 49, 
+		50, 54, 
+		55, 59, 
+		60, 64, 
+		65, 69, 
+		70, 74, 
+		75, 79, 
+		80, 106, 
+		(84) {
+			(2) -1, 
+		},
+	};
+};
+

@@ -1,0 +1,997 @@
+﻿/*****************************************************************************
+*	POHEM™ published by authority of the Minister responsible for 
+*			   Statistics Canada.
+*	© 1998-2001 Minister of Industry. 
+*
+* +-----------------------------------------------------------------------------------------------------+
+* | The version number is at bottom of this file (PohemVersion.mpp). Two instances need to be changed.  |
+* | The version notes should be written by developers in the "Revisions" section just below.            |  
+* +-----------------------------------------------------------------------------------------------------+
+*
+* Revisions:
+* +-----+------------+----------------------------------------------------------+
+* | Who |   Date     | Description                                              |
+* +-----+------------+----------------------------------------------------------+
+  |VS	| 2024-08-20 | 8.3.1.4 | Compiled in VS2019, openM 1.17.1
+				Incremental changes to 8.3.1.3 (from branch HUI-table) merged to create 8.3.1.4
+								
+				- Added new HUI table tHUI_age_5year which tabulates average HUI by sex and 5-year age groups for McConnell-Nzunga from the Health Statistics Branch.
+
+  |JB   | 2024-06-24 | 8.3.1.3 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.17.3
+                Incremental changes to 8.3.1.2 (from branch JB-index-errors-option) merged to create 8.3.1.3
+
+				- Added new (as of OpenM++ 1.17.3) index_errors option to ompp_options.ompp. 
+				- Per Steve Gribble's comment (https://gitlab.k8s.cloud.statcan.ca/microsim/pohem/-/issues/55), "In POHEM, two lines of model code use quoted strings which contain what appear to the new omc markup phase to be valid parameters with indices, and when omc applies the patterns, the C++ code becomes syntactically invalid and the C++ compiler raises an error. This only occurs if index_errors (new feature, not yet released) is turned on." The two lines of relevant model code in Diabetes.mpp were fixed by breaking up "the offending string constants into appended pieces so that they no longer look like true parameter references, so the patterns no longer match inside the string constant."
+
+  |JB   | 2024-03-19 | 8.3.1.2 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.17.0
+                Incremental changes to 8.3.1.1 (from branch JB-investigate-bug-re-first-year-of-dementia-costs) merged to create 8.3.1.2
+
+				- Bugfix: added a condition to the in_tabulation_scope object in the PersonCore module so that years of data (i.e., 2001-2009) that should not be included in the first year of tabulation (i.e., 2010) in the dementia cost tables are no longer included. 
+				- Updated dementia cost parameters in Dementia.dat with the latest data from Stacey Fisher's team (DementiaPhysicianCosts, DementiaPrescriptionDrugs, DementiaHospitalAdmissions, DementiaHomeCare, DementiaLongTermCare, DementiaAssistiveDevices).
+				- Renamed model .ini file so that it matches model name and added example microdata output (commented out by default).
+				- Added an ompp_options.ompp file and relocated the options that were in ompp_framework.ompp to this location. Also added a call to a header file (omc/optional_IDE_helper.h) that helps the IDE recognize model symbols. Also added options for model documentation (turned off by default because they significantly increase model compilation time). Splitting the framework and options into separate files is recommended by OpenM++ Inc. Microdata output settings were also added to this new file (turned off by default).
+				- Changed default SimulationCases from 5M to 100k.
+
+  |JB   | 2024-01-15 | 8.3.1.1 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.15.5
+                Incremental changes to 8.3.1.0 (from branch JB-update-ompp-ui-bat-file) merged to create 8.3.1.1
+
+				- Replaced deprecated code in start-ompp-ui.bat with code from props/start-ompp-ui.bat in the OpenM++ 1.15.5 instance.
+
+  |JB   | 2023-12-21 | 8.3.1.0 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.15.5
+                Incremental changes to 8.3.0.9 (from branch JB-make-pohem-header-file-lower-case) merged to create 8.3.1.0
+
+				- Renamed the POHEM.h header file (POHEM.h => pohem.h).
+				- Updated references to the header file accordingly in Smoking_crm.mpp and Smoking_CRM_plus.mpp.
+ 
+  |VS   | 2023-12-13 | 8.3.0.9 | Compiled in VS2019, openM 1.14.0
+			    Incremental changes to 8.3.0.7 from branch VS_pohemtesting merged to create 8.3.0.9
+
+				Miscellaneous 
+				- Added some new partitions for ages for tables in the following files: Diabetes.mpp, DiabetesPrevalenceStart.mpp
+				- Modified the partitions on some tables in files: Tab.CVDPoRT_Stroke_AMI.mpp, Tab.Dementia.mpp, Tab.DiabetesProject.mpp, Tab.RiskFactors.mpp, Tab.Standard.mpp, TableAndParameterGroups
+
+  |CN   | 2023-05-03 | 8.3.0.8 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.14.0 rebuilt for VS2019
+				Incremental changes to 8.3.0.7 (from branch CN_FixDim1Dim2) merged to create 8.3.0.8
+
+				Miscellaneous
+				- Took OncoSim's ompp_framework.ompp. This fixes the Dim1, Dim2 ... issue when exporting tables in csv.
+				- Took OncoSim's Model.vcxproj.filters.  POHEM's version is polluted with several instances of <None Include="../code/*.mpp"> (to name just one thing repeated endlessly) which appears to do nothing.
+				- Added RetainSuppress.ompp and put parameters_suppress in it.  This used to be in ompp_framework.ompp, but RetainSuppress.ompp is a better home for it.
+
+  |JB   | 2023-03-14 | 8.3.0.7 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.14.0
+				Incremental changes to 8.3.0.6 (from branch JB-add-french-translations) merged to create 8.3.0.7 
+
+				Branch JB-add-french-translations
+
+				- Created a new Languages module.
+				- Moved the languages object from the StartPop module to the Languages modules and enabled the FR option.
+				- Renamed the ModgenFR module as LanguagesFrench and removed all the string translations (which, as I understand, are redundant).
+					- Used R to scrape all module files for English labels and performed a preliminary translation of all labels into French using DeepL API (https://www.deepl.com/docs-api).
+					- For various modules, code and labels were tidied up along the way.
+					- All French translations were wrapped in the LABEL function and dumped into the LanguagesFrench module.
+				- Removed zBMI, which is no longer used in POHEM, to eliminate a warning message that was being generated when compiling.
+				- Removed several calls to the floor() function in the Alcohol module and casted the objects as integers to eliminate "possible loss of data" warnings that were being generated when compiling.
+
+  |CN,JB| 2023-01-18 | 8.3.0.6 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.11.0 patched
+				Incremental changes to 8.3.0.5 (from branches CN_StableModeOnly and JB-relocate-some-english-labels) merged to create 8.3.0.6
+
+				Branch CN_StableModeOnly
+
+				- Removed parameters ForcePopulationSource and UseUnstableRunningMode.  Hardcoded the logic of UseUnstableRunningMode = FALSE.
+				- Burned in pStartPop in executable by using parameters_suppress.
+				- Use range DB_RECORDS {0 , 99999}. It was {0 , 149999}.
+				- Altered Framework.odat. In particular, added this line: bool DisablePopulationScaling = false; 
+				- Altered ompp_framework.ompp to make it look at bit more like OncoSim's. In particular:
+				  - Dropped this line: use "case_based/case_based_scaling_none.ompp";  // No population scaling
+				  - Added this line: use "case_based/case_based_scaling_endogenous_or_none.ompp";
+
+				Branch JB-relocate-some-english-labels
+
+				- Relocated a couple of English labels in the COPD and convert CRM modules so that they can be isolated/processed more easily when scraping the labels in R for downstream purposes (e.g., translation of labels).
+
+  |JB   | 2023-01-13 | 8.3.0.5 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.12.0
+				Incremental changes to 8.3.0.3 (from branch JB-enable-microdata-output-feature) merged to create 8.3.0.5 
+
+				Branch JB-enable-microdata-output-feature
+
+				- Enabled new microdata output capability in ompp_framework.ompp (still requires setup of a PohemX.ini file in ompp/bin before microdata will be outputted; see https://github.com/openmpp/openmpp.github.io/wiki/Microdata-Output#1-build-model-with-microdata-output-capability)
+
+  |NB,CN| 2023-01-13 | 8.3.0.4 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.11.0
+				Incremental changes to 8.3.0.3 (from branches NB_PohemX_Linux, CN_LeanOpenmExe) merged to create 8.3.0.4 
+				 
+				Branch NB_PohemX_Linux
+					
+					Adding Linux compatiblity to 8.3.0.3
+					- Replaced all occurences of the function 'abs' with 'std::abs'
+					- Replaced all occurences of 'sprintf_s' with 'snprintf'
+					- Fixed a mismatched brace in Smoking.MPP
+					- Parameters SmTransProb and SmTransProbT in Smoking_crm.mpp are now created on the heap rather than the stack
+
+				Branch CN_LeanOpenmExe
+
+					- Used a different numbering system for immigrants.  Used to be immigrant #0, #1, ..., #2407. Now they are numbered within sex, age group.
+						- within sex, age group = (0,3) : immigrant #0, #1, ... , #135
+						- within sex, age group = (0,4) : immigrant #0, #1, ... , #224
+						- Et cetera ...
+						- This is implemented by adding sex and age group dimensions to model_generated mgStartPopImmigDecode
+						- Using this different numbering system for immigrants leads to no change in POHEM results.
+                    - DB_RECORDS_IMMIG used to be range {0, 16000}. It is now range {0, 250}. Large SIZE(DB_RECORDS_IMMIG) led to large executable file when compiling in openM.
+						- Using 2500 instead of 16000 and making no other change to the code would have worked and achieved some reduction in size of executable. 
+						- Using the new numbering system for immigrants allows us to use 250 instead of 16000.
+					- Added/fixed several labels (i.e. //EN whatever)
+
+  |JB,CN| 2022-12-16 | 8.3.0.3 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.11.0 patched
+				Incremental changes to 8.3.0.1 (from branch JB-clean-up-interventions-module) and 8.3.0.2 (from branches CN_AlcoholDispatcherReview, JB-replace-bp_actual-in-HUImodel2) merged to create 8.3.0.3 
+
+				Branch JB-clean-up-interventions-module
+
+					- Removed deprecated blood pressure- and cholesterol-related related objects.
+					- Removed deprecated parameters.
+				
+				Branch CN_AlcoholDispatcherReview 
+
+					ALCOHOL (Dispatcher)
+					- Removed code (while loop) from UpdateNumberDrinksPastWeekExtra() as it was duplicated in ApplyAlcoholIntervention().
+					- Removed classification ALCOHOL_NUMBER_DRINKS_PAST_WEEK_RANGE_HEAVY_DRINKERS_ONLY and use generic cLOWER_UPPER_BOUNDS instead.  It does the job OK.
+					- Removed "NOTE: please do not manipulate the "Never drank alcohol" category." from label for ALCOHOL5.
+					- Removed “(NOTE: the minimum for females must be at least 10 and the minimum for males must be at least 15)” from NumberDrinksPastWeekRangeHeavyDrinkersOnly.  
+					- Changed nicknames ALCOHOL_PAIR_whatever to ALCOHOL_IR_whatever.  Did not understand what PAIR was for.  Possibly a faulty copy paste from PA dispatcher.
+					- Added basic protection against improper settings for parameter NumberDrinksPastWeekRangeHeavyDrinkersOnly in PreSimulation
+					- Added parameter AllowedToRequestFormerInsteadOfNever
+					- Added parameter AlcoholTransitionCorrelation and state cauchy_alcohol_transition_static.
+					- Made gAlcohol5 a derived variable again. 
+					  - Only number_drinks_past_week_extra1 may be altered. States number_drinks_past_week_extra2, gAlcohol5 and always_never_so_far are automatically updated.
+					  - Ditto for _no_intervention variables
+					  - Former function UpdateAlcoholSuite now comes in two copies: UpdateAlcoholAmigosSet1 and UpdateAlcoholAmigosSet2.
+
+					Miscellaneous
+					- Moved PreSimulation at the end as we have always done.  Left other functions in alphabetical order.
+					- Removed output table tRiskFactorDiabAgeSex_SillyCopy
+					- Removed declaration of function AdjustRandomIntegerToSpecifiedRange (not fully removed in 8.3.0.2)
+					- Turned off case_checksum in TraceOptions.mpp.  
+					- Found a home (table_group) for the following 31 orphan tables
+					  - tCVDPoRTAMI5yr, tCVDPoRTStroke5yr, tPopulation_Source, tDementia_Mortality, tDementia_Costs,
+					  - tDementia_Costs_whatever (13 instances), created table_group tgDementiaCostsTableVariants
+					  - tDementia_whatever       (13 instances), created table_group tgDementiaTableVariants
+
+				Branch JB-clean-up-interventions-module
+
+					- Replaced bp_actual with gBP_PA.
+	
+  |JB   | 2022-10-25 | 8.3.0.2 | Compiled in VS2019, MODGEN 12.1.3.0
+				Incremental changes to 8.3.0.0 (from branch JB-fix-suspicious-integer-division) merged to 8.3.0.1 to create 8.3.0.2 
+
+					- Removed AdjustRandomIntegerToSpecifiedRange() and replaced with runif() in the alcohol module to achieve a uniform distribution when sampling number_drinks_past_week_extra2 during an alcohol intervention.
+					- Removed MEND_cutoff and MEND_target from the BMI youth and intervention modules.
+					- The changes in this branch address this GitLab issue: https://gitlab.k8s.cloud.statcan.ca/microsim/pohem/-/issues/38
+					- Testing/documentation of the changes in this branch are available here: https://gitlab.k8s.cloud.statcan.ca/microsim/pohem_workshop/-/tree/Joel_branch/Joel/JB-fix-suspicious-integer-division
+ 
+  |NB   | 2022-10-20 | 8.3.0.1 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.11.0 
+				 Incremental changes to 8.3.0.0 (from branch NB_Test_Steves_File) merged to 8.3.0.0 to create 8.3.0.1
+
+				 A few changes to make POHEM compile in openM
+					  - Renamed Base(COPD).dat and Base(COPD_cost).dat as COPD.dat and COPD_cost.dat
+					  - Changed model_streams from 1000 to 10000 to accomodate COPD's silly use of RandUniform(5456)
+					  - Unhid calls to hook_COPDexaEvent() and hook_FEV1_updateEvent()
+			     Note that this does not compile in openM 1.11.0 unless it is patched (look for omc.exe in M:\POHEM\03 CodeVersions\03 All versions deemed reviewed\POHEM8301)
+
+  |NB,CN| 2022-10-12 | 8.3.0.0 | Compiled in VS2019, MODGEN 12.1.3.0, openM 1.11.0 
+ 				 Incremental changes to 8.2.4.6 (from branch CN_Add_Noahs_Xcompatible_8246) merged to 8.2.4.8 to create 8.3.0.0 
+
+					  - Copy the cross-compatible version of POHEM 8246 built by Noah in **PohemX workshop** (https://gitlab.k8s.cloud.statcan.ca/microsim/pohemx_workshop) as is.
+					  - Then do the following changes.
+						- Remove README.md.
+						- Add PohemBranches.md to Documentation folder.
+						- To better align with OncoSim
+						  - Modify Model.vcxproj (both the modgen and openM versions) to use OM_ROOT rather than hardcoded path.
+						  - Add modgen/bin/PohemX.exe shortcut.
+						  - Use Oncosim's .gitignore.
+						  - Let the Documentation folder be a subfolder of folder PohemX.  Steve Gribble expressed a preference for this structure. OncoSim has not yet adopted it, but will do so shortly.
+					  - Added table tRiskFactorDiabAgeSex_SillyCopy which, as the name suggests, is a user_table copy of tRiskFactorDiabAgeSex.  This is done to explore a potentially interesting feature of OpenM.  It shall be removed afterwards.
+					  
+					  - In the merge process, there was recent code from COPD (not in branch CN_Add_Noahs_Xcompatible_8246) which needed some modifications to make openM happy.
+					    - The first argument of ComputeXBeta is now const double * rather than just double *. 
+					    - Tried to add empty functions hook_COPDexaEvent() and hook_FEV1_updateEvent() as requested by openM, but modgen does not like it. 
+						  Weird because it is fine with others (e.g. hook_InitializeAlcohol).  We do not add empty functions so that it compiles in modgen. To be fixed later.
+                      - We unduplicated random stream 152 which was used in HUImodel2 and Alcohol.  Unrelated to the merge but we fix it here.
+
+  |JB   | 2022-10-10 | 8.2.4.8 | Compiled in MODGEN 12.1.3.0 using VS2019 
+				Incremental changes to 8.2.4.7 (from branch JB-remove-deprecated-code) merged to create 8.2.4.8
+
+					POHEM clean-up
+					  - Modules/Files removed:
+					    - BMI model 1: BMImodel1.mpp, BMImodel1_12FEB09_13h09_right_no_income.dat
+					    - HUI model 1: HUImodel1.mpp, HUImodel1.dat
+					    - Coronary artery disease model (Framingham): CAD-AMI.MPP, CAD-AMI.dat
+					    - Mind, Exercise, Nutrition, Do it (MEND):  Tab.MEND.mpp removed as well as parameters and code in various other files
+					    - AMI (Framingham) and OA calibration: Tab.Calibration.mpp
+					  - Output tables altered or removed:
+					    - removed tables tMEND_AverageBMI_BMIcats, tCount_MEND_Target, tCC_for_MEND, tCosts_for_MEND, tBMI_CAT_by_youth_BMI_MEND
+					    - removed tables tDiseaseEvents, tDiseaseEventsAge, tDiseaseEventsProvince
+					    - removed tables tCC, tCC_by_age_start, tCC_count_autoreg
+					    - removed tables utActuarial_LE_HALE, tActuarial_LE_HALE_components
+					    - removed BMI-based costs in tables tCohort_LifeLong, tHealth_Outcomes_CrossSectional, tHealth_Outcomes_Longitudinal
+					      - Input parameters and associated code were also removed
+					    - Several miscellanous operations (e.g. remove parameter BMI_std or move pMeanDiffBMIm_sr from now defunct BMImodel1_12FEB09_13h09_right_no_income.dat to BMI_core.dat)
+
+						- In the end, POHEM generates the same results as POHEM 8.2.4.7 for tables still present in decluttered version.  Tested on base scenario with 1 million cases.
+
+   |JB,CN| 2022-10-05 | 8.2.4.7 | Compiled in MODGEN 12.1.2.0 using VS2017 (JB) and in  MODGEN 12.1.3.0 using VS2019 (CN)
+				Incremental changes to 8.2.4.6 (from branches CN_COPD_modgen12, JB-add-md-files-for-github, JB-link-categorical-and-continuous-alcohol-in-dispatcher) merged to create 8.2.4.7 
+
+					ALCOHOL (Dispatcher)
+					  - Hooked the Alcohol Dispatcher so that it executes after both number_drinks_past_week_extra1 and number_drinks_past_week_extra2 have been updated and then modifies number_drinks_past_week_extra1 if an alcohol intervention is being applied and gAlcohol5 has changed due to the alcohol intervention.
+					  - Added a parameter, NumberDrinksPastWeekRangeHeavyDrinkersOnly, that allows users to censor the range for number_drinks_past_week_extra1 for female and male heavy drinkers in an alcohol intervention.
+					  - The updates in this branch change the number_drinks_past_week_extra1 so that it falls within the correct range of gAlcohol5 for a given actor if gAlcohol5 has changed due to the application of an alcohol intervention.
+					  - For example, if the actor is male and number_drinks_past_week_extra1 is 25, gAlcohol5 will be ALCOHOL_HEAVY. However, if an alcohol intervention is being applied and gAlcohol5 changes to ALCOHOL_MODERATE, number_drinks_past_week_extra1 must change so that it is between 2-14.
+					  - The tentative logic for changing number_drinks_past_week_extra1 (and, consequently, number_drinks_past_week_extra2 and number_drinks_past_week) during an alcohol intervention is as follows:
+							- If gAlcohol5 changes to ALCOHOL_NEVER or ALCOHOL_FORMER, number_drinks_past_week_extra1 is set to -1.
+							- If gAlcohol5 changes to ALCOHOL_LIGHT, number_drinks_past_week_extra1 is set to 1.
+							- If gAlcohol5 changes to ALCOHOL_MODERATE and the change represents an uptick in drinking (e.g., ALCOHOL_FORMER => ALCOHOL_MODERATE), number_drinks_past_week_extra1 is set to a random integer between 2 and 5 for females or 2 and 8 for males.
+							- If gAlcohol5 changes to ALCOHOL_MODERATE and the change represents a downtick in drinking (e.g., ALCOHOL_HEAVY => ALCOHOL_MODERATE), number_drinks_past_week_extra1 is set to a random integer between 6 and 9 for females or 9 and 14 for males.
+							- If gAlcohol5 changes to ALCOHOL_HEAVY, number_drinks_past_week_extra1 is set to a random integer between 10 and 30 for females or 15 and 60 for males, by default, as specified in the NumberDrinksPastWeekRangeHeavyDrinkersOnly parameter.
+
+
+                    COPD
+					  - Add 4 files from M:\POHEM\03 CodeVersions\02 Submit for review\20190531_140925_Pohem2.0_build8012_COPD_Dec2018
+					    - COPD_table.mpp and copd_test.mpp       (renamed as COPD_model.mpp)
+						- Base(COPD).dat and Base(cost_COPD).dat (renamed as Base(COPD_cost).dat)
+					  - In COPD_model.mpp, stream numbers were removed as they collided with stream numbers used elsewhere. Modgen generated new stream numbers in COPD_model.mpp.
+					  - Add COPD to pDisease and transpose it (shows better)
+					    - If COPD is turned off, there is no COPD incidence and no COPD prevalence at start. POHEM results are the same as before (except for HUI, see below).
+						- When COPD is turned on ...
+						  - If mortality engine is **not** "Demography projection",  POHEM results are the same as before (except for HUI, see below) as COPD is connect to nothing for now (e.g. MPoRT currently is currently not a function of COPD).
+						  - If mortality engine is "Demography projection", COPD module may kill people who have exacerbation and hence POHEM results will change from previous versions.
+					  - Hooks
+					    - Explicitly spell out hook orders.  Hooks from COPD executed last.
+						- Two hooks were not needed and were removed.
+					  - Streamlining/tidying
+					    - Removed about 30 unneeded states. Recoded some COPD tables accordingly.
+						- States and partitions that are only used for tabulation purposes where moved in COPD_tables.mpp.
+					  - Equations
+					    - Introduce classification COPD_EQUATION and use it in 8 parameters.  This way we have more coefficients within parameters and less hardcoded equations (but not none).
+						- Introduce and use ComputeXBeta which will compute X'Beta with Beta being one of the 8 aforementioned coefficients.
+						- Parameter CopdExacerbationStage was introduced to replace an hardcoded equation.  It does not use the classification COPD_EQUATION.
+						- The old code was written in such a way that entry COPD_STAGE1 of parameter COPD_exac_hazard (happened to be 0.8) would never be used. In new code, this entry is used and we set the value to 0 in order to have the same results as the "old code".
+					  - Add COPD to tHealth_Outcomes_CrossSectional and tHealth_Outcomes_Longitudinal.
+					  - After seeing that above steps worked OK, we removed COPD_table.mpp as we are not interested in those tables for now and do not want to add to existing table clutter.
+					  
+					Miscellaneous
+					  - Removed Case_Seed_Table and instead introduced a WriteDebugLogEntry which spits out (case_id, case_seed) if EcrireDebugLogEntry < 0.
+					  - Tiny unexpected differences with respect to HUI occured with commit 5f94f9e2 (CN_COPD_modgen12 branch) and persist in subsequent commits. More info on this in the technical document about POHEM 8.2.4.6.
+					  - Added LICENSE.md, README.md, CONTRIBUTING.md and SECURITY.md files as required by Statistics Canada for any code being released on the StatCan GitHub account per their software release guide (https://digital.statcan.gc.ca/drafts/guides-software-release).
+
+
+  |NB,JB| 2022-07-26 | 8.2.4.6 | Compiled in MODGEN 12.1.3.0 using VS2019 (NB) and in MODGEN 12.1.2.0 using VS2017 (JB) 
+				Incremental changes to 8.2.4.5 merge to 8.2.4.5
+					  - NB_Change_Dementia_Costs branch: updated dementia cost parameters.
+					  - JB-add-tDementia_Mortality-and-update-tPop_Count branch: removed dementia status dimension from tPop_Count table.
+					  - JB-add-tDementia_Mortality-and-update-tPop_Count branch: added tDementia_Mortality table.
+					  - JB-add-tDementia_Mortality-and-update-tPop_Count branch: created AGE_GROUP_20_TO_90_BY_5 partition and applied to all dementia tables.
+
+  |JB,NB| 2022-07-19 | 8.2.4.5 | Compiled in MODGEN 12.1.2.0 using VS2017 (JB) and in  MODGEN 12.1.3.0 using VS2019 (NB)
+				Incremental changes to 8.2.4.4 merge to 8.2.4.4 (JB-bugfix-negative-costs-in-tDementia_Costs), incremental changes to 8.2.4.3 merge to 8.2.4.4 (NB_Changes_For_External_Release)
+
+					  - JB-bugfix-negative-costs-in-tDementia_Costs branch: amended previous commit (incorrect POHEM version) in the master branch; added a condition in the mortality module so that dementia 
+					    costs are not tallied at MaxYear (currently set to 2051).
+					  - NB_Changes_For_External_Release branch: created tDementia for each risk factor, disease and socio-economic factor; finalized dementia tables.
+
+  |NB	| 2022-07-18 | 8.2.4.4 | Compiled in MODGEN 12.1.3.0 using VS2019
+				Incremental changes to 8.2.4.3 merge to 8.2.4.3
+
+					  - Created tDementia_Costs for each risk factor, disease and socio-economic factor
+  |JB	| 2022-07-15 | 8.2.4.3 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.4.2 merge to 8.2.4.2
+
+					  - Set MaxYear and pMaxYearNewArrivals to 2051 so that output tables now tabulate to 2050.
+					  - Changed REPORT_YEAR range from 2001-2051 to 2010-2051 so that output tables now start tabulating in 2010 instead of 2001.
+
+  |CN,JB| 2022-07-12 | 8.2.4.2 | Compiled in MODGEN 12.1.3.0 using VS2019 (CN) and in MODGEN 12.1.2.0 using VS2017 (JB)
+				Incremental changes to 8.2.4.1 merge to 8.2.4.1
+
+					  - JB-hide-deprecated-risk-factor-intervention-parameters branch: removed deprecated risk factor intervention parameters (total cholesterol, HDL, diastolic blood pressure, 
+					    systolic blood pressure, diabetes) from the POHEM UI and disabled them on the backend in the underlying code.
+					  - JB-add-age-at-dementia-onset branch: added an age_at_dementia_onset variable (integer age at dementia onset) to the dementia modules, and to the dementia tables.
+					  - CN_Generic_X1_X2 branch: fixed some code in CheckFinish(). This impacted tEnd_Of_Life_Costs_For_Dementia and tDementia_Costs (progression costs and end-of-life costs). 
+
+  |NB	| 2022-06-08 | 8.2.4.1 | Compiled in MODGEN 12.1.3.0 using VS2019
+				Incremental changes to 8.2.4.0
+
+					  - Calibrated Stroke, AMI, Dementia and Mortality
+					  - Added tables for stroke and AMI by 5-year age groups, for validation purposes.
+
+  |JB	| 2022-06-01 | 8.2.4.0 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.3.9 merge to 8.2.3.9
+
+					  - Introduced new parameter group, AlcoholInterventions.
+					  - Introduced new parameters, AlcoholInterventioSwitch, AlcoholDispatcher and ALCOHOL5_transition.
+					  - The following 4 parameters have a new extra leading dimension [PA_INTERVENTION_GROUP]: LTPA_4CAT_transition, PA_USUAL_DAY_transition, WALK_ERRANDS_transition, BIKE_ERRANDS_transition.
+					    Furthermore, they are cumrate (no longer double) so intervention that could be done with previous version of POHEM will give stochastically equivalent (but not identical) results.
+  
+  |CN   | 2022-05-25 | 8.2.3.9 | Compiled in MODGEN 12.1.2.0 using VS2019
+				Incremental changes to 8.2.3.8 merge to 8.2.3.8.
+
+						- C1 Introduced ARMAplus(1,1) process and migrated HUI (model 2 and 3) and BMI youth to it. Minor changes and/or renaming of some functions or parameters.
+						  - No change in simulated results if UpdateNumberDrinksPastWeekExtra is hooked early (priority 0).  Minor changes if hooked late (priority 50).  Latter may make more sense.
+						- C2 Introduced [ARMAPLUS_11_PARAMETERS] classification/dimension to tidy up things.  For instance, former (BmiArmaplus11Phi, BmiArmaplus11Theta, BmiArmaplus11Kappa) --> BmiArmaplus11
+						- C2 Introduced siloed uniform process and migrated HUI (model 2 and 3) and BMI youth (partially) to it. Still no change in simulated results if hooked early (see above). 
+						  - New parameters: HuiModel2SiloProbs, HuiModel3SiloProbs and BmiSiloProbs.
+						  - Following parameters now have [UNIFORM_SILOS] dimension: HuiModel2Armaplus11, HuiModel3Armaplus11 and BmiArmaplus11.  They also all have the [ARMAPLUS_11_PARAMETERS] dimension. 
+						- C3 Added input parameters AlcoholSiloProbs and AlcoholArmaplus11 to implement the siloed uniform Alcohol quantile process.
+						  - Code fully in place but a few lines are incorrect on purpose so that we can replicate results of previous commits.  See "A few things done to replicate results from POHEM 8238" below.
+						- C3 Added input parameters TableFilterAlcohol and TableFilterAlcoholStart.
+						- C4 A few last changes
+						  - Add input parameter AlcoholUpdateAtStart.
+						  - UpdateNumberDrinksPastWeekExtra's hook priority set to 50.   It was 0 before.
+						  - Update number_drinks_past_week_extra1 with InvertAlcoholCumulativeHazard(-log(1.0 - alcohol_quantile)) - 1. Previously, InvertAlcoholCumulativeHazard(alcohol_quantile) was used.
+						  - alcohol_quantile initiated with alcohol_quantile_startpop  (not with RandUniform(9393)).
+						  - Uncommented alcohol_quantile = UpdateSiloedUniform(alcohol_siloed_unif, ... ). 
+						 
+						Above, C1, C2, C3 and C4 refer to commits 8287d471, 7183ec46, b05f18a0, ??? (final commit of the CN_AlcoholLongitudinal branch). Results from C1, C2 and C3 agree with POHEM 8238.
+												   
+  |JB   | 2022-05-20 | 8.2.3.8 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.3.4 merge to 8.2.3.7.
+
+						- Introduced state number_drinks_past_week_extra. number_drinks_past_week and gAlcohol5 are now derived states. This does not change simulation results.
+						- Updated InvertAlcoholCumulativeHazard() so that it behaves in a way similar to modivic.sim() in the ModIvIc R package (https://f3eaipitcap01.statcan.ca/HAD_R_Packages/ModIvIc). 
+						- Added UpdateNumberDrinksPastWeekExtra(), which updates number_drinks_past_week_extra every two years.
+						- Added Alcohol parameter group.
+						- Changed values in parameter MetDistribution so that MET = 0 (not 0.1) for those with gLTPA_cat = LTPA_NO. This leads to small changes in simulation results.
+
+  |NB   | 2022-04-13 | 8.2.3.7 | Compiled in MODGEN 12.1.3.0 using VS2019
+				Incremental changes to 8.2.3.4 merge to 8.2.3.6.
+
+						- Added dementia to MPoRTV2.
+						- Added temporal alteration spec to DemPoRT, CVDPoRT (Stroke and AMI).
+						- Deirdre added tPopulation_Source to Tab.Standard
+						- New error logs in DemPoRT and MPoRTV2
+
+  |NB   | 2022-05-06 | 8.2.3.6 | Compiled in MODGEN 12.1.3.0 using VS2019
+                Incremental changes to 8.2.3.3 merge to 8.2.3.5.
+
+						- Introduced 6 input parameters: DementiaPhysicianCosts, DementiaPrescriptionDrugs, DementiaHospitalAdmissions, DementiaHomeCare, DementiaLongTermCare, DementiaAssistiveDevices.
+						- Introduced 4 output tables: tProgression_Costs_For_Dementia, tDiagnosis_Year_Costs_For_Dementia, tYear_Before_Diagnosis_Costs_For_Dementia, tEnd_Of_Life_Costs_For_Dementia.
+						- Introduced output table tDementia_Costs. It provide the same info as the above 4 tables but its coding is harder to decipher.  Will need to decide what to keep/drop.
+  
+  |JB   | 2022-05-06 | 8.2.3.5 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.3.1 merge to 8.2.3.4.
+
+						- Introduced parameter HUIAlterationSpecs to allow for calibration of HUI values in the future. 
+						  For those without dementia, default values are set to one. For those with dementia, CCHS correction factors are the default values.
+
+  |NB   | 2022-02-08 | 8.2.3.4 | Compiled in MODGEN 12.1.3.0 using VS2019
+ 				Incremental changes to 8.2.3.3.
+
+						- Altered cubic spline update functions in for stroke, mortality, dementia and AMI to update when sex changes.
+						- Deirdre made changes to parameters DementiaAlterationSpecs, MportV2AlterationSpecs, MortalityEngine.
+						- Added 'duration(dementia, DEMENTIA_NO)' to dementia output table to use in validation process.
+
+  |JB   | 2021-11-04 | 8.2.3.3 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.3.2.
+
+						- Removed MPORT_V1: Bye Bye to Base(Mortality_MPoRT_V1).dat, Mortality_MPoRT_V1.mpp, pgMORTALITY_MPORT_V1, MORTALITY_ENGINE_MPORT_V1. 
+
+  |CN   | 2021-11-01 | 8.2.3.2 | Compiled in MODGEN 12.1.3.0 using VS2019
+				Incremental changes to 8.2.3.1.
+
+						- Introduced parameter AlcoholHazard and dimensions  HAZARD_SEGMENT and ALCOHOL_CROSS_SECTIONAL_HAZARD_MODEL. Filled with dummy values -9.9. 
+						- Introduced a draft of function InvertAlcoholCumulativeHazard. This is all embryonic and subject to substantive changes.
+						- The classification SMOKER2 was the same as SMOKING_STATE3 so retain only the latter (SMOKER2 -->  SMOKING_STATE3)
+						  -  cNEVER_SMOKER --> SMOKING_STATE3_NEVER, cFORMER_SMOKER --> SMOKING_STATE3_FORMER, cCURRENT_SMOKER --> SMOKING_STATE3_CURRENT
+
+  |JB   | 2021-10-27 | 8.2.3.1 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.3.0.
+
+						- Introduced parameter MportV2AlterationSpecs to allow for calibration of MPoRT_v2 in the future. Default values are zeros. 
+
+  |DH   | 2021-10-06 | 8.2.3.0 | Compiled in MODGEN 12.1.2.0 using VS2015
+				Incremental changes to 8.2.2.9.
+
+						- Fixed a bug in Mortality_MPoRT_v2.mpp
+						- Updated TabStandard.mpp to allow the tHealth_Outcomes_CrossSectional to output by dementia status
+
+  |CN   | 2021-06-17 | 8.2.2.9 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.2.8.
+
+						- Re-introduced Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  Also did the usual minor actions required when bringing back Mortality_MPoRT_V2 (e.g. add Base(Mortality_MPoRT_V2).dat to scenario and VS solution ).
+
+  |DH,JT| 2021-06-16 | 8.2.2.8 | Compiled in MODGEN 12.1.2.0 using VS2017
+  |RG,CN|
+				Incremental changes to 8.2.2.7.
+
+						- Corrected some coefficients in DEMPoRT
+						- New parameter DementiaMinimumAgeForIncidence
+						- Updated parameter notes ... from updated data dictionary
+						- unhide pgSTROKE_CVDPoRT and pgAMI_CVDPoRT
+						- unhide tCVDPoRTAMI and tCVDPoRTStroke
+
+  |JB,JT| 2021-06-15 | 8.2.2.7 | Compiled in MODGEN 12.1.2.0 using VS2017
+				Incremental changes to 8.2.2.6.
+
+						- Corrected some coefficients in DEMPoRT
+
+  |DH,JT| 2021-03-31 | 8.2.2.6 | Compiled in MODGEN 12.1.2.0 using VS2017
+  |JB,CN|
+				Incremental changes to 8.2.2.4.
+				Note this was initially done the old fashion way (outside GIT) due to some GIT mishaps.  This will need to be pushed to master branch since 8.2.2.4 is from master branch.
+				
+						- Calibrated dementia incidence by age, sex via parameter DementiaAlterationSpecs "Alteration of DEMPORT log hazard by sex and age" 
+						  Calibration works OK with respect to time for most (but not all) age sex combinations
+						- Removed province as dimension to table tDementia
+						- Added dementia to tables tHealth_Outcomes_CrossSectional and tHealth_Outcomes_Longitudinal 
+						- Introduced dependency(utActuarial_LE_HALE, tActuarial_LE_HALE_components) so that former does not generate blanks when latter is hidden.
+
+  |DH,JB| 2021-03-22 | 8.2.2.4 | Compiled in MODGEN 12.1.2.0 using VS2017
+ 				Incremental changes to 8.2.1.0 merged to 8.2.2.3.  
+				Note that branch DH_RD_Add_Dementia was created from master branch (develop brance did not exist then).  It is therefore merged to master branch to be safe.
+				The develop branch will be updated to align with POHEM 8.2.2.4 to the extent that it should.  This will be POHEM 8.2.2.5.
+
+						- Added Dementia.mpp, DementiaPrevalenceStart.mpp, Base(Dementia).dat, Base(DementiaPrevalenceStart).dat
+						- Updated the StartPop file: Base(POHEM_StartPop_CCHS1.1_PUMF_03MAR21_Public_weight_adjusted).dat
+						- hide(tCVDPoRTAMI, tCVDPoRTStroke)
+
+  |CN	| 2021-02-10 | 8.2.2.3 | For release to PHAC | Compiled in MODGEN 12.1.2.0 using VS2017
+						- Removed Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+						- hide(pgSTROKE_CVDPoRT) and hide(pgAMI_CVDPoRT)
+						- hide(tCVDPoRTAMI, tCVDPoRTStroke)
+
+  |JB,CN| 2021-02-09 | 8.2.2.2 | Compiled in MODGEN 12.1.2.0 using VS2017
+								 Incremental changes to 8.2.1.8 merged to 8.2.2.1
+
+					  - Added the following 5 tables: tHealth_Outcomes_CrossSectional, tHealth_Outcomes_Longitudinal, tRisk_Factors_CrossSectional, tRisk_Factors_Longitudinal, tCohort_LifeLong. Some modifications are called for in future versions.  
+						- Use gDiabetes_use rather than gDiabetes_DPoRT and gDiabetes_PA.
+						- Use CVDPoRT's acute_myocardial_infract and stroke rather than gHeartDisease_PA
+						- Do not compute hazard as it is simply crude/(1-prevalence)
+						- Put OA back in.  Need to check gOA versus IndexOA_event and PrevOA_event
+						- Remove costs?
+					  - Added some tables at Ron's request: tCC, tCC_by_age_start, tCC_count_autoreg, utActuarial_LE_HALE (and its ingredients tActuarial_LE_HALE_components). 
+					  - Added but hid following table group	TG03_Consider_Deletion_Tables.  As name suggests, it contains some candidates for deletion.  Certainly not exhaustive. Many more tables should be removed.
+	
+  |JB	| 2021-01-14 | 8.2.2.1 | Compiled in MODGEN 12.1.1.0 using VS2015
+				                 Incremental changes to 8.2.1.6 merged to 8.2.2.0
+
+					  - Introduce new parameter PaDispatcher.
+					  - The following 4 parameters have a new extra leading dimension [PA_INTERVENTION_GROUP]: LTPA_4CAT_transition, PA_USUAL_DAY_transition, WALK_ERRANDS_transition, BIKE_ERRANDS_transition.
+					    Furthermore, they are cumrate (no longer double) so intervention that could be done with previous version of POHEM will give stochastically equivalent (but not identical) results.
+
+  |JB	| 2020-11-30 | 8.2.2.0 | Incremental changes to to 8.2.1.9 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					  - Update pImmig parameter.  
+					  - More details for the update are available in https://f3eaipitcap01.statcan.ca/MicroSim/POHEM/merge_requests/9
+
+  |JB	| 2020-09-29 | 8.2.1.9 | Incremental changes to to 8.2.1.8 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					  - Update pImmig parameter.  All values (by year, sex and province/territory) were replaced with the following:
+						- Observed estimates for 2001-2018 from CANSIM Table 17-10-0014-01 (formerly Table 051-0011)
+						- Projected (M3) estimates for 2019-2042
+						- Imputed estimates for 2043-2100 based on 2042 estimates
+                      - More details for the update are available in https://f3eaipitcap01.statcan.ca/MicroSim/POHEM/merge_requests/8 
+
+  |JB	| 2020-09-11 | 8.2.1.8 | Incremental changes to to 8.2.1.6 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					  - Update pPOPULATION parameter.  All values (by year, sex and province/territory) were replaced with the following: 
+					    - Observed estimates for 2001-2017 from CANSIM Table 17-10-0005-01 (formerly Table 051-0001)
+						- Projected (M3) estimates for 2018-2043
+						- Imputed estimates for 2044-2100 based on 2043 estimates
+						- Zero values for age groups 100-119 for all years, sexes and provinces/territories
+					  - There are discrepancies between these values and those in POHEM 8216, most of which are judged to be "noise". 
+					    There are, however, significant discrepancies between these values and those in POHEM 8216 for Nova Scotia and New Brunswick for 2001-2013 due to an accidental reversal of values.
+					  - All details for the update are available in R Markdown document https://f3eaipitcap01.statcan.ca/MicroSim/POHEM/uploads/0953baa034878af766a5c446eea3139e/update-pPOPULATION-parameter.html.
+
+  |CN	| 2020-02-25 | 8.2.1.7 | For release to PHAC | Compiled in MODGEN 12.1.1.0 using VS2015
+						- Removed Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+						- hide(pgSTROKE_CVDPoRT) and hide(pgAMI_CVDPoRT)
+						- hide(tCVDPoRTAMI, tCVDPoRTStroke)
+
+  |DH	| 2020-02-25 | 8.2.1.6 | Incremental changes to to 8.2.1.4 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					  - Table tDPP_PACAT_Table removed from tgPopulationTables and added to tgDPPTables.
+					  - Parameter YouthBmiBounds added to parameter group pgExpertYouthBMI.
+					  - HUI model 3 set as default HUI model.
+
+  |CN	| 2020-02-20 | 8.2.1.5 | For release to PHAC | Compiled in MODGEN 12.1.1.0 using VS2015
+								- Removed Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+								- hide(pgSTROKE_CVDPoRT) and hide(pgAMI_CVDPoRT)
+								- hide(tCVDPoRTAMI, tCVDPoRTStroke)
+								- Set HUI model 3 as the default.
+
+  |CN	| 2020-02-19 | 8.2.1.4 | Incremental changes to to 8.2.1.2 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					  - The table tOA_Prevalence is now filtered by in_tabulation_scope like all others
+					  - Bug in table tRegularSmokers was corrected by using person years.  Also table is now about smoking_status3 not gSmoker
+					  - Introduced tables tPA and tPA_by_age_start with minor modifications. They were taken from POHEM-PA.
+
+  |DH	| 2020-02-11 | 8.2.1.3 | For release to PHAC | Compiled in MODGEN 12.1.1.0 using VS2015
+								-Removed Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+								-hide(pgSTROKE_CVDPoRT) and hide(pgAMI_CVDPoRT)
+
+  |DH	| 2020-02-06 | 8.2.1.2 | Incremental changes to to 8.2.1.1 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					- Worked on parameter and table groups.  Also hid some tables and parameters  
+					  - Tables hidden: OA_Calibration_Other_Tables, tChol, tHDL, tBP, utPresimView, tDbBMI, tDbEDU, tRiskFactorDiab, tRiskFactorBMI
+					  - Parameters groups hidden: pgAMIinterventions, TG04_Special_Tabulation_Parameters, pgRiskFactorDistributions, pgLookupAndTransitionTables, pgAMI, pgBpTreatment 
+
+  |CN	| 2020-02-05 | 8.2.1.1 | Incremental changes to to 8.2.1.0 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+					- Table tMeasuredSrYouthBMI, aka "Youth BMI distribution and average (self-reported or measured) by sex, age, year" was introduced.
+					- Table tMeasuredSrAdultBMI, aka "Adult BMI distribution and average (self-reported or measured) by sex, age, year" was introduced.  
+					- Table tBMIcat set to be decomissioned, hence its long name "BMI distribution (decomission forthcoming - should instead use table  BMI distribution and average (self-reported or measured) by sex, age, year )"
+					- WHO_cutoffs[][][AGE_YOUTH_MONTH][]  was only used with third dimension set to 0 (i.e. WHO_cutoffs[][][0][] ).  Now it is used with third dimension set to AgeYouthMonthSimu. 
+ 					  No visible change to outputs since AgeYouthMonthSimu=0 in default scenario
+					- BMI for youth is now constrained by new parameter YouthBmiBounds.  It was previously constrained by COERCE(BMI_RANGE, ...), i.e. [12,55], which was designed with adults in mind.
+                                          It turns out that [12,55] also seems OK for children so this is the default settings of YouthBmiBounds.  
+					- States  bmi4cat_measured_start     , bmi4cat_measured     , gBMImeasured were removed so that one is more likely to pick the proper PHAC counterparts in the future
+					  that is bmi4cat_measured_start_PHAC, bmi4cat_measured_PHAC, gBMImeasured_PHAC.
+
+  |DH-CN| 2019-11-26 | 8.2.1.0 | FIX to 8.2.0.9    | Compiled in MODGEN 12.1.1.0 using VS2015
+						FIX
+							- Presim in CVDPoRT AMI and Stroke was fixed by adding "fake" interaction terms for Education- this allows the 
+							code to cycle trough the looper and matches the interactin term with the correct main term- Gitlab issues #25
+
+  
+  |DH-CN| 2019-11-13 | 8.2.0.9 | FIX to to 8.2.0.8 | Compiled in MODGEN 12.1.1.0 using VS2015
+                         
+						 CVDPoRT AMI and Stroke
+							- Added the CVDPoRT AMI and Stroke parameter values and added an AMI/Stroke output table.
+							- Changed code so that one can run a model using time since interview or time since birth.
+							- Added prevalence adjustment code for CVDPoRT-AMI and CVDPoRT-Stroke. Latter is turned off until better target is found.
+							- Got synthetic target for AMI and stroke from CCDSS information (public and not public but shared with STC).
+							- Introduced CVDportStrokeAlterationSpecs and CVDportAmiAlterationSpecs for forthcoming calibration excercise.	
+							- Updated data dictionary and parameter notes.	
+
+  |CN	| 2019-11-05 | 8.2.0.8 | FIX to to 8.2.0.7 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+						- Undo what was done in 8207 so that 8208 is 8206 under a different name
+						  -Re-introduced Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+						  -Unhide(pgSTROKE_CVDPoRT) and unhide(pgAMI_CVDPoRT)
+
+  |CN	| 2019-10-08 | 8.2.0.7 | FIX to to 8.2.0.6 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+							-Removed Base(Mortality_MPoRT_V2).dat  and  Mortality_MPoRT_V2.mpp.  ModelExit("\n MPoRT V2 disabled from now.");
+							-hide(pgSTROKE_CVDPoRT) and hide(pgAMI_CVDPoRT)
+
+  |DH	| 2019-10-08 | 8.2.0.6 | FIX to to 8.2.0.5 last internal release | Compiled in MODGEN 12.1.1.0 using VS2015
+
+							-Tabulation bug was discovered by Ron while trying to run interventions on BMI. The incorrect BMI state was being reported out of the model.
+							-Searched the tables for references to gBMI or bmi or BMI in order to check which version of BMI was being reported.
+							-Changed all references from gBMI to gBMI_PHAC in the Tab.X.mpps. 
+							-CVDPoRT and MPoRT now depdends on gBMI_PHAC through gBMI4_cvdport_ami, gBMI4_cvdport_stroke, gBMI4_mport_v2.
+  
+  |CN   | 2019-07-09 | 8.2.0.5 | Incremental changes to 8.2.0.4 (modgen 12) | Compiled in MODGEN 12.1.1.0 using VS2015
+
+ 						Now that external release is behind us, we bring back MPoRT_V2 and unhide CVDPoRT (AMI and Stroke).
+						A province dimension was also added to tPop_Count.
+
+  |CN   | 2019-06-28 | 8.2.0.4 | Incremental changes to 8.2.0.3 (modgen 12) | Compiled in MODGEN 12.1.1.0 using VS2015
+
+ 						DPP 
+						- Streamlined the code.
+  						- Added expressions to table tDPP_AgeSexRisk_TargetPop_Table to confirm that adherence does not work the way it should.
+						- Fixed the adherence bug. This involves new parameter DppAdherencePropensityCorrelation.
+						- New parameter DppAgeRange replaces DPP_minimal_age and DPP_maximal_age
+						- DPP may now increase activity among those with gLTPA_cat=LTPA_30_60
+						- Added age dimension to Threshold_for_Elevated_Plasma_Glucose
+
+ 						Miscellaneous 
+						- Customized filtered tabulation via a set of 9 new parameters : 
+						  - These are logical parameters TableFilterSex, TableFilterProvince, TableFilterDoor, TableFilterEducation, TableFilterIncome
+						  - These are [cLOWER_UPPER_BOUNDS] parameters :  TableFilterAge, TableFilterAgeStart, TableFilterYear, TableFilterYearStart
+						- Created groups of favorites parameters and tables.
+						- Removed MPoRT V2 since it is not published and 8204 should be an external release to PHAC.
+						- Hid CVDPoRT (AMI and Stroke).  Did not removed because this is published so not worried about disclosing anything.
+						- Dropped old diabetes calibration.  Keep the new approach introduced in POHEM 8.1.2.2. 
+						  - The following therefore disappeared.
+						    - Function DiabetesPrevalenceStartCheck
+						    - Parameters DiabetesPrevalenceStartMultiplier, DiabetesPrevalenceFixSR, DiabetesPrevalenceStartTarget
+						    - Tables utDIABETES_PREVALENCE_START_MULTIPLIERS, utDIABETES_PREVALENCE_FIX_SELFREPORT, tDiabetesPrevalenceStart
+						  - Put old code for user tables in UserTablesDiabetesCalibration.mpp in the extras folder (i.e. no longer part of POHEM).
+						- Unused parameter PeriodMortHazardMIDTARGET was dropped.
+						- Hid some calibration tables.
+						- Drop tables utCases.
+						- Gives same results as POHEM 8.2.0.3 for base scenario and 3 DPP intervention scenarios: (i) no adherence, (ii) classic V1 with 100% adherence, (iii) classic V2 with 100% adherence
+
+  |CN   | 2019-06-25 | 8.2.0.3 | Incremental changes to 8.2.0.2 (modgen 12) | Compiled in MODGEN 12.1.1.0 using VS2015
+
+ 						MPort and CVDPort
+  						- Split Mortality_MPoRT.mpp into Mortality_MPoRT_v1.mpp and Mortality_MPoRT_v2.mpp.  Ditto for dat files.
+						- Use total_packyears_smoked rather than gSmokePackyears
+						- Use gBMI rather than gBMI_PHAC
+
+						Hooks
+						- Logic has been revisited and simplified (e.g. hooks to EmptyHubs).
+						- In the process, InterventionsAtStart was killed (RiskFactorInterventions handles everything).
+						- See Technical Notes POHEM 8.2.0.3.docx for more details and impact assessment (apparently did not break POHEM).
+
+ 						Miscellaneous
+						- DPoRT now uses gImmigrantEver rather than gImmigrantRecent
+						- Extra tables to TabPhotoAlbum.mpp  (not in POHEM project/solution but in Extras folder instead)
+						- MinLife introduced in 8200 was not doing much of anything.  Now it works as intended: deny death prior to age MinLife.
+  
+  |DH   | 2019-05-31 | 8.2.0.2 | Incremental changes to 8.2.0.1 (modgen 12) | Compiled in MODGEN 12.1.1.0 using VS2015
+							
+						This is the first draft of the implementation of CVDPoRT in POHEM.
+						- CVDPoRT AMI and CVDPoRT Stroke were implemented in 2 new .mpps callend AMI_CVDPoRT.mpp and STROKE_CVDPoRT.mpp respectively.
+						- The same method of implementation was used for these modules as for Mortality_MPoRT.mpp written by Claude.
+						- In this version the proper values of the parameters are not included just dummied so that the .exe will run.
+
+  |CN   | 2019-05-30 | 8.2.0.1 | Incremental changes to 8.2.0.0 (modgen 12) | Compiled in MODGEN 12.1.1.0 using VS2015
+
+						MPoRT  
+
+						- The introduction of MPoRT (V1 and mostly V2) in POHEM is the main purpose of this version.
+						- MPoRT V1 involves two parameters: MportV1Coeffients and  MportV1MinOneYearSuvival
+						- MPoRT V2 involves 6 splines (thus 6*2 parameters from splines) with respect to age, pack years, number of drinks, MET, BMI, Cdn resident percent
+						- MPoRT V2 also involves 4 other parameters for a grand total of 16 parameters.
+                           Those 4 non-spline parameters are MportV2Baseline, MportV2MainTermsMeans, MportV2MainTermsCoefficients, MportV2InteractionCoefficients 
+						- MPoRT has a few loose ends and has not been fully tested.  The ability to run MPoRT has thus been disabled.
+
+						Miscellaneous (sprung by introduction of MPoRT in POHEM)
+
+						- A new StartPop file has been created.
+						- Parameter MortalityEngine now replaces parameter NphsMortality.
+						- MET from leasure time physical activity is now modeled and involves parameters MetDistribution and MetCorrelation.
+						- Time since immigration  is now modeled and involves parameters ImmigrationTimingAge, ImmigrationTimingYear and ImmigrationTimingInteractionYearAge.
+						- Time since quit smoking is now modeled and involves parameter TimeSinceQuitDistribution (and change to StartPop file).
+						- Table tPop_Count has been changed to also show death counts and death hazard rates.
+   
+  
+  |DH   | 2019-05-21 | 8.2.0.0 | Incremental changes to 8.2.0.0 to convert to modgen 12 | Compiled in MODGEN 12.1.1.0 using VS2015
+
+						This is the first version of POHEM compiled with MODGEN 12.
+
+						- Hook order/priority are now explicitly specified in order to avoid warnings in modgen 12.
+						- Modgen 12 did not like parameter pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_IN_START_YEAR_TO_CHANGE_HUI_IN_START_YEAR.
+						  It was therefore given a shorter name: pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_START_YEAR_TO_CHANGE_HUI. 
+						- POHEM 8200 (modgen12) gave the same results as POHEM 8200 (modgen11)- after sorting out the hook order.  
+
+
+  |CN,DH| 2019-05-13 | 8.2.0.0 | Incremental changes to 8.1.3.0 | Compiled in MODGEN 11.7.3.0 using VS2010
+
+						This could be the last version of POHEM compiled with MODGEN 11.
+
+						- Stroke/SPoRt module was removed. It will be replaced by forthcoming CVDPoRt
+						- Parameter pDisease was reduced to only show things that are actually modeled in POHEM.  So Diabetes, CAD-AMI, OA and OA drug side effect were kept. Everything else (e.g. lung cancer) is gone.
+						- Corrected a bug that impacted who was subject to the alteration of the diabetes status read in from the StartPop file.
+						- Removed province dimension in table tDiseaseEvents which made it very large.
+						- DPoRT was calibrated to agree with CCDSS diabetes prevalence.
+						- Parameter MinLife (Minimum number of years of life) was introduced.  It is the companion of MaxLife (Maximum number of years of life) which has been around for ever.  
+						  MinLife may be useful for debugging but has otherwise no real application.
+
+ 
+  |CN,DH| 2019-04-01 | 8.1.3.0 | Incremental changes to 8.1.2.2 | Compiled in MODGEN 11.7.3.0 using VS2010
+
+						CUBIC SPLINES
+						- The function CubicSpline was introduced.  It should ease the implementation of cubic spline in the future. 
+
+						BMI
+						- Parameter BuiltInBmiAlterationSpecs was introduced to nudge the BMI model closer to the SR BMI observed in CCHS for years up to 2016.
+
+						DIABETES
+						- Parameter DportAlterationSpecs was introduced to alter the risk of diabetes according to DPoRT.  Alteration may be made by sex and age group to align with CCDSS prevalence targets.
+						- Parameter DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR indicates if the alterations should also be applied in DPoRTish10YearProb which is used
+						  in the new way to tamper with diabetes read in from StartPop (this approach was introduced in POHEM 8.1.2.2).
+						- Parameter DiabetesPrevalenceTarget2001 now uses finer age groups.  The target is synthetic and was obtained using raking on known margins (see Technical Notes for 8130).
+						- Parameters DiabetesInitialAlterationPopulationScope and DiabetesInitialAlterationYearScope were introduced to specify whom is subject to tampering of their diabetes read in from StartPop 
+						- The elevated risk of mortality due to diabetes was re-implemented using the new CubicSpline function.  A bug with previous spline implementation was found (see Technical Notes for 8130).
+						  - The new implementation requires the parameters DiabetesMortalityRelRiskAgeSplineLocationCoef  and DiabetesMortalityRelRiskAgeSplineCompanion  for the age  spline.
+						  - The new implementation requires the parameters DiabetesMortalityRelRiskYearSplineLocationCoef and DiabetesMortalityRelRiskYearSplineCompanion for the year spline.
+						  - The new implementation led to a leaner version of pDiabetes_RR_Mortality as some of its former content moved to the cubic spline parameters mentioned above.  
+						  - Parameter pDB_RR_Max_Year was removed and its content was moved to the cubic spline parameters mentioned above.
+						- Another bug for the elevated risk of mortality due to diabetes was found and corrected (see Technical Notes for 8130).  
+						
+						TABLES
+						- Table tDiseaseEventsDiab uses a different age group.
+
+  | CN  | 2019-01-24 | 8.1.2.2 | Incremental changes to 8.1.2.1 | Compiled in MODGEN 11.7.3.0 using VS2010
+					
+                      This implements an alternative way to tamper with diabetes read in from StartPop. This involves new parameters DiabetesPrevalenceTarget2001 and WeightForUnderlyingDPoRTishUniform.
+					  There is another new parameter called TimeHorizonForDport which specifies the time horizon for which POHEM computes the risk of diabetes before converting it to annual hazard.
+					  This time horizon used to be hard-coded to 10.  It is set to 2 in the default scenario. 
+					  POHEM 8.1.2.2 reproduces results from POHEM 8.1.2.1.
+
+  | CN  | 2019-01-16 | 8.1.2.1 | Incremental changes to 8.1.2.0 | Compiled in MODGEN 11.7.3.0 using VS2010
+					
+                      The main raison d’être of 8.1.2.1 is to merge 8.1.2.0 with 8.0.1.2-ish (aka 8.0.2.0 though no such version officially exists) which is a branch out of 8.0.1.2 that introduced/implemented "metformin".  
+					  In addition, the PreSimulation code of BMIyouth.mpp was re-structured to ease its re-use for other application foreseen later (alternative to DiabetesPrevalenceStartCheck).  
+					  POHEM 8.1.2.1 reproduces results from  POHEM 8.1.2.0 and  POHEM 8.0.1.2-ish. 
+
+  | CN  | 2019-01-14 | 8.1.2.0 | Incremental changes to 8.1.1.0 | Compiled in MODGEN 11.7.3.0 using VS2010
+					
+                       The purpose of 8.1.2.0 is to strip veterans from 8.1.1.0.  
+					   POHEM 8.1.2.0 replicates the results of 8.0.1.2 (the pre-veteran version of POHEM) but retains some functionality introduced along the way and code restructuring.
+                                 1. veterans.mpp module was removed
+								 2. all parameters related to veterans (including model_generated) were removed and code that was using them was removed or altered
+								 3. cNewVeterans was removed from classification cPopulationSource
+								 4. POHEM 8.1.2.0 uses the StartPop file from POHEM 8.0.1.2 and cDb_Veteran removed from DB_FIELDS
+
+  |CN	| 2018-04-09 | 8.1.1.0 This is the second version of POHEM-veteran. 
+                          The following parameters were introduced or modified.
+                                 1. RakeInYoungVeteran tells whether the parameter pVeterans needs to be raked (e.g. new 17 year old veterans in 2022 to be dismissed or to be seen as new 20 year old veterans in 2025).
+						 	 	 2. The mortality hazard of Regular Force Veterans is altered through the relative risk parameter pVeteranMortRate.
+								 3. ProbabilityVacClient contains the probability that a veteran is a client of Veteran Affairs Canada (VAC) as a function of HUI group, age group and sex.
+								 4. A parameter trio was introduced: NewVeteranDonorDef, NewVeteranDonorConditionField and NewVeteranDonorConditionRange. 
+								    They allow the user to say what is an acceptable donor for the creation a new veteran in the future.
+									Also, the modgen code is now set up to use, if needed, an expanded donor pool which ignores the veteran status (see model_generated parameter mgCumStartPopWeightVeteransOfAllKinds).
+								 5. A parameter trio was introduced: pStartPopReweightDefinitionFields, pStartPopReweightDefinitionBounds, pStartPopReweightMultiplier.
+								    They allow one to modify the survey weights of some respondents on the StartPop file.
+								    The new trio replaces the now defunct parameter duo pStartPopRestrictionField and pStartPopRestrictionBounds.
+								 6. Removed some old/unused parameters: ZSCORE, RandomShuffleSeed, EvaluateCauseSpecificSurvival.
+
+                          The following tables were introduced or modified. 
+                                 1. The model shipped to Veteran Affairs Canada (VAC) only show the following 4 tables (TG_NonVeteran_Tables hidden in VAC's version of POHEM 8110).
+									A) tPopulation_Veteran --> Population and mortality by sex, age, year and veteran status
+									B) tVaria_Veteran_Lean --> Several things (e.g. proportion obese) by sex, veteran status, age and year
+								    C) tPopulation_Start_Veteran --> Population by year created, age created, sex and veteran status
+									D) tHui_3Categories_Veteran_Client --> Counts by HUI category, sex, veteran status, age and year
+								 2. Introduced some utility tables.
+								    A) tStart_Pop_AgeSexVet_Original_Distribution and tStart_Pop_AgeSexVet_Altered_Distribution show the (age, sex, veteran status) distribution of respondents before and after the alteration of survey weights.
+									B) tStart_Pop_Sex, tStart_Pop_Bmi, tStart_Pop_Age, tStart_Pop_Veteran_Status, tStart_Pop_Survey_Weight spit out micro data from the StartPop file.  Those tables are commented out.
+									C) tStart_Pop_Donor_Used_Count shows how often a given record is used to initialise an actor. The table is commented out.
+
+                          A few changes were made to parameter groups and table groups, mostly to first show things relevant to Veteran Affairs Canada (VAC).
+								 
+  |CN	| 2017-04-13 | 8.1.0.0 This is the first version of POHEM-veteran.  The following parameters were introduced or modified.
+                                 1. pVeterans [YEARS][SEX][VETERAN2][LIFE] gives the actual and projected number of releases from regular forces or reserve forces.
+						 	 	 2. Created a new StartPop file that contains dummy information for veteran status.
+								 3. pNewArrivalsControl allows for all 16 possible ways to run the model (e.g. StartPop and future veterans but not future births nor future immigrants).
+								 4. It is now possible to subset the StartPop file on the fly (e.g. only males) through two new parameters pStartPopReweightDefinitionFields and pStartPopReweightDefinitionBounds.
+								 5. The parameter AimAtAllFutureImmigrants allows one to simulate new immigrants according to the parameter pImmig (TRUE) or an altered version thereof (FALSE). 
+								    The latter setting corresponds to what POHEM 8012 did.
+								 6. The parameter AimAtAllFutureYoungAdults allows one to scope the future young adults (20 year old) in the future.  
+								    If set to TRUE, new young adults are simulated to conceptually align with to the census definition (20 year old with a pulse).  
+									If set to FALSE, POHEM tries to conceptually align with the CCHS population definition (e.g. exclude people in the army turning age 20 in year 2005).  
+									The FALSE setting corresponds to what POHEM 8012 did.
+								 7. The parameter UseNewUnduplicationMethod offers a slightly different way to unduplicate population sources (e.g. new birth and new immigrants). 
+								    The FALSE setting corresponds to what POHEM 8012 did.
+								 8. The parameter ForceInitialisationToNonVeteran  , when set to TRUE, allows the user to set veteran   status to "not veteran  " after a donor from CCHS was selected (does not impact the donor selection process itself).
+								 9. The parameter ForceInitialisationToNonImmigrant, when set to TRUE, allows the user to set immigrant status to "not immigrant" after a donor from CCHS was selected (does not impact the donor selection process itself).
+							   A few tables were also created to tabulate veterans : tPop_Count_Veteran, tPopulation_Province_Veteran, tPopulation_Start_Veteran
+
+* | BF  | 2016-06-24	8.0.1.2	- Recompiled in Modgen 11.7.2 and Model version number and version label to 8.0.1.2 (at end of this file)
+* | JF  | 2016-06-24	8.0.1.1	- Updated StartPop input data file because modified smokingpackyears calculation, age over 50 category  changed for 50 instead of 52.
+  | BF  | 2016-06-13  8.0.1.0   - Additional smoking variables (packs_smoked_per_year, packyears_smoked_thisyear and others) now initialized for proper updating of pack-years 
+									Also, to initialize smoking_periods at startup, changed the method of updating this variable (this enhancement should be migrated back to CRMM code)
+
+  | BF  | 2016-06-10  8.0.0.9   -Height and Smoking Pack-year variables added to the StartPop parameter (from CCHS) (by JF)
+									-- they are called gHeight_m and gSmokePackYears, respectively.
+
+								- a new dervied variable gMass_kg was also added as a derived state.
+
+								- in order to dynamically keep track of total packyears (and packs) smoked:
+									-- variable is called total_packyears_smoked is the cumulative pack-years smoked as person ages
+									-- ported most up-to-date Smoking_CRM.mpp code from most recent version of CRMM v3.0.1.0 Smoking.mpp 
+										(some changes from previous version to clarifying naming of variables)
+									-- re-organized code that initialized a few of the key smoking variables, formerly in Convert_CRM.mpp but not in new Smoking_CRM_plus.mpp
+									-- initialized smoking_status4 which had been overlooked before
+									-- other variables that come with the Smoking_CRM.mpp should be initialized too but at the moment they are not used by POHEM and
+										so have been ignored
+									** we may need to revisit smoking variables from CCHS/StartPop to identify the key set required to properly initialize all variables **
+
+								- variable renaming: 
+										smoker_cancer_static renamed to gSmokingCurrent
+										gSmoker_Initial renamed to gSmokingRegular
+									- classificaiton labels renamed
+										cDb_SmokingAMI		renamed as	cDb_SmokingRegular
+										cDb_SmokingCancer	renamed as	cDb_SmokingCurrent
+
+								- new table called tSmokePackYears in new mpp Tab.SmokingPackYears.mpp
+
+
+  | BF	| 2016-05-16  8.0.0.8   Refinement of the calibration of diabetes prevalence at startup
+								- Added documentation of code to DiabetesPrevalenceStart.mpp and to UserTables.mpp including some parameter notes for the new calibration parameters
+								- Made minor changes to structure of code in a more strict manner (best to compare code between versions to fully understand) and to eliminate 
+									some minor discrepancies in the calibrated results
+  								- Recalibrated with this new version (three iterations), updating these two parameters
+									DiabetesPrevalenceStartMultiplier - used when imputing SR non-diabetics as diabetics,
+									DiabetesPrevalenceFixSR - used when impuating SR diabetices as non-diabetics.
+
+								- changed province dimension on the prevalence start output table to be consistentce with the province defintion used elsewhwere in this
+									calibration exericse
+								- removed the old code based on Meltem's calcualtions that attempted to adjust diabetes
+								- added parameter and table groups for those involved in this new feature to calibrate diabetes prevalence at startup
+
+								WARNING: POHEM does not like to be running as a distributed run using Executor. Something in the scaling of the combined results is off. 
+										 Best to run as non-distributed job if using Executor.
+
+  | DH	| 2016-4-01	  8.0.0.7   Implemented fully the diabetes relative risk for mortality, previously orphaned in version 6.0.0.5.
+								This version was used to produce the results for the CAHSPR presentation 2016. In addition to
+								diabetes RR for mortality the following developments were completed:
+								- Diabetes prevalence at startup was aligend with the CCDSS, which involved addition of a new MPP and .dat file (DiabetesPrevalenceStart).
+								- The simulation was run to calculate multipliers, which increased the number of diabetes cases reported, and also to fix the self-reproted
+								data for overreporting of diabetes. Both BF and DH thought there was a conceptual problem with aligning with disregards for the self-reported status,
+								we have added this issue to the "POHEM to do- list". The multipliers and fix SR parameters are output in user tables and then entered back into
+								the appropriate parameters when we iterate. It only took 1 iteration to acheive the desired total number of diabetes cases in 2001 (around 135,000).
+								- A special tabulation .mpp was added to the code for this project "Tab.DiabetesProject.mpp"
+  
+   
+    DH	| 2016-02-15   8.0.0.6  Implemented the MEND intervention with CN's help. See documentation for fuller description.
+								Added a parameter (MEND_cutoff) and a logical variable (MEND_target) to Intervention.mpp.
+								The logical variable identifies 20 year olds who were obese or overweight as children based on the
+								MEND_cutoff. The age at which the "historical" growth curve of children is comapred to the MEND_cutoff 
+								is specified in the AgeXXXXX parameter, explained in more detail in the documentation.
+								Also created a range called REPORT_YEAR_MEND and a new mpp for MEND tables. 
+
+  | DH	| 2016-02-15   8.0.0.5  Hid the DPP_porporion_reduc_BMI and changed the intial values of the adherence parameters for
+								both BMI and PA to 1 instead of 0-- that means that DPP intervention is ready to run once
+								on/off switch is activated.
+
+  | DH	| 2016-02-15   8.0.0.4  Checked out Philippe's version and modified TabDPP.mpp to include LTPA, added BMI categories to tDPP_AverageBMI_Table,
+								modified TabStadard.mpp tDiseaseEvents to output diabetes prevalence using gDiabetes,
+								as well as diabetes prevalence in the starting population. Corrected a label, 
+								now it reads Stroke parameters instead of Diabetes parameters.
+
+  | PF  |  2016-01-25 | 8.0.0.3  1. Added labels for all parameters
+                                2. Added parameter notes in Base scenario
+								3. Enhanced documentation of code of DPP_Intervention.mpp
+
+  |BF	| 2016-01-13 | 8.0.0.2	(incremental internal release)
+								1. Modified DPP code to allow flexibility in how BMI value is set when a person becomes non-adherent (added new logical parameter to control)
+								2. Renamed Tab.DPP.mpp as ValidationTab.DPP.PF.mpp which will be removed from the compiled version for release.
+								3. The Release version of tables will be kept in Tab.DPP.mpp and currently includes revised versions 
+								of Tables 1, 3c and 5 as well as Target_DPP with new names, fewer dimensions and new functionality
+								4. Re-order of DPP parameter grouping. 
+								5. NOTE: Additional labeling and parameter note documentation required
+								
+  |PF	| 2015-12-30 | 8.0.0.1	Philippe Added DPP code (incremental internal release)
+  |DH	| 2015-10-06 | 8.0.0.0	This version is identical to 7.1.0.0 except the pImmig parameter has been updated to reflect net immigration, which is immigration- emigration.
+								Deirdre checked that the correct version of the parameter which corrected for the swapping of NS and NB, described by Claude in point 1 below,
+								was inserted.
+                                 
+
+  |CN	| 2015-09-10 | 7.1.0.0	Several small changes/bug fixes so that POHEM 2.0 can replicate results from POHEM-BMI and also replicate POHEM 7090.
+                                 1. Corrected an error in parameter pImmig. For both sexes, all ages and years 2001-2013 (inclusively), Nova Scotia and New Brunswick were swapped.
+								 2. Created a new StartPop file that contains non-dummy information for physical activity.
+								 3. Removed cDb_Nutrition (dummy and not used) and cDb_PD_Diabetes (now imputed in POHEM) from StartPop.
+								 4. Bug in computation of the model_generated parameter UnderlyingUniformForBmi was corrected
+								 5. Function pt (CDF of Student distribution) was re-written because it somehow does not work in POHEM 2.0.
+								 6. Unduplicated random streams.
+								 7. Corrected a bug which led to education and income being updated for the first time when the actor was created instead of 1, 2 or 3 years after the creation.
+								 8. Corrected a bug in the income model which led to the wrong auto-regressive order being used on the long run.
+* | CN	| 2015-07-02 | 7.0.9.0	In this update, POHEM-BMI's physical activity and youth BMI (without "human") were ported to POHEM7090.
+* | CN	| 2015-06-24 | 7.0.8.0	The main purpose of this update was to port chronic conditions from POHEM-BMI to POHEM7080. Namely,
+                                 1.	Dynamic models for 4 self reported chronic conditions : cancer, diabetes, heart disease, hypertension.
+								 2. Dynamic model for the number of chronic conditions other than OA and the four listed above.
+								 3. NPHS based mortality.
+								Miscellaneous
+								 1. On top of reading the imputed Physician Diagnosed Diabetes available on the StartPop file, 
+								    it is now also possible to impute it using the new parameter ProbabilitySelfReportedDiabetesIsWrong.
+								    The plan is to keep the latter approach and drop the former in the future to get "Physician Diagnosed Diabetes".
+* | CN	| 2015-06-19 | 7.0.7.0	The following was ported from POHEM-BMI to POHEM7070.
+                                 1.	BMI model 3 (called BMI_adult_AR_with_PA_smoke.mpp in POHEM-BMI). 
+								 2.	“Time travel” which allows for BMI inflation; i.e. it does something similar to POHEM 2.0’s parameter pBmiCompoundChange which is still in place.
+								 3.	BMI intervention à la POHEM-BMI; POHEM 2.0 intervention is still intact. 
+								 4.	Self-reported BMI to « measured » BMI conversion à la POHEM-BMI; the ancient conversion is still in place.
+								 5.	Direct cost associated to BMI.
+* | CN	| 2015-06-10 | 7.0.6.0	Restructured HUI models
+                                 - hui.mpp was split into HUImodel1.mpp (change in HUI according to change in age, BMI, OA) and HUIcore.mpp (impact of drugs and the like on HUI for model 1, 2, 3).
+								 - hui.dat was also split accordingly.
+                                 - Added HUI model 3 from POHEM-BMI.  For now, it uses dummy chronic conditions and physical activity states; these will be opeartional latter.
+								 - Parameter HUIModel2Chosen is replaced by HuiModelPreference which allows user to state which HUI model(s) will be run and which one will be reported in tables
+* | CN	| 2015-06-08 | 7.0.5.0	Changed DB_FIELDS in preparation for POHEM 7100
+                                  - added   cDb_PD_Diabetes, cDb_PA_cancer, cDb_PA_cc_ex5, cDb_PA_walk2job, cDb_PA_bike2job, cDb_PA_UsualDay, cDb_PA_LTPA
+								  - removed cDb_Region (may be derived from cDb_Province), cDb_HeartBP_ToBeDecomissioned,  cDb_HeartDisease_ToBeDecomissioned, cDb_Diabetes_ToBeDecomissioned  
+                                Restructured the parameters of HUI model (now uses a few big parameters rather than plethora of smaller parameters).
+* | CN	| 2015-05-14 | 7.0.4.0	Killed the so-called "Full Run". 
+                                Introduced self-scaling à la CRMM.
+* | CN	| 2015-05-12 | 7.0.3.0	Streamlined and moved stuff from StartPop.mpp to PersonCore.mpp 
+                                Stopped the use of duplicates cDb_HeartBP, cDb_HeartDisease, cDb_Diabetes;
+								These are now called cDb_Diabetes_ToBeDecomissioned, cDb_HeartDisease_ToBeDecomissioned, cDb_HeartBP_ToBeDecomissioned, 
+								Introduced pps_sampling in function.mpp and used it.
+								Introduced clinical mode in POHEM.
+* | CN	| 2015-04-27 | 7.0.2.0	Streamlined/de-cluttered StartPop.mpp and PersonCore.mpp
+								Introduced some modularity through ReadFromStartPop
+* | DH	| 2014-11-12 | 7.0.0.0	Adding Steve Gribbles fix for smoking to
+								Smoking_crm.mpp. Does not need its own version no.
+	BF  | 2014-09-18 | 7.0.0.0	Porting demography components from CRMM onto POHEM6604 version
+* | BF  | 2014-06-25 | 6.6.0.5	orphaned - new state for physician diagnosed diabetes
+* | BF  | 2014-03-25 | 6.6.0.4	Based on official released version 6602
+						- diabetes.mpp replaced to fix a bug
+						- stroke module added by Deirdre
+						- StartPop updated to include some HUI attribute variables (Anya's work) and new stroke variables (Deirdre's work).
+						- Personcore.mpp updated because of new starting population variables.
+* | BF  | 2014-05-20 | 6.6.0.3	Orphaned - Anya's HUI component code based on Eric's model and form pohem6602
+* | BF  | 2013-02-25 | 6.6.0.2	New HUI model2 by CN and integrated by BF.		|
+								Reorganized HUI.mpp and OA.mpp code re: HUI		|
+* | AO  | 2012-09-18 | 6.5.0.0	New BP treatment model first introduced.		|
+								Fixed BMI interventions bug, which resulted		|
+								from an incorrect sequence of BMI updates and	|
+								caused persistent upward trend in BMI despite	|
+								interventions and excessive "corrugated paper"	|
+								pattern in average BMI.							|
+								Plus Behnam's OA cost model.					|
+* | AO  | 2011-12-16 | 6.4.0.4  New tables to report LE, HALE and HUI for OA vs.|
+								non-OA population: by OA-at startup, and by age |
+								at OA diagnosis.								|
+* | SC	| 2011-11-21 | 6.4.0.3  New BMI model2;									|
+								Another fix to HUI for OA Prev 2001.			|
+								More parameter grouping improvements			|
+* | BF+	| 2011-10-28 | 6.3.0.0  Income and Education dynamic models added (beta); 
+								OA costs (beta)									|
+								Improved parameter groups						|
+* | BF  | 2011-10-11 | 6.2.1.1  Bug fix to update HUI when Intervene on BMI		|
+* | BF  | 2011-07-16 | 6.2.0.1  No code change. Recompiled for new OA drug data |
+* | AO  | 2011-05-16 | 6.2.0.0  Implemented new BMI intervention parameters     |
+* | PF  | 2011-04-27 | 6.1.0.0	Added smoking model from CRMM					|
+* | PF  | 2009-04-01 | 6.0.1.0	Fixed bugs in hui.mpp and PainDist parameter	|
+* | BF  | 2009-03-11 | 6.0.0.0	Recompiled in Modgen10 (no other changes)		|
+* | CN  | 2009-03-11 | 5.0.0.5	Code cleaning of BMI module and dat file		|
+* | BF  | 2009-02-09 | 5.0.0.4	Code fix for AMI prevalence causing death in OA |
+* |BF,PF| 2009-02-03 | 5.0.0.3	Code fix for OA prevalence wrt RF interventions |
+* |BF,PF| 2008-09-11 | 5.0.0.2	Code enhancement for OA and AMI calibration 	|
+* |BF,PF| 2008-07-28 | 5.0.0.1	Minor bugs fixed; substantial code cleaning 	|
+* | BF  | 2008-06-23 | 5.0.0.0	See ModificationsLog.txt in Project directory	|
+* +-----+------------+----------------------------------------------------------+
+*
+SC = Statistics Canada (BF, DH, CN and/or PF) // initials in alphabetical order
+******************************************************************************/
+
+//LABEL(PohemVersion, EN) POHEM version number
+
+version 8,3,1,4;
+
+
+
+/* NOTE(PohemVersion, EN)
+	This module sets the current POHEM version. 
+	It is kept in a separate module so that custom models build using POHEM
+	can retain the core model and simply replace this file with a more appropriate one.
+*/
+
+
+//LABEL(model, EN) POHEM 8.3.1.4
+
+
+/*NOTE(model, EN)
+
+THIS IS A CONTRACT.   BY INSTALLING THIS MODEL YOU ACCEPT ALL THE TERMS AND CONDITIONS OF THIS AGREEMENT.
+
+This End User License Agreement (EULA) accompanies the POHEM Model and related documentation.  The term "Model" shall include the Model and any upgrades, modified versions or updates of the Model licensed by Statistics Canada.  Please read this EULA carefully.  At the end, you will be asked to accept this EULA and continue to install or, if you do not wish to accept this EULA, to decline in which case you will not be able to use the Model.  Statistics Canada reserves the right to change the EULA in the future at its discretion.
+
+The Model and all related documentation are and shall at all times remain the intellectual property of Statistics Canada. Nothing contained in this EULA shall be deemed to convey to the user any title or ownership in the Model or the related documentation.
+
+The user is permitted reasonable rights of use of the Model for personal, corporate, research, or educational purposes.  This permission includes the use of the Model in analyses and their internal and external reporting of results and conclusions, including the citation of limited amounts of supporting information extracted from the Model in such documents and/or on Internet sites.
+
+The user may publish written reports analyzing the results of any use by the user of the Model pursuant to this agreement, provided always that each such report contains the following notice.  In the following notice, the words "The User" should be replaced with the user's name.
+
+"This analysis is based on Statistics Canada's POHEM micro-simulation model.  The assumptions and calculations underlying the simulation results were prepared by "The User" and the responsibility for the use and interpretation of these data is entirely that of the author(s)".  
+
+The user may make oral statements, to the media or otherwise, analyzing the results of any use by the user of the Model pursuant to this agreement, provided that the user shall use his or her best efforts to try to ensure that each statement includes a notice incorporating in all material respects the content of the notice for written reports set out in the preceding paragraph.
+
+No part of the Model or any right granted under this agreement shall be sold, rented, leased, lent, sub-licensed or transferred to any other person or organization without the express written consent of Statistics Canada.
+
+The user is not permitted to use any part of the content of the Model to develop or derive any product or service for distribution or commercial sale, without a license to do so.  Users interested in developing such products are invited to contact Statistics Canada for further information.
+
+Statistics Canada warrants that it is the rightful owner of the Model and related documentation that is the subject of this EULA. Statistics Canada makes no other warranties, guarantees or representations, express or implied, including but not limited to warranties of merchantability, fitness for intended use, and fitness for any particular purpose, with respect to the Model and related documentation.
+
+Statistics Canada shall in no event be liable for any indirect, special, or consequential loss or damages arising from the user's Use or inability to Use the Model or the documentation even if Statistics Canada has been advised of the possibility of such loss or damage including, but not limited to, lost business revenue, failure to realize expected savings, or other commercial or economic loss of any kind. The user agrees that Statistics Canada will not be liable for any claim against the user by any other party.
+
+Prior to making use of the Model, the user must have signed or be employed by an institution that has signed a Micro-data License Agreement with Statistics Canada on behalf of the user for access and use of the Canadian Community Health Survey, Cycle 1.1 Public Use Micro-data File. The terms and conditions of the Micro-data License Agreement apply to this EULA.
+
+~~~~
+
+LE PRÉSENT DOCUMENT CONSTITUE UN CONTRAT. EN INSTALLANT CE MODÈLE, VOUS ACCEPTEZ TOUTES LES CONDITIONS DU PRÉSENT CONTRAT. 
+
+Cette Entente de licence d’utilisation finale (ELUF) accompagne le modèle POHEM et la documentation connexe. Le terme « Modèle » doit englober le Modèle et toutes les mises à niveau, versions modifiées ou mises à jour du Modèle sous licence qui lui est octroyée par Statistique Canada. Veuillez lire attentivement cette ELUF. À la fin, on vous demandera d'accepter cette ELUF et de poursuivre l'installation ou, si vous ne souhaitez pas accepter cette ELUF, de le refuser, auquel cas vous ne pourrez pas utiliser le Modèle. Statistique Canada se réserve le droit de modifier cette ELUF de licence d'utilisation dans l'avenir, à sa discrétion.
+
+Le Modèle et toute la documentation connexe sont et doivent toujours demeurer la propriété intellectuelle de Statistique Canada. Aucune disposition de cette ELUF ne doit être réputée conférer à l'usager un titre ou un droit de propriété applicable au Modèle ou à la documentation connexe.
+
+L'usager est autorisé à bénéficier de droits raisonnables d'utilisation du Modèle à des fins personnelles, corporatives, éducatives ou de recherche. Cette autorisation s'applique à l'usage du Modèle dans des analyses et aux rapports internes et externes de résultats et de conclusions, y compris la mention de quantités limitées de données justificatives tirées du Modèle dans ces documents et/ou sites Internet.
+
+L'usager peut publier des rapports écrits qui analysent les résultats de toute utilisation par l'usager du Modèle conformément au présent contrat, à condition que tous ces rapports renferment toujours l'avis suivant. Dans cet avis, l'expression « l'usager » devrait être remplacée par le nom de l'usager.
+
+« Cette analyse est fondée sur le modèle de microsimulation POHEM de Statistique Canada. Les hypothèses et les calculs rattachés aux résultats de la simulation ont été préparés par « l'usager » et la responsabilité de l'utilisation et de l'interprétation de ces données incombe en totalité à l'auteur ou aux auteurs. »  
+
+L'usager peut faire des déclarations orales, aux médias ou autrement, relativement à l'analyse des résultats de toute utilisation du Modèle par l'usager conformément au présent contrat, à condition que l'usager s'efforce de veiller à ce que chaque déclaration comporte un avis intégrant tous les aspects importants de son contenu dans les rapports écrits dont il est question au paragraphe précédent.
+
+Aucun élément du Modèle ni droit conféré aux termes du présent contrat doit être vendu, loué, donné à bail, prêté, faire l'objet d'une sous-licence ou être cédé à quelque autre personne ou organisation que ce soit sans consentement écrit exprès de Statistique Canada.
+
+L'usager n'est pas autorisé à utiliser une partie du contenu du Modèle pour élaborer ou tirer des produits ou services à des fins de distribution ou de vente commerciale s'il ne possède pas de licence pour le faire. Les usagers intéressés à élaborer de tels produits sont invités à communiquer avec Statistique Canada pour obtenir plus de renseignements.
+
+Statistique Canada garantit être le propriétaire légitime du Modèle et de la documentation connexe qui font l'objet de cette ELUF. Statistique Canada ne fournit pas d'autres garanties ou représentations, expresses ou implicites, comprenant notamment les garanties de qualité marchande, d'usage prévu et d'adaptation à un usage particulier, en ce qui concerne le Modèle et la documentation connexe.
+
+Statistique Canada n'est pas responsable des pertes ou des dommages indirects, spéciaux ou consécutifs découlant de l'utilisation faite par l'usager ou de l'incapacité d'utiliser le Modèle ou la documentation, même si Statistique Canada a été informé de la possibilité de telles pertes ou de tels dommages incluant, sans s'y limiter, la perte de revenus commerciaux, l'omission de réaliser les économies prévues ou toute autre perte commerciale ou économique de quelque nature que ce soit. L'usager convient que Statistique Canada ne sera responsable d'aucune réclamation faite contre lui par quelque autre partie.
+
+Avant d’utiliser le modèle, l’utilisateur doit avoir signé un contrat de licence pour l’utilisation de microdonnées ou être à l’emploi d’une institution ayant déjà signé, au nom de l’utilisateur, un tel document à Statistique Canada afin de pouvoir consulter et utiliser le fichier de microdonnées à grande diffusion du cycle 1.1 de l’Enquête sur la santé dans les collectivités canadiennes. Les modalités du contrat de licence pour l’utilisation de microdonnées s’appliquent à cette ELUF.
+
+
+*/

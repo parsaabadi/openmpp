@@ -1,0 +1,9 @@
+//LABEL(RetainSuppress, EN) Retain and Suppress statements for PohemX
+
+#include "omc/omSimulation.h" // For IDE to understand C++ code in this module (if any)
+
+#if 0 // Hide non-C++ syntactic island from IDE
+parameters_suppress
+pStartPop
+;
+#endif

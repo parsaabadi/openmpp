@@ -1,0 +1,33 @@
+parameters {
+
+	 //EN COPD direct cost per GOLD stage per year
+	double	COPD_CostGOLD[COPD_STAGE] = {
+		0, 144, 430, (2) 628, 
+	};
+
+	 //EN COPD indirect cost per GOLD stage per year
+	double	COPD_indirectCostGOLD[COPD_STAGE] = {
+		0, 40, 80, (2) 134, 
+	};
+
+	 //EN COPD utility per GOLD stage
+	double	COPD_UtilityGOLD[COPD_STAGE] = {
+		1, 0.81, 0.72, (2) 0.67, 
+	};
+
+	 //EN exacerbation cost by GOLD stage and exacerbation stage
+	double	COPD_CostExacerbation[EXAC_STAGE] = {
+		0, (2) 161, (2) 6501, 
+	};
+
+	 //EN Dis-Utility per GOLD stage per exacerbation
+	double	COPD_Exacerbation_disutility[COPD_STAGE][EXAC_STAGE] = {
+		0.0, 0, (3) 0.0, 
+		0.0, (2) 0.00246, (2) 0.00797, 
+		0.0, (2) 0.001698, (2) 0.00747, 
+		(2) {
+			0.0, (2) 0.00534, (2) 0.00717, 
+		},
+	};
+};
+

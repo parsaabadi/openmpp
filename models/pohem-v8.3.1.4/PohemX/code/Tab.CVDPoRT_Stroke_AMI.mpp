@@ -1,0 +1,115 @@
+
+//FILE_LABEL (EN) Tables for AMI and stroke incidence and prevalence
+/* FILE_NOTE(EN) 
+	 POHEM CVDPoRT AMI and Stroke tables
+*/
+//hide(tCVDPoRTAMI, tCVDPoRTStroke);
+
+// AMI incidence and prevalence by age, sex and province
+
+	table Person tCVDPoRTAMI							//EN AMI by sex, province, age and year
+	[in_tabulation_scope &&  report_calendar_year == calendar_year ]
+	{
+		sex+											//EN Sex
+			*
+		gProvince+										//EN Province
+			*
+	{
+		duration(),																									//EN Person-years alive duration()  	decimals=1
+		nz_delta(duration()),																						//EN Population count
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES),														//EN AMI incidence
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES)/duration(acute_myocardial_infract, CVDPORT_AMI_NO),	//EN AMI incidence rate      decimals=4
+		nz_delta( duration(acute_myocardial_infract, CVDPORT_AMI_YES) ),											//EN AMI prevalence counts
+		duration(acute_myocardial_infract, CVDPORT_AMI_YES) /duration()											//EN AMI Prevalence proportion  decimals=4
+	}
+		*   report_calendar_year							//EN Year  
+		*	split( lifespan_age, FROM_20_TO_90_BY_5)+		//EN Age groups used for validation against the public CCDSS		
+
+	};
+
+	// Stroke incidence and prevalence by age, sex and province
+
+	table Person tCVDPoRTStroke //EN Stroke by sex, province, age and year
+		[in_tabulation_scope &&  report_calendar_year == calendar_year]
+	{
+		sex +	//EN Sex
+		*
+		gProvince +											//EN Province
+		*
+	{
+		duration(),	//EN Person-years alive duration()																								
+			nz_delta(duration()),																						//EN Population count
+			entrances(stroke, CVDPORT_STROKE_YES),														//EN Stroke incidence
+			entrances(stroke, CVDPORT_STROKE_YES) / duration(stroke, CVDPORT_STROKE_NO),				//EN Stroke incidence rate         decimals=4
+			nz_delta(duration(stroke, CVDPORT_STROKE_YES)),												//EN Stroke prevalence counts
+			duration(stroke, CVDPORT_STROKE_YES) / duration()											//EN Stroke prevalence proportion  decimals=4
+	}
+	*report_calendar_year							//EN Year  
+		*	split(lifespan_age, FROM_20_TO_90_BY_5) +		//EN Age groups used for validation against the public CCDSS		
+															
+
+	};
+
+	table Person tCVDPoRTStroke5yr //EN Stroke by sex, province, fine age and year
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +	//EN Sex
+		*
+		gProvince +		//EN Province									
+		*
+	{
+		duration(), //EN Person-years alive duration()	
+			nz_delta(duration()),																						//EN Population Count
+			entrances(stroke, CVDPORT_STROKE_YES),														//EN Stroke incidence
+			entrances(stroke, CVDPORT_STROKE_YES) / duration(stroke, CVDPORT_STROKE_NO),				//EN Stroke incidence rate         decimals=4
+			nz_delta(duration(stroke, CVDPORT_STROKE_YES)),												//EN Stroke prevalence counts
+			duration(stroke, CVDPORT_STROKE_YES) / duration()											//EN Stroke prevalence proportion  decimals=4
+	}
+	*report_calendar_year							//EN Year  
+		* split(lifespan_age, AGE_GROUP18_5) +		//EN Age groups used for validation against the public CCDSS		
+															
+
+	};
+
+	table Person tCVDPoRTAMI5yr //EN AMI by sex, province, fine age and year
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +	//EN Sex
+		*
+		gProvince +											//EN Province
+		*
+	{
+		duration(),																									//EN Person-years alive duration()  	decimals=1
+		nz_delta(duration()),																						//EN Population count
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES),														//EN AMI incidence
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES) / duration(acute_myocardial_infract, CVDPORT_AMI_NO),	//EN AMI incidence rate      decimals=4
+		nz_delta(duration(acute_myocardial_infract, CVDPORT_AMI_YES)),											//EN AMI prevalence counts
+		duration(acute_myocardial_infract, CVDPORT_AMI_YES) / duration()											//EN AMI prevalence proportion  decimals=4
+	}
+	*report_calendar_year							//EN Year  
+		* split(lifespan_age, AGE_GROUP18_5) +		//EN Age groups used for validation against the public CCDSS		
+	};
+
+	// New table for Nan Chen
+
+	table Person tCVDPoRTAMI_Stroke							//EN AMI and stroke by sex, province, age and year
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +											//EN Sex
+			*
+		gProvince +										//EN Province
+			*
+	{
+		duration(),																									//EN Person-years alive duration()  	decimals=1
+		nz_delta(duration()),																						//EN Population count
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES),														//EN AMI incidence
+		entrances(acute_myocardial_infract, CVDPORT_AMI_YES) / duration(acute_myocardial_infract, CVDPORT_AMI_NO),	//EN AMI incidence rate      decimals=4
+		nz_delta(duration(acute_myocardial_infract, CVDPORT_AMI_YES)),											//EN AMI prevalence counts
+		duration(acute_myocardial_infract, CVDPORT_AMI_YES) / duration()											//EN AMI Prevalence proportion  decimals=4
+	}
+		*report_calendar_year 					//EN Year  
+		* split(lifespan_age, FROM_20_TO_90_BY_5) +		//EN Age groups used for validation against the public CCDSS	
+		*stroke +      //EN by stroke
+
+	};
+

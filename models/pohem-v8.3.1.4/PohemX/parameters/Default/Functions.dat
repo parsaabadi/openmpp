@@ -1,0 +1,7 @@
+parameters {
+	STATISTICAL_PACKAGE	StatisticalPackage = STATISTICAL_PACKAGE_DCDFLIB; //EN StatisticalPackage
+	logical DisallowStatisticalPackageR = {TRUE};
+
+
+};
+

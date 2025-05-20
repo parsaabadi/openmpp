@@ -1,0 +1,74 @@
+parameters {
+	double	intercept_exac_hazard = -2.1; //EN Intercept for COPD exacerbation hazard (calibration)
+
+	 //EN coefficients COPD exacerbation hazard per COPD stage Stage (calibration)
+	double	COPD_exac_hazard[COPD_STAGE] = {
+		(2) 0, 1.1, 1.9, 2.4, 
+	};
+	double	intercept_mortality = -13; //EN COPD intercep for COPD_Mortality (calibration)
+
+	 //EN COPD_Mortality coefficients per Exacerbation Stage (calibration)
+	double	COPD_Mortality[EXAC_STAGE] = {
+		(3) 0, 7.4, 8, 
+	};
+
+	 //EN FEV1 decline over time, Zafar's equation
+	double	Slope_FEV1_t_beta[SEX][FEV1_T_BETA] = {
+		2.31, 0, 0.15, 74.13, 11.39, -25.79, -0.92, -0.44, 
+		2.31, -8.86, 0.15, 74.13, 11.39, -25.79, -0.92, -0.44, 
+	};
+
+	 //EN Probability of COPD at start
+	double	CopdProb[SEX][COPD_EQUATION] = {
+		-4.377285, 0.031689, (5) 0, 0.636127, 0.025183, (2) 0, 
+		-5.337997, 0.044918, (5) 0, 1.093586, 0.018734, (2) 0, 
+	};
+
+	 //EN COPD hazard
+	double	CopdHazard[SEX][COPD_EQUATION] = {
+		-8.34076514, 0.04678374, (5) 0, 1.32274101, 0.01402998, (2) 0, 
+		-9.14458547, 0.06076611, (5) 0, 1.88052462, 0.00299393, (2) 0, 
+	};
+
+	 //EN FEV1 coefficients for ordinary people  icitte
+	double	CopdFev1Base[SEX][COPD_EQUATION] = {
+		0, -5.08, 0, -0.49, -1872.5, 1951.3, -8.32, -92.21, (3) 0, 
+		482.5, -5.08, 0, -0.49, -1872.5, 1951.3, -8.32, -92.21, (3) 0, 
+	};
+
+	 //EN FEV1 coefficients for people with initially prevalent COPD
+	double	CopdFev1Prevalence[SEX][COPD_EQUATION] = {
+		1.4564221, -0.0300643, (3) 0, 0.9368746, (2) 0, -0.0071115, (2) 0, 
+		1.365940, -0.032715, (3) 0, 1.098201, (2) 0, -0.003434, (2) 0, 
+	};
+
+	 //EN FEV1 coefficients for people with incident COPD
+	double	CopdFev1Incidence[SEX][COPD_EQUATION] = {
+		1.1483397, -0.0275225, (3) 0, 0.9715759, (2) 0, -0.0046540, (2) 0, 
+		0.8064169, -0.0322286, (3) 0, 1.2714224, (2) 0, -0.0042846, (2) 0, 
+	};
+
+	 //EN FEV1 coefficients for people with ongoing COPD
+	double	CopdFev1Ongoing[SEX][COPD_EQUATION] = {
+		0, 2.344, 0, 0.126, 58.35, 18.07, -0.93, -30.74, (2) 0, -1.46, 
+		-7.62, 2.344, 0, 0.126, 58.35, 18.07, -0.93, -30.74, (2) 0, -1.46, 
+	};
+
+	 //EN PEF coefficients
+	double	CopdPef[SEX][COPD_EQUATION] = {
+		0.4333, -0.00361, -0.000194, (2) 0, 1.1496, (5) 0,
+		0.5536, -0.01303, -0.000172, (2) 0, 1.4098, (5) 0, 
+	};
+
+	 //EN Excerbation stage
+	double	CopdExacerbation[SEX][COPD_EQUATION] = {
+		0, -0.0076, 0, 0.017820, (3) 0, 0.347579, -0.001127, -0.002945, 0, 
+		-0.764289, -0.0076, 0, 0.017820, (3) 0, 0.347579, -0.001127, -0.002945, 0, 
+	};
+
+	 //EN Excerbation stage (COPD stage terms)
+	double	CopdExacerbationStage[COPD_STAGE] = {
+		0, -1.25, -1.5, -1.6, -2, 
+	};
+};
+

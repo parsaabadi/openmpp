@@ -1,0 +1,164 @@
+table_group tgSEP_Tables { //EN Socio-economic tables
+tIncome_SEP,
+tEducation_SEP,
+tIncome_SEP_prop,
+tEducation_SEP_prop,
+tEducation_CohortView5,
+tIncome_CohortView5,
+tEducation_CrossSectionalView5,
+tIncome_CrossSectional5
+};
+table Person tIncome_SEP	//EN Risk factors by Income by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+	//EN Sex
+	*
+	gIncomeQuartile+	//EN Income quartile
+	*
+	{
+		duration(),								//EN People count (person-years)
+		duration(daily_smoker, TRUE),			//EN Daily smoker decimals=2
+		duration( gDiabetes_use, DIAB_YES ),	//EN Diabetes decimals=2
+		duration(bmi_PHAC, BMI_CAT_4)			//EN BMI decimals=2
+		
+	}
+	*
+	report_calendar_year+	//EN Year
+};
+
+table Person tEducation_SEP	//EN Risk factors by Education by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+										//EN Sex
+	*
+	gEducation+									//EN Self-reported Education
+	*
+	{
+		duration(),								//EN People count (person-years)
+		duration(daily_smoker, TRUE),			//EN Daily smoker decimals=2
+		duration( gDiabetes_use, DIAB_YES ),	//EN Diabetes decimals=2
+		duration(bmi_PHAC, BMI_CAT_4)			//EN BMI decimals=2
+		
+	}
+	*
+	report_calendar_year+						//EN Year
+};
+
+table Person tIncome_SEP_prop	//EN Risk factor proportions by Income by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+												//EN Sex
+	*
+	gIncomeQuartile+									//EN Income quartile
+	*
+	{
+		duration(daily_smoker, TRUE) / duration(),		//EN Daily smoker decimals=2
+		duration( gDiabetes_use, DIAB_YES )/duration(), //EN Diabetes decimals=2
+		duration(bmi_PHAC, BMI_CAT_4) / duration()		//EN BMI decimals=2
+	}
+	*
+	report_calendar_year+								//EN Year
+};
+
+table Person tEducation_SEP_prop	//EN Risk factor proportions by Education by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+												//EN Sex
+	*
+	gEducation+											//EN Self-reported education
+	*
+	{
+		duration(daily_smoker, TRUE) / duration(),		//EN Daily smoker decimals=2
+		duration( gDiabetes_use, DIAB_YES )/duration(), //EN Diabetes decimals=2
+		duration(bmi_PHAC, BMI_CAT_4) / duration()		//EN BMI decimals=2
+	}
+	*
+	report_calendar_year+								//EN Year
+};
+
+/*NOTE(tEducation_CohortView5, EN)
+This output table shows a COHORT view of the distribution of persons by education level, by sex, by year according
+to age in 2001 and only follows this cohort (ie cases generated in 2001). 
+
+The calculation divides the person-years in an education level by the total person-years.
+
+*/
+table Person tEducation_CohortView5	//EN Education Cohort view by year 
+[in_tabulation_scope && in_tabulation_scope && calendar_year_start==pStartYear]
+{
+	sex+											//EN Sex
+	*
+	{
+		duration(gEducation, EDUC1)/duration(),		//EN Proportion education less than highschool decimals=2
+		duration(gEducation, EDUC2)/duration(),		//EN Proportion education secondary grad but no post-sec. decimals=2
+		duration(gEducation, EDUC3)/duration(),		//EN Proportion other post-secondary but less than bachelor decimals=2
+		duration(gEducation, EDUC4)/duration()		//EN Proportion post-secondary grad bachelor or higher decimals=2
+	}
+	*
+	report_calendar_year+							//EN Year
+};
+/*NOTE(tIncome_CohortView5, EN)
+This output table shows a COHORT view of the distribution of persons by INCOME quartile, by sex, by year according
+to age in 2001 and only follows this cohort (ie cases generated in 2001). 
+
+The calculation divides the person-years in an INCOME quartile by the total person-years.
+
+*/
+table Person tIncome_CohortView5	//EN Income Cohort view by year, sex 
+[in_tabulation_scope && calendar_year_start==pStartYear]
+{
+	sex+														//EN Sex
+	*
+	{
+		duration(gIncomeQuartile, INCOME_Q1)/duration(),		//EN Proportion in poorest income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q2)/duration(),		//EN Proportion in lower-middle income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q3)/duration(),		//EN Proportion in upper-middle income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q4)/duration()			//EN Proportion in richest income quartile decimals=2
+	}
+	*
+	report_calendar_year+										//EN Year
+};
+
+/*NOTE(tEducation_CrossSectionalView5, EN)
+This output table shows a CROSS-SECTIONAL  view of the distribution of persons by education level, by sex, by year and 5-year age group according
+to age in year being reported. Includes new cases entering Canada (births and immigrants) in years after 2001.
+
+The calculation divides the person-years in an education level by the total person-years.
+
+The denominator "Person-years" can be found in table Average_per_year_CohortView5.
+*/
+table Person tEducation_CrossSectionalView5	//EN Education cross-sectional view by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+											//EN Sex
+	*
+	{
+		duration(gEducation, EDUC1)/duration(),		//EN Proportion education less than highschool decimals=2
+		duration(gEducation, EDUC2)/duration(),		//EN Proportion education secondary grad but no post-sec. decimals=2
+		duration(gEducation, EDUC3)/duration(),		//EN Proportion other post-secondary but less than bachelor decimals=2
+		duration(gEducation, EDUC4)/duration()		//EN Proportion post-secondary grad bachelor or higher decimals=2
+	}
+	*
+	report_calendar_year+							//EN Year
+};
+/*NOTE(tIncome_CrossSectional5, EN)
+This output table shows a CROSS-SECTIONAL  view of the distribution of persons by INCOME quartile, by sex, by year according
+to age in year being reported. Includes new cases entering Canada (births and immigrants) in years after 2001.
+
+The calculation divides the person-years in an INCOME quartile by the total person-years.
+
+*/
+table Person tIncome_CrossSectional5	//EN Income cross-sectional view by year, sex 
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year)]
+{
+	sex+														//EN Sex
+	*
+	{
+		duration(gIncomeQuartile, INCOME_Q1)/duration(),		//EN Proportion in poorest income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q2)/duration(),		//EN Proportion in lower-middle income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q3)/duration(),		//EN Proportion in upper-middle income quartile decimals=2
+		duration(gIncomeQuartile, INCOME_Q4)/duration()			//EN Proportion in richest income quartile decimals=2
+	}
+	*
+	report_calendar_year+										//EN Year
+};

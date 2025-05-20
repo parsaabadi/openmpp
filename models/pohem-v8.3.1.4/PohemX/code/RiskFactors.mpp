@@ -1,0 +1,357 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Risk Factor Transitions
+/* FILE_NOTE(EN) 
+	This file updates risk factor categories for blood pressure, cholesterol and HDL
+	at change in age group (5 year).  It also assigns an exact value for each based on 
+	observed distributional information (by sex, age group and category).
+*/
+classification FIRST_UPDATE { //EN Timing of first update of some attributes such as education and BMI
+	FIRST_UPDATE_1,   //EN First update is one year after initialisation
+    FIRST_UPDATE_2,   //EN First update is two years after initialisation
+	FIRST_UPDATE_3    //EN First update is three years after initialisation
+};
+classification WEIBULL_PARAMETER {	//EN Inverse piecewise Weibull parameters
+	Weibull_uFixed,
+	Weibull_tFixed,
+	Weibull_lambda1,
+	Weibull_beta1,
+	Weibull_lambda2,
+	Weibull_beta2,
+	Weibull_rr
+};
+classification ALCOHOL5 {		//EN Alcohol (drinks/week) 
+    ALCOHOL_NEVER,				//EN Never drank alcohol
+    ALCOHOL_FORMER,				//EN Former drinker
+    ALCOHOL_LIGHT,				//EN Light (less than 2 drinks per week)
+    ALCOHOL_MODERATE,			//EN Moderate (2-14 drinks per week for males, 2-9 for females)
+    ALCOHOL_HEAVY				//EN Heavy (15+ drinks per week for males, 10+ for females)
+};
+classification ALCOHOL {	//EN Alcohol (drinks/day)
+	cALCOHOL_NIL,			//EN Nil (0-0.25)
+	cALCOHOL_LOW,			//EN Low (0.26-2f,-4m)
+	cALCOHOL_HAZARD,		//EN Hazardous (2f-,4m-6)
+	cALCOHOL_HARM			//EN Harmful (>6)'
+};
+classification NUTRITION {	//EN Nutrition
+	cNUTRITION_LOW,			//EN <5 servings F&V/day
+	cNUTRITION_HIGH			//EN >=5 servings F&V/day
+};
+classification PACTIVITY {	//EN Physical Activity 
+	cPACTIVITY_INACTIVE,	//EN Inactive
+	cPACTIVITY_MODERATE,	//EN Moderate
+	cPACTIVITY_ACTIVE		//EN Active
+};
+/*
+classification CHOL_STATE {		// Cholesterol (mg/dl)
+	CHOL_NUL,						// Null initial state
+	CHOL_LOW,						// Low <160
+	CHOL_MEDLOW,					// Medium-Low [160,200)
+	CHOL_MED,						// Medium [200,240)
+	CHOL_MEDHI,						// Medium-High [240,280)
+	CHOL_HIGH						// High  >=280
+};
+*/
+/*
+classification CHOL_INDEX {		// Cholesterol (mg/dl)
+	iCHOL_LOW,						// Low <160
+	iCHOL_MEDLOW,					// Medium-Low [160,200)
+	iCHOL_MED,						// Medium [200,240)
+	iCHOL_MEDHI,					// Medium-High [240,280)
+	iCHOL_HIGH						// High >=280
+};
+*/
+classification HDL_STATE {		//EN HDL (mg/dl)
+	HDL_NUL,						//EN Null initial state
+	HDL_LOW,						//EN Low HDL <35
+	HDL_MEDLOW,						//EN Medium-Low HDL [35,45)
+	HDL_MED,						//EN Medium HDL [45,50)
+	HDL_MEDHI,						//EN Medium-High HDL [50,60)
+	HDL_HIGH						//EN High HDL >=60
+};
+classification HDL_INDEX {		//EN HDL (mg/dl)
+	iHDL_LOW,						//EN Low HDL <35 
+	iHDL_MEDLOW,					//EN Medium-Low HDL [35,45)
+	iHDL_MED,						//EN Medium HDL [45,50)
+	iHDL_MEDHI,						//EN Medium-High HDL [50,60)
+	iHDL_HIGH						//EN High HDL >=60
+};
+// nota: When Systolic and Diastolic BP provides diff. cat., we used the higher number
+classification BP_STATE {         //EN Blood Pressure (systolic/diastolic)
+	BP_NUL,                          //EN Null initial state
+	BP_LOW,                          //EN Optimal     <120/80
+	BP_MEDLOW,                       //EN Normal      120/80 to 130/85
+	BP_MED,                          //EN High normal 130/85 to 140/90
+	BP_MEDHI,                        //EN Stage I     140/90 to 160/100
+	BP_HIGH                          //EN Stage II    >=160/100
+};
+classification BP_INDEX {         //EN Blood Pressure (systolic/diastolic)
+	iBP_LOW,                         //EN Optimal     <120/80
+	iBP_MEDLOW,                      //EN Normal      120/80 to 130/85
+	iBP_MED,                         //EN High normal 130/85 to 140/90
+	iBP_MEDHI,                       //EN Stage I     140/90 to 160/100
+	iBP_HIGH                         //EN Stage II    >=160/100
+};
+classification HIGH_BP_STATE {		//EN Self-Reported High BP
+	HIGH_BP_NO,						//EN No
+	HIGH_BP_YES						//EN Yes
+};
+classification DIAB_STATE {		//EN Diabetes 
+	DIAB_NO,						//EN No Diabetes reported
+	DIAB_YES						//EN Diabetes reported
+};
+classification DIAB_INDEX {		//EN Diabetes
+	iNonDiabetic,				//EN Non-Diabetic
+	iDiabetic					//EN Diabetic
+};
+classification STATIN_REASSESSMENT {	//EN Lipid re-assessment
+	cSTATIN_LIPIDLEVELS_OK,			//EN Time to re-assessment for acceptable lipid level cases
+	cSTATIN_NONADHERENCE,			//EN Time to re-assessment for non-adherents
+	cSTATIN_NONADHERENCE_FOLLOWUPS	//EN Number of follow-ups for non-adherents
+};
+
+
+partition AGE_GROUP			{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70 };	//EN Age group
+partition TRANS_AGE_GROUP	{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65 };		//EN Previous Age group
+
+partition AGE_HDL_GROUP		{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70 };//EN Age group
+partition AGE_GROUP_RFI	{ 19, 40, 50, 60 }; //EN Age group
+
+
+partition SBP_GROUPS { 120, 130, 140, 160 }; //EN SBP groups
+partition DBP_GROUPS { 80, 85, 90, 100 };    //EN DBP groups
+partition AMI_10YR_RISK_GROUPS { 0.0, 0.10, 0.20, 0.30 };	//EN LOW, MODERATE, HIGH AND VERY HIGH RISK OF AMI (10 YEAR PREDICTED RISK)
+
+
+parameter_group pgHealthRisks { // Risk Factors
+	pgBMI_Parameters,
+	pgPA_Parameters,
+	TG01_Smoking_Parameters,
+	pgRiskFactorDistributions,
+	pgLookupAndTransitionTables,
+	pgAlcoholParameters
+};
+
+parameter_group pgRiskFactorDistributions { // Risk Factor Distributions for assigning value for given category
+//pgChol_Distribution,
+pgDBP_Distribution,
+pgSBP_Distribution,
+pgHDL_Distribution
+//pgBMI_Distribution
+};
+/*
+parameter_group pgChol_Distribution { // Total Cholesterol
+Chol_min,
+Chol_max,
+Chol_mean,
+Chol_std,
+Chol_CumDistribution
+};
+*/
+parameter_group pgHDL_Distribution { // HDL
+HDL_min,
+HDL_max,
+HDL_mean,
+HDL_std
+//HDL_CumDistribution
+};
+parameter_group pgDBP_Distribution { // Blood Pressure diastolic
+dBp_min,
+dBp_max,
+dBp_mean,
+dBp_std,
+DBP_CumDistribution
+};
+parameter_group pgSBP_Distribution { // Blood Pressure systolic
+sBp_min,
+sBp_max,
+sBp_mean,
+sBp_std,
+SBP_CumDistribution
+};
+/*parameter_group pgBMI_Distribution { //EN Body Mass Index (BMI)
+//BMI_min,
+//BMI_max,
+BMI_mean,
+BMI_std
+//BMI_CumDistribution
+};*/
+parameter_group pgLookupAndTransitionTables  { //EN Lookup and Transition Probability Tables
+//CumMargHRisk,
+//CumHDLdistr,
+CumBPdistr,
+//TransHRisk,
+//CumTransBMI,
+SmokTrans
+};
+
+parameter_group pgCalibration { //EN Calibration Tolerance
+	 ITERATOR_ERROR_TOLERANCE,
+	 ITERATOR_OVERALL_ERROR_TOLERANCE_SCALAR
+};
+
+parameters {
+
+	int         dBp_min;
+	int         dBp_max;
+	int         sBp_min;
+	int         sBp_max;
+	//int         Chol_min;
+	//int         Chol_max;
+	int         HDL_min;
+	int         HDL_max;
+	double      HDL_mean[SEX][AGE_GROUP];
+	double      HDL_std[SEX][AGE_GROUP];
+	//double      Chol_mean[SEX][AGE_GROUP];
+	//double      Chol_std[SEX][AGE_GROUP];
+	double      sBp_mean[SEX][AGE_GROUP];
+	double      sBp_std[SEX][AGE_GROUP];
+	double      dBp_mean[SEX][AGE_GROUP];
+	double      dBp_std[SEX][AGE_GROUP];
+
+/* NOTE ( TimingFirstUpdate, EN )
+	Distribution of timing of first update of some attributes such as education and BMI
+*/
+	cumrate	TimingFirstUpdate[FIRST_UPDATE] ;	
+
+
+
+/* NOTE ( DBP_CumDistribution, EN )
+	Cumulative distribution by distolic blood pressure category within age group and sex.
+*/
+	double      DBP_CumDistribution[SEX][BP_STATE][AGE_GROUP];
+
+/* NOTE ( SBP_CumDistribution, EN )
+	Cumulative distribution by systolic blood pressure category within age group and sex.
+*/
+	double      SBP_CumDistribution[SEX][BP_STATE][AGE_GROUP];
+
+	//double      HDL_CumDistribution[SEX][HDL_STATE][AGE_GROUP];
+
+	
+	//EN Cholesterol lookup table
+	//cumrate  CumMargHRisk[SEX][AGE_GROUP][BMI_INDEX][DIAB_INDEX][BP_INDEX][CHOL_INDEX];
+
+	
+	//EN Evolution of Cholesterol and Blood Pressure
+	//double  TransHRisk[SEX][TRANS_AGE_GROUP]						
+				//[BMI_INDEX][DIAB_INDEX][CHOL_INDEX][BP_INDEX]		
+				//[BMI_INDEX][DIAB_INDEX][CHOL_INDEX][BP_INDEX];		
+
+
+	/* June 09, 2004 */
+	//model_generated cumrate[4] CumTransHRisk[SEX][TRANS_AGE_GROUP]
+						//[BMI_INDEX][DIAB_INDEX][CHOL_INDEX][BP_INDEX]
+						//[BMI_INDEX][DIAB_INDEX][CHOL_INDEX][BP_INDEX];
+
+	
+	//EN HDL lookup table
+	//cumrate		CumHDLdistr[SEX][AGE_GROUP][CHOL_INDEX][DIAB_INDEX][BMI_INDEX][HDL_INDEX]; 
+
+	/* NOTE ( CumBPdistr, EN )
+		Initial blood pressure category is imputed from donors matching key variables identified by dimensions of this parameter.
+		An exact value is drawn from the distributional parameters.
+	*/
+	//EN Blood Pressure lookup table
+	cumrate		CumBPdistr[HIGH_BP_STATE][SEX][AGE_GROUP][BP_INDEX];
+
+	double ITERATOR_ERROR_TOLERANCE;	//EN Error tolerated for one disease (ssq across age)
+	double ITERATOR_OVERALL_ERROR_TOLERANCE_SCALAR;	//EN Scales error tolerance by a % for calculation of overall error tolerance (across disease and age)
+};
+
+hide(pgCalibration);
+
+actor Person            // Core Individual
+{
+	int         timing_first_update;           //EN Timing of first update of some attributes such as education and BMI
+
+	//CHOL_STATE  cholF;							//EN Cholesterol State used in Framgingham function
+	//CHOL_STATE  chol;							//EN Cholesterol State used in Joint transitions
+	HDL_STATE	hdl;							//EN HDL State
+	BP_STATE    bp_actual = {BP_NUL};			//EN Blood Pressure State	used in Framingham function (incorporates treatment effects)
+	BP_STATE    bp_chhs = {BP_NUL};				//EN Blood Pressure State	used in Joint transitions (projected from CHHS)
+	DIAB_STATE	diab;							//EN Diabetes State in Joint Transition
+	BMI_STATE	bmi_previous;					//EN Body Mass Index State at the beginning of transition
+	BMI_STATE	CHHS_bmi;						//EN BMI generated from lookup transition matrix based on CHHS (not used)
+
+
+	double		gTC_HDL_ratio = {0.0};
+	logical		JointTransExisted = {TRUE};		// Used simply to count the number of times that the joint rf combo does not exist in the TransMatrix
+
+	//int			cholx;                 			//EN cholesterol x value
+	int			hdlx;                 			//EN hdl x value
+	int			dbpx_chhs;                   	//EN Diastolic blood pressure value as projected from CHHS
+	int			sbpx_chhs;                   	//EN Systolic blood pressure value as projected from CHHS
+	int			dbpx_actual;                   	//EN Diastolic blood pressure value possibly affected by treatment
+	int			sbpx_actual;                   	//EN Systolic blood pressure value possibly affected by treatment
+	logical		htn_treatment = {FALSE};		//EN Treated for high blood pressure (yes/no)
+	logical		htn_treatment_eff = {FALSE};	//EN BP treatment effective (yes/no)
+
+	void    GetTimingFirstUpdate();
+//	hook    GetTimingFirstUpdate,Start;  // hook problematic because it is executed too late (after other things also hooked to Start)
+
+	void	RiskFactorTransitions();
+	hook	RiskFactorTransitions, BirthdayEvent, 10;	// 10 = execution number, the higher the value, the later the execution	// To update after every birthday
+//	hook	RiskFactorTransitions, InterventionsAtStart;				// To initialize (other) health risk states at Start
+
+	//void	AssignExactValueForBpCholHDL();
+//	hook	AssignExactValueForBpCholHDL, RiskFactorTransitions;
+//	hook	AssignExactValueForBpCholHDL, ImputeInitialStatesNotOnStartPop;
+
+};
+
+void hook_GetTimingFirstUpdate() {};
+
+void Person::GetTimingFirstUpdate()
+{
+	int     nTime ;
+
+    Lookup_TimingFirstUpdate( RandUniform(86), &nTime );
+	timing_first_update = 1 +nTime;
+
+	hook_GetTimingFirstUpdate();
+};
+
+void hook_RiskFactorTransitions() {};
+
+void Person::RiskFactorTransitions()
+//
+// Generate the health risk factors of the core adult.
+//
+{	
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	int     nAgeGroup = SPLIT( truncated_age, AGE_GROUP);
+	int		nChol = {0};
+	int		nHDL = {0};
+	int		nBp = {0};
+	int		nDiab = {0};
+	int		nbmi = {0};
+
+	/*	Update by Bill May 31, 2001
+		When the StartTimeMethod = January 1st (bday in year) then
+		a person aged 18 in StartPop, may receive a starting age of 17.d
+		at simulation start time. Thus, we include
+		age 17 as the first age for marginal lookup, but it is based 
+		on data from CHHS age group 18-19.
+	*/
+
+	// Update Blood Pressure, Cholesterol, and HDL at change in age group 
+	// (subsequent to age at initialization)
+	
+
+	hook_RiskFactorTransitions();
+}; // End of RiskFactorTransitions
+
+void PreSimulation()
+{
+	// THESE MEMMOVE STATEMENTS ARE ESSENTIAL - THEY ARE NOT "0" INTIALIZERS - DO NOT DELETE
+
+	// Copy the double version to the cumrate version
+	//	sex * age * bmi * db * chol * bp_chhs * bmi2 * db2 * chol2 * bp2
+	//	2 * 11 * 4 * 2 * 5 * 5 * 4 * 2 * 5 * 5 = 880,000
+	//memmove(&CumTransHRisk[0][0][0][0][0][0][0][0][0][0], 
+		//&TransHRisk[0][0][0][0][0][0][0][0][0][0], 880000 * sizeof(double));
+};
+// IT WOULD BE NICE TO DROP PARAMETER TransHRisk because it won't 
+//be used in the simulation beyond presimulation

@@ -1,0 +1,892 @@
+
+//FILE_LABEL (EN) Person Core
+/* FILE_NOTE(EN) 
+	This file initializes attributes for the person when first created.
+*/
+
+classification PLACE_OF_BIRTH {
+	CANADA,
+	ABROAD
+};
+classification REGION {        //EN Region
+	ATLANTIC,
+	QUEBEC,
+	ONTARIO,
+	PRAIRIES,
+	BCregion
+};
+classification PROVINCE {        //EN Province
+	//EN Newfoundland 
+	NFLD,       
+	//EN P.E.I. 
+	PEI,        
+	//EN Nova Scotia 
+	N_S,         
+	//EN New Brunswick 
+	N_B,         
+	//EN Quebec 
+	QUE,        
+	//EN Ontario 
+	ONT,        
+	//EN Manitoba 
+	MAN,        
+	//EN Saskatchewan 
+	SASK,       
+	//EN Alberta 
+	ALTA,       
+	//EN British Columbia 
+	B_C
+};
+classification cPROVINCE {      //EN Province and Territories
+	//EN Newfoundland 
+	cNFLD,       
+	//EN P.E.I. 
+	cPEI,        
+	//EN Nova Scotia 
+	cNS,         
+	//EN New Brunswick 
+	cNB,         
+	//EN Quebec 
+	cQUE,        
+	//EN Ontario 
+	cONT,        
+	//EN Manitoba 
+	cMAN,        
+	//EN Saskatchewan 
+	cSASK,       
+	//EN Alberta 
+	cALTA,       
+	//EN British Columbia 
+	cBC,
+	//EN Yukon
+	cYUKON,
+	//EN North West Territories
+	cNWT,
+	//EN Nunavut
+	cNUNAVUT
+};
+
+aggregation REGION, PROVINCE
+{
+	ATLANTIC, NFLD,       
+	ATLANTIC, PEI,        
+	ATLANTIC, N_S,         
+	ATLANTIC, N_B,         
+	QUEBEC  , QUE,        
+	ONTARIO , ONT,        
+	PRAIRIES, MAN,        
+	PRAIRIES, SASK,       
+	PRAIRIES, ALTA,       
+	BCregion, B_C
+};
+
+
+
+classification ETHNICITY {	//EN Ethnicity
+	ETHNICITY_WHITE,		//EN White
+	ETHNICITY_NONWHITE		//EN Non-white
+};
+classification ABORIGINAL {
+	ABORIGINAL_NO,
+	ABORIGINAL_YES
+};
+classification CULTURAL_ORIGIN {
+	CULTURAL_ORIGIN_WHITE,		//EN White
+	CULTURAL_ORIGIN_ABORIGINAL,	//EN Aboriginal
+	CULTURAL_ORIGIN_BLACK,		//EN Black
+	CULTURAL_ORIGIN_CHINESE,	//EN Chinese
+	CULTURAL_ORIGIN_SOUTH_ASIAN,//EN South asian
+	CULTURAL_ORIGIN_JAPAN_KOREA,//EN Japanese or Korean
+	CULTURAL_ORIGIN_SOUTH_EAST_ASIAN,//EN South east asian
+	CULTURAL_ORIGIN_UNKNOWN		//EN Unknown
+};
+
+/* wrong classification below 
+classification CULTURAL_ORIGIN {
+	CULTURAL_ORIGIN_WHITE,		// White
+	CULTURAL_ORIGIN_ABORIGINAL,	// Aboriginal
+	CULTURAL_ORIGIN_BLACK,		// Black
+	CULTURAL_ORIGIN_ASIAN,		// Asian
+	CULTURAL_ORIGIN_OTHER,		// Other
+	CULTURAL_ORIGIN_UNKNOWN		// Unknown
+};
+ */
+classification EDUCATION {	//EN Education level
+	EDUC1,	//EN Less than secondary
+	EDUC2,  //EN Secondary grad 
+	EDUC3,  //EN Other post-secondary
+	EDUC4   //EN Post-secondary grad
+};
+classification EDUCATION_NA {  //EN Education level
+	EDUC_NA_1 ,	//EN < THAN SECONDARY
+	EDUC_NA_2 ,  //EN SECONDARY GRAD 
+	EDUC_NA_3 ,  //EN OTHER POST-SEC
+	EDUC_NA_4 ,  //EN POST-SEC. GRAD
+	EDUC_NA_NA   //EN Not applicable  (age < 20)
+};
+classification INCOME_QUARTILE { //EN Income quartile
+	//EN Income quartile 1 (poorest)
+	INCOME_Q1,	
+	//EN Income quartile 2 (lower middle)
+	INCOME_Q2,	
+	//EN Income quartile 3 (upper middle)
+	INCOME_Q3,	
+	//EN Income quartile 4 (richest)
+	INCOME_Q4	
+};
+//EN Sex
+classification SEX {
+	//EN Female
+	FEMALE,
+	//EN Male
+	MALE
+};
+
+
+
+//EN Age group
+partition	COD_AGE_GROUP {1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 
+						50, 55, 60, 65, 70, 75, 80, 85, 90, 95};
+
+range LIFE { 0, 99 }; //EN Age
+
+//EN year of birth
+range LIFE_SPAN {0,  119} ;	//EN span of life *GR*
+
+range RANGE_FROM_2001_TO_2099 {2001,2099};//EN year
+range RANGE_FROM_2001_TO_2111 {2001,2111};//EN year
+
+range YEAR		{ 1872, 2051 };//EN year
+
+/* years in which new cases can be generated */
+range YEARS		{ 2001, 2100 };		//EN Year
+
+
+
+/** NOTES on YEARS range
+Various parts of the code uses YEARS but the code is robust to changes in the range specified ie no modification of
+code is required. 
+However, changing YEARS impacts on parameters pPOPULATION and pImmig and appropriate data must be supplied
+for the range of years chosen.
+The other related parameter is pStartYear. It determines when the simulation starts. 
+We can continue to set it 2001 to continue as usual, but we now also have the option of setting 
+it to an earlier year for purposes of validation (or later such as 2003 or 2005 if we update to more recent waves
+of CCHS).
+eg1, start simulation in 1971 (census population estimates as StartPop db) 
+	with certain incidence rates, and see what prevalence rates generated for 2001)
+eg2, start simulation in 1994 (with NPHS 1994 as StartPop db) and run forward to 2001 to validate AMI incidence.
+*/
+
+range   RANGE_FROM_2001_TO_2021 { 2001, 2021 };		//EN Year
+range	REPORT_YEAR_MEND { 2001, 2041 };		//EN Year
+range	REPORT_YEAR		 { 2010, 2051 };		//EN Year
+
+parameter_group PG_Tabulation_Parameters { //EN Tabulation parameters
+	 TableFilterSex      ,
+	 TableFilterProvince ,
+	 TableFilterAge      ,
+	 TableFilterAgeStart ,
+	 TableFilterYear     ,
+	 TableFilterYearStart,
+	 TableFilterDoor     ,
+	 TableFilterEducation,
+	 TableFilterIncome   ,
+	 TableFilterAlcohol  ,
+	 TableFilterAlcoholStart  
+};
+
+
+parameters 
+{
+	double FictivePersonCharacteristics[DUMMY_ROW_OR_COLUMN][DB_FIELDS]; //EN Characteristics of a fictive person to be simulated
+
+	int    TableFilterAge      [cLOWER_UPPER_BOUNDS]; //EN Tabulation restriction: Age (current)
+	int    TableFilterAgeStart [cLOWER_UPPER_BOUNDS]; //EN Tabulation restriction: Initial age (upon actor creation)
+	int    TableFilterYear     [cLOWER_UPPER_BOUNDS]; //EN Tabulation restriction: Year (current)
+	int    TableFilterYearStart[cLOWER_UPPER_BOUNDS]; //EN Tabulation restriction: Initial year (upon actor creation)
+	logical TableFilterSex      [SEX               ]; //EN Tabulation restriction: Sex 
+	logical TableFilterProvince [PROVINCE          ]; //EN Tabulation restriction: Province
+	logical TableFilterDoor     [cPopulationSource ]; //EN Tabulation restriction: Entry point/door
+	logical TableFilterEducation[EDUCATION         ]; //EN Tabulation restriction: Education
+	logical TableFilterIncome   [INCOME_QUARTILE   ]; //EN Tabulation restriction: Income quartile
+	logical TableFilterAlcohol     [ ALCOHOL5      ]; //EN Tabulation restriction: Alcohol
+	logical TableFilterAlcoholStart[ ALCOHOL5      ]; //EN Tabulation restriction: Initial alcohol (upon actor creation)
+
+};
+
+//EN Person
+actor Person
+{
+	REPORT_YEAR    	report_calendar_year = COERCE( REPORT_YEAR, calendar_year);	//EN Year
+	RANGE_FROM_2001_TO_2021 calendar_year_2001_2021 =   COERCE(RANGE_FROM_2001_TO_2021 , calendar_year );  //EN Year
+	RANGE_FROM_2001_TO_2111 calendar_year_2001_2111 =   COERCE(RANGE_FROM_2001_TO_2111 , calendar_year );  //EN Year
+	
+	logical in_tabulation_scope = dominant && 
+		 calendar_year >= MIN(REPORT_YEAR) &&
+	     TableFilterAge      [LOWER_BOUND] <= lifespan_age         && lifespan_age        <=  TableFilterAge      [UPPER_BOUND] &&
+		 TableFilterAgeStart [LOWER_BOUND] <= lifespan_age_start   && lifespan_age_start  <=  TableFilterAgeStart [UPPER_BOUND] &&
+		 TableFilterYear     [LOWER_BOUND] <= year                 && year                <=  TableFilterYear     [UPPER_BOUND] &&
+		 TableFilterYearStart[LOWER_BOUND] <= calendar_year_start  && calendar_year_start <=  TableFilterYearStart[UPPER_BOUND] &&
+		 TableFilterSex      [sex               ]  &&
+		 TableFilterProvince [gProvince         ]  &&
+		 TableFilterDoor     [population_source ]  &&
+		 TableFilterEducation[gEducation        ]  &&
+		 TableFilterIncome   [gIncomeQuartile   ]  &&
+		 TableFilterAlcohol  [gAlcohol5         ]  &&
+		 TableFilterAlcoholStart[gAlcohol5_start]  ;
+
+	logical dominant;       //EN Dominant Actor - kept to maintain table defintions
+	DB_RECORDS cchs_record; //EN record number from Startpop 
+	//double *record_to_be_read; //EN points to the right record in StartPop or in FictivePersonCharacteristics   ...  unfortunately modgen does not seem to like it as an actor state
+	cPopulationSource population_source ; //EN Actor origin (2001 adult Canadian, new birth, new immigrant)
+
+	SEX	sex; //EN Sex
+
+	
+	logical alive      = { TRUE }; //EN Alive
+	logical alive_NPHS = { TRUE }; //EN Alive
+	logical alive_deterministic_MaxYear = {TRUE}; //EN This becomes FALSE only when MaxYear is reached
+	logical alive_deterministic_MaxLife = {TRUE}; //EN This becomes FALSE only when MaxLife is reached
+
+	//EN Place of birth (Canada or Abroad)
+	PLACE_OF_BIRTH place_of_birth;
+
+	//EN Time person was created
+	TIME time_person_created;
+
+	//EN Date of birth
+	TIME date_of_birth;
+
+	//EN Year of birth
+	YEAR year_of_birth;
+
+	//EN Year of initialization
+	YEARS calendar_year_start;
+
+	//EN Calendar Year
+	YEARS calendar_year;
+	
+	//EN Integer age when actor started
+	LIFE_SPAN lifespan_age_start;
+
+	//EN Integer age of life span
+	LIFE_SPAN lifespan_age;	
+
+	//EN Integer age of life
+	LIFE truncated_age = COERCE(LIFE, lifespan_age);
+	
+	//EN Time to next birthday (elapsed)
+	TIME next_birthday;
+
+	//EN Time to next New Year (elapsed)
+	TIME next_year;
+
+	logical escaped_start={FALSE}; //EN Indicator that Start has completed
+
+	int		gAgeGroupSmok = split( lifespan_age, AGE_GROUP_SMOKING);
+	int		cod_age_group = split( lifespan_age, COD_AGE_GROUP);
+
+	//EN Risk factor state variables
+	//REGION				gRegion;			//EN Self-reported Region
+	REGION              gRegion = aggregate(gProvince, REGION); //EN Self-reported Region
+	PROVINCE			gProvince; 			//EN Self-reported Province
+	EDUCATION			gEducation;			//EN Self-reported Education
+	EDUCATION			gEducation_startpop;//EN Self-reported Education on Startpop file
+	INCOME_QUARTILE		gIncomeQuartile;	//EN Self-reported Income Quartile
+
+
+	
+	/*Historically, the BMI state was captured in global variable called "bmi", 
+	this version will continue to use the "bmi" variable since it is implicated
+	in existing code.
+	BMI_STATE			gBMIstate;			//EN BMI state
+	*/
+
+	double				gHeight_m;				//EN Self-reported height in meter
+	double				gMass_kg = gBMI * gHeight_m * gHeight_m;		//EN Mass (Kg) 
+
+	DIAB_STATE			gDiabetes_use = UseDport ? gDiabetes_DPoRT : gDiabetes_PA;			//EN Self-reported Diabetes status
+	DIAB_STATE			gDiabetes_Initial;	//EN Self-reported Diabetes status at start
+	DIAB_STATE			gDiabetes_Initial_Altered;	//EN Self-reported Diabetes status altered at start (static afterwards)
+	int					gHeartDisease;		//EN Self-reported Heart Disease
+	int					gHeartAgeDiagnosed; //EN Self-reported Heart Disease Age
+	int					gHeartBP;			//EN Self-reported High Blood Pressure (N/Y)
+	int					gHeartAttack;		//EN Self-reported Heart Attack
+	int					gHeartAngina;		//EN Self-reported Angina
+	int					gCHF;				//EN Self-reported Congestive Heart Failure
+	
+	double				gHUI;				//EN Self-reported Health Utilities Index Mark 3
+	ETHNICITY			gEthnicityNonWhite;	//EN Self-reported Ethnicity
+	CULTURAL_ORIGIN		gCulturalOrigin;	//EN Self-reported Cultural Origin
+	ABORIGINAL          gAboriginal;        //EN Self-reported Aboriginal
+	int					gArthritis;			//EN Self-reported Arthritis (SRA)
+	logical				gSROA;				//EN Self-reported Osteoarthritis
+	
+	
+	logical	gPrev_IndexAMI_event = {FALSE};
+
+
+
+	void	Start( cPopulationSource lPopulationSource);
+	void	Finish();
+
+	//void    MessageWhoWhenWhere(char *message,logical show);
+
+	void   InitializationEmptyHub();
+	hook   InitializationEmptyHub, Start, 0; // 0 = execution number, the higher the value, the later the execution
+
+	void   RiskFactorsUpdatesEmptyHub();
+	hook   RiskFactorsUpdatesEmptyHub, Start, 10; // 10 = execution number, the higher the value, the later the execution
+	hook   RiskFactorsUpdatesEmptyHub, BirthdayEvent, 20; // 20 = execution number, the higher the value, the later the execution
+
+	void   HealthHazardUpdatesEmptyHub(); // does not cover HUI  (UpdateHuiModel2 is hooked to HealthNonHazardUpdatesEmptyHub and get executed a bit later)
+	hook   HealthHazardUpdatesEmptyHub, Start, 30; // 30 = execution number, the higher the value, the later the execution
+	hook   HealthHazardUpdatesEmptyHub, BirthdayEvent, 40; // 40 = execution number, the higher the value, the later the execution
+	
+	void   HealthNonHazardUpdatesEmptyHub(); // covers cross-sectional models like HUI and 
+	hook   HealthNonHazardUpdatesEmptyHub, Start, 40; // 40 = execution number, the higher the value, the later the execution
+	hook   HealthNonHazardUpdatesEmptyHub, BirthdayEvent, 50; // 50 = execution number, the higher the value, the later the execution
+
+	int     ConvertAgeGroup (const double *record_to_be_read) ;
+	void    GetRecordYearAgeSexProvinceRegion(  TIME *pAge, TIME *pTime);
+
+	void    ReadFromStartPop();
+	void    StartSnapshots(); //EN takes a snapshot of attributes after the Start function and its hooks have been implemented
+
+	event   timeEscapedStartEvent, EscapedStartEvent , 250;  //EN Highest priority.  First event visited when Start and its hooks have been implemented
+
+	void	ImputeInitialStatesNotOnStartPop();
+	hook	ImputeInitialStatesNotOnStartPop, InitializationEmptyHub, 60; // 60 = execution number, the higher the value, the later the execution
+
+	event	timeNewYearsEvent, NewYearsEvent, 2;	// Priority over birthday and mortality from MaxYear
+	event	timeBirthdayEvent, BirthdayEvent, 0;	// 0 is the default for all events
+};
+
+void Person::InitializationEmptyHub()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 5==5);
+	//do nothing. Only purpose is to be hooked by other function.
+
+	hook_InitializationEmptyHub();
+};
+
+void Person::RiskFactorsUpdatesEmptyHub()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 5==5);
+	//do nothing. Only purpose is to be hooked by other function.
+
+	hook_RiskFactorsUpdatesEmptyHub();
+};  
+
+void Person::HealthHazardUpdatesEmptyHub()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 5==5);
+	//do nothing. Only purpose is to be hooked by other function.
+
+	hook_HealthHazardUpdatesEmptyHub();
+};
+ 
+void Person::HealthNonHazardUpdatesEmptyHub()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 5==5);
+	//do nothing. Only purpose is to be hooked by other function.
+
+	hook_HealthNonHazardUpdatesEmptyHub();
+};
+
+/*
+* void hook_MessageWhoWhenWhere(){};
+* 
+void Person::MessageWhoWhenWhere(char *message,logical show)
+{
+	if (show && EcrireDebugLogEntry == 1 && CasesDebugLogEntry[LOWER_BOUND]  <=  case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND]  )
+	{
+		char line[199];
+		snprintf(line, 199, "%s,%i,%0.9f \n", message, case_id, time);
+		WriteDebugLogEntry(line);
+	}
+
+	hook_MessageWhoWhenWhere();
+}
+*/
+
+void Person::ReadFromStartPop()
+{
+		// NB pStartPop should be CLEAN on input to the simulation
+		// ie, it should not contain in invalid codes - simulation will not check
+
+
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gEthnicityNonWhite   = ( ETHNICITY             ) int(record_to_be_read[cDb_Ethnicity]);
+	gCulturalOrigin      = ( CULTURAL_ORIGIN       ) int(record_to_be_read[cDb_CulturalOrigin]); // NEW feb 2008
+	gAboriginal          = (gCulturalOrigin == CULTURAL_ORIGIN_ABORIGINAL ) ? ABORIGINAL_YES : ABORIGINAL_NO ;
+
+	gEducation_startpop  = ( EDUCATION             ) int(record_to_be_read[cDb_Education]);
+	gEducation           = ( EDUCATION             ) int(record_to_be_read[cDb_Education]);
+	gIncomeQuartile      = ( INCOME_QUARTILE       ) int(record_to_be_read[cDb_IncomeQuartile]);
+
+				 
+	gHeight_m			=	(double					)	record_to_be_read[cDb_Height_m];	
+
+	gArthritis           =                           int(record_to_be_read[cDb_Arthritis]); 
+	gSROA                = ( logical               ) int(record_to_be_read[cDb_Osteoarthritis]); 
+	gCHF                 =                           int(record_to_be_read[cDb_CHF]);
+	gHeartBP             =                           int(record_to_be_read[cDb_SP_HBP]);
+	gHeartAttack         =                           int(record_to_be_read[cDb_HeartAttack]);
+	gHeartDisease        =                           int(record_to_be_read[cDb_SP_HRT]);
+	gHeartAngina         =                           int(record_to_be_read[cDb_HeartAngina]);
+
+	 
+
+	/* This code is intended to establish AMI prevalence but has not been
+	   fully thought through. Therefore, it is being commented out for now.
+	   Calibration of AMI will be impacted. (Bill Feb 9, 2009)
+
+	*if ( pDisease[DM_CAD_AMI][ROW_1] && 	
+	 truncated_age >= MIN( CAD_AGE_RANGE ) && 
+	 !IndexAMI_event ) 
+	{
+     //	if ( gHeartDisease || gHeartAttack ) {	
+		if ( gHeartAttack ) {	
+			gPrev_IndexAMI_event = TRUE;
+			IndexAMIEvent();	// happened in past, so time to next events is not quite right
+		}
+	}
+   */
+
+
+	hook_ReadFromStartPop();
+};
+
+void hook_GetRecordYearAgeSexProvinceRegion() {};
+
+void Person::GetRecordYearAgeSexProvinceRegion(  TIME *pAge, TIME *pTime)
+{
+	int nRecord    ;  // To eventually set actor state cchs_record.  
+	int nYear, nAge;  // To eventually set actor state next_birthday, next_year, time (through *pTime) , age  (through *pAge) 
+	int nSex       ;  // To eventually set actor state sex.
+	int nProvince  ;  // To eventually set actor state gProvince.
+
+
+		// ==========================================================
+		// Case from pStartPop initialization database in start year
+		// ==========================================================
+		if ( population_source == cStartPop || FictivePersonCharacteristics[ROW_1][cDb_Weight] >= 0.0  ) 
+		{
+			// Determine which record to process from pStartPop.  Randomly select record, its probability based on survey sample weight  
+			Lookup_mgCumStartPopWeight( RandUniform(79), &nRecord );
+
+			const double *record_to_be_read;
+			record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[nRecord] : FictivePersonCharacteristics[ROW_1] ;
+
+			// start year
+			nYear = pStartYear;								
+
+			// age (integer)
+			nAge = ConvertAgeGroup( record_to_be_read );
+
+			nSex      = int(record_to_be_read[cDb_Sex     ]); 
+			nProvince = int(record_to_be_read[cDb_Province]); 
+//			nRegion   = int(record_to_be_read[cDb_Region  ]);
+		
+		}
+
+		// ===================================================================
+		// NEW BIRTHS generated in future year at youngest age represented on pStartPop
+		//				not necessarly at birth)
+		// ===================================================================
+		else if ( population_source == cNewBirth ) 
+		{ 
+			int nProv;
+			int nYoungestRecord;
+
+			Lookup_mgBirth( RandUniform(83), &nSex, &nYear, &nProv);
+
+			// year
+			nYear = nYear + MIN( YEARS );
+
+			// age
+			nAge = mgYoungestAge;
+
+			// Hot-deck imputation of other person characterictics from pStartPop
+			// - Lookup donor from Immigrants on initialization db based on sex and age group
+			// - Then translate the record number back to the initialization db to lookup init values
+			Lookup_mgCumStartPopWeightYoungest( RandUniform(87), nSex, nProv, &nYoungestRecord ); 
+			nRecord = mgStartPopYoungestDecode[nYoungestRecord]; 
+
+			//record_to_be_read =  pStartPop[nRecord] ; this line would have been useful if record_to_be_read could have been declared as actor state (no need to assign it all the time)
+
+
+			nProvince = int(pStartPop[nRecord][cDb_Province]);
+//			nRegion   = int(pStartPop[nRecord][cDb_Region]);
+		}
+
+		// ===============================================
+		// New immigrants
+		// ===============================================
+		else if ( population_source == cNewImmig ) 
+		{	
+			// Determine sex, year, age group, and province at immigration 
+			Lookup_mgImmig( RandUniform(88), &nYear, &nSex, &nProvince, &nAge );
+
+			// year
+			nYear = nYear + MIN( YEARS );
+
+			int nRegion = {0}    ;  
+			if ( nProvince <=3 ) 
+			{
+				nRegion= 0 ; // ATLANTIC
+			}
+			else if ( nProvince == 4 ) 
+			{
+				nRegion= 1 ; // QUEBEC
+			}
+			else if ( nProvince == 5 ) 
+			{
+				nRegion= 2 ; // ON
+			}
+			else if ( nProvince >= 6 && nProvince <= 8 ) 
+			{
+				nRegion= 3 ; // Prairies
+			}
+			else 
+			{
+				nRegion= 4 ; // BCregion
+			}
+
+
+			// Translate the age into an age code for hot-deck imputation based on sex and age group
+			int nAgeCode = 0;
+			while  ( !( nAge >= pDbAgeDecode[nAgeCode][cDbBeginAge] &&
+					    nAge <= pDbAgeDecode[nAgeCode][cDbEndAge] ) 
+					 && ( nAgeCode < SIZE( DB_AGE_CODE ) - 1 ) ) 
+			{
+				nAgeCode++;	
+			}
+
+			// Hot-deck imputation of other person characterictics from pStartPop
+			// - Lookup donor from Immigrants on initialization db based on sex and age group
+			// - Then translate the record number back to the initialization db to lookup init values
+			int nImmigRecord;
+			if (Lookup_mgCumStartPopWeightImmig( RandUniform(89), nSex, nProvince, nAgeCode, &nImmigRecord ))
+			{
+				nRecord = mgStartPopImmigDecode[nSex][nAgeCode][nImmigRecord];
+			}
+			else if (Lookup_mgCumStartPopWeightImmigReg( RandUniform(8), nSex, nRegion, nAgeCode, &nImmigRecord ))
+			{
+				nRecord = mgStartPopImmigDecode[nSex][nAgeCode][nImmigRecord];
+			}		
+			else if (Lookup_mgCumStartPopWeightImmigCan( RandUniform(10), nSex, nAgeCode, &nImmigRecord )) 
+			{
+				nRecord = mgStartPopImmigDecode[nSex][nAgeCode][nImmigRecord];
+			}
+			else 
+				ModelExit("No immigrant donor found.\n");
+			//record_to_be_read =  pStartPop[nRecord] ; this line would have been useful if record_to_be_read could have been declared as actor state (no need to assign it all the time)
+		}
+		else
+			ModelExit("Unexpected population_source.\n");
+		
+	//Finally set the actor states 
+	//Set actor states cchs_record, gProvince, sex
+	cchs_record = ( DB_RECORDS ) nRecord;
+	sex         = ( SEX        ) nSex;
+	gProvince   = ( PROVINCE   ) nProvince;
+
+	
+	if(FALSE)
+	{
+		char line[199];
+		snprintf(line,199,"%i,%i,%i,%i,%i,%i \n",(int)case_id,(int)population_source , (int)nYear, (int)nAge, (int)nSex, (int)nRecord );
+		WriteDebugLogEntry(line);
+	}
+
+	/* BEGIN set actor states next_birthday, next_year, age, time   */
+
+
+	double dFractionOfYear;
+
+	// Set the age and time for this person
+	dFractionOfYear = RandUniform(393); // Draw a fractional part of year
+	if ( pStartTimeMethod == cStart_BdayIsJan01 ) {
+		// Start Jan 1st and make this the birthday for everyone
+		*pAge = (TIME ) ( nAge );
+		*pTime = (TIME) ( nYear );
+		next_birthday = 1.0;
+		next_year = 1.0;
+	}
+	else if ( ( pStartTimeMethod == cStart_Jan01 )
+		&& ( nYear == pStartYear ) && (nAge > 0 ) )
+	{	
+		// Start on Jan 1st with floating birthday (except new borns and immigrants)
+		*pAge = (TIME ) ( nAge - dFractionOfYear );
+		*pTime = (TIME) ( nYear );
+		next_birthday = dFractionOfYear;
+		next_year = 1.0;
+	}
+	else { // (pStartTimeMethod == cStart_Bday) or new born or immigrant 
+		// Start on birthday with floating date 
+		*pAge = (TIME ) ( nAge );
+		*pTime = (TIME) ( nYear + dFractionOfYear );
+		next_birthday = 1.0;
+		next_year = 1 - dFractionOfYear;
+	}
+	//age = CoarsenMantissa( *pAge ); // age  can only be set in the Start function, that's why age  is passed back to the Start function through the pointer *pAge
+	//time = CoarsenMantissa(*pTime); // time can only be set in the Start function, that's why time is passed back to the Start function through the pointer *pTime
+
+	/* END set actor states next_birthday, next_year, age, time   */
+
+	hook_GetRecordYearAgeSexProvinceRegion();
+};
+
+
+// Assign nAge (integer) by converting nAgeCode
+//	(note: in Start it is converted to a real number)
+int Person::ConvertAgeGroup (const double *record_to_be_read ) 
+{
+	int nAge;
+	logical lAgeNotAssigned; 
+	double dRand;
+
+	int nAgeCode, nProvince, nSex;	// or pass them ??
+	nAgeCode  = (int) record_to_be_read[cDb_AgeGrp  ];
+	nProvince = (int) record_to_be_read[cDb_Province];
+	nSex      = (int) record_to_be_read[cDb_Sex     ];
+
+	//Choose the random number once to be used to pick the age, either through population distribution or uniform method
+	dRand = RandUniform(90);
+
+	if ( pUseInputPopulationToAssignAge ) {
+		/* Assign age within an age group based on the distribution of the
+		population with same sex and province; pPOPULATION is converted to 
+		mgCumPOPULATION to allow for within-age cumrate-like "lookup". 
+		*/
+		lAgeNotAssigned = TRUE;
+		nAge = pDbAgeDecode[nAgeCode][cDbBeginAge];
+		while ( lAgeNotAssigned && (nAge <= pDbAgeDecode[nAgeCode][cDbEndAge]) ) 
+		{
+			if ( dRand < mgCumPOPULATION[nProvince][nSex][nAge] ) 
+			{
+				lAgeNotAssigned = FALSE; //use current value of nAge
+			}
+			else 
+			{	
+				nAge++;
+			}
+		}
+	}
+	else {	
+		// 	Choose age randomly within age group nAgeCode
+		nAge = (int) pDbAgeDecode[nAgeCode][cDbBeginAge] 
+			 +  int( dRand * ( pDbAgeDecode[nAgeCode][cDbEndAge]
+								- pDbAgeDecode[nAgeCode][cDbBeginAge] + 1) );
+	};
+	return nAge;
+};
+
+
+
+/* NOTE(Person.Start,EN) 
+	Initializes a new Person.
+	>Persons can be initialized on (see bottom part of GetRecordYearAgeSexProvinceRegion)
+	(1) on January 1st and force this to be birthday for everyone
+	(2) on January 1st (excluding new borns and immigrants)
+	(3) on their birthday sometime during the year (including new borns and immigrants)
+
+	The data should be clean before arriving here (We could COERCE, but that may hide unclean data).
+	Also would benefit from classification variables that make it clear the expected values as input.
+	The StartPop SAS program needs to respect these definitions and be cleaned accordingly.
+*/
+
+void Person::Start( cPopulationSource lPopulationSource)
+{
+	// Initialize all attributes (OpenM++).
+	initialize_attributes();
+
+	dominant = TRUE;	//Maintained to provide consistent with historical model
+	place_of_birth = lPopulationSource == cNewImmig &&  FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0  ? ABROAD : CANADA;
+	population_source = lPopulationSource;
+
+	/* BEGIN set these actor states: cchs_record, sex, gProvince, gRegion, place_of_birth, next_birthday, next_year, time, age   */
+
+	TIME starting_age;
+	TIME starting_time;
+	GetRecordYearAgeSexProvinceRegion(   &starting_age, &starting_time);
+	age  = starting_age; 
+	time = starting_time;
+	
+	// Initialize the integral age and year counters
+	lifespan_age = COERCE(LIFE_SPAN, int( age ) );
+	lifespan_age_start = lifespan_age;
+	calendar_year = COERCE(YEARS , int( time ) );
+	calendar_year_start = calendar_year;
+	time_person_created = time;
+	
+	// Initialize birth date variables
+	date_of_birth = time - age;
+	year_of_birth = COERCE(YEAR, int( date_of_birth ));
+
+	/* END set these actor states: cchs_record, sex, gProvince, gRegion, next_birthday, next_year, time, age   */
+
+	//Since cchs_record has been assigned, we may now read stuff from CCHS
+	ReadFromStartPop();  //Read the CCHS record.  Note that more reading takes place through functions hooked to ReadFromStartPop
+
+	// Initialize other variables to be used in the transition 
+	// of BP, chol and hdl at subsequent ages.
+	diab = gDiabetes_use;
+
+	GetTimingFirstUpdate();
+
+	// INTERVENTION CODE FOR BMI AND SMOKING IS NOW HOOKED TO START
+	// Initial values for BP, CHOL, HDL are imputed after Start using HOOK.
+
+	hook_Start();
+
+	// Have the entity enter the simulation (OpenM++).
+	enter_simulation();
+};
+
+void hook_StartSnapshots() {};
+
+void Person::StartSnapshots()
+{
+	//bmi4cat_measured_start      = (BMI_INDEX_ALL_AGES) bmi4cat_measured;
+	bmi4cat_measured_start_PHAC = (BMI_INDEX_ALL_AGES) bmi4cat_measured_PHAC;
+
+	hook_StartSnapshots();
+};
+
+
+TIME Person::timeEscapedStartEvent()
+{
+	TIME event_time = {TIME_INFINITE};  
+
+	if ( !escaped_start ) // first time in this function
+	{
+		event_time = WAIT( 0.0 ); 
+	}
+	return event_time;
+};
+
+void hook_EscapedStartEvent() {};
+
+void Person::EscapedStartEvent()
+{
+	escaped_start = TRUE;
+
+	StartSnapshots();
+
+	hook_EscapedStartEvent();
+};
+
+TIME Person::timeBirthdayEvent()
+{
+	return WAIT( next_birthday );
+};
+
+void Person::BirthdayEvent()
+{
+	next_birthday = 1.0;
+	lifespan_age = COERCE(LIFE_SPAN, lifespan_age + 1 );
+
+	hook_BirthdayEvent();
+};
+
+TIME Person::timeNewYearsEvent()
+{
+	return WAIT( next_year );
+};
+
+void Person::NewYearsEvent()
+{
+	next_year = 1.0;
+	calendar_year = COERCE(YEARS, calendar_year + 1 );
+
+	hook_NewYearsEvent();
+};
+
+
+/* NOTE(Person.Finish,EN) 
+	Performs additional hidden processing when terminating a Person.
+*/
+void hook_Finish() {};
+
+void Person::Finish()
+{
+	alive = FALSE;
+
+	hook_Finish();
+
+	// Have the entity exit the simulation (OpenM++).
+	exit_simulation();
+};
+
+/* NOTE(Person.ImputeInitialStatesNotOnStartPop,EN) 
+	Initialize Blood Pressure, Cholesterol and HDL at time Person is created (after Start)
+	We use hot-deck imputation based on donor records of common variables 
+	on Cdn Heart Health Surveys.
+*/
+
+void hook_ImputeInitialStatesNotOnStartPop() {};
+
+void Person::ImputeInitialStatesNotOnStartPop()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	int     nAgeGroup = SPLIT( truncated_age, AGE_GROUP);
+	int		nChol = {0};
+	int		nHDL = {0};
+	int		nBp = {0};
+
+			
+	// Initialization Blood Pressure category (hot-deck imputation)
+	if ( Lookup_CumBPdistr( RandUniform( 14 ), gHeartBP, sex, nAgeGroup, &nBp ) )
+	{
+		bp_chhs = (BP_STATE) (nBp+1);
+	}
+	// Lookup failed, assign a category arbitrarily
+	else 
+	{
+		bp_chhs = BP_MEDLOW;
+	}
+	bp_actual = bp_chhs;
+
+	// Initialization Cholesterol category (hot-deck imputation)
+        /*
+	if ( Lookup_CumMargHRisk( RandUniform(28), sex, nAgeGroup, 
+								bmi-1,diab,bp_chhs-1,&nChol) )
+	{
+		chol = (CHOL_STATE) (nChol+1);
+	}
+	// Lookup failed, assign a category arbitrarily
+	else 
+	{
+		chol = 	CHOL_MED;
+	};
+	cholF = chol ;
+	*/
+	// Initialization HDL category (hot-deck imputation)
+    /*
+	if ( Lookup_CumHDLdistr( RandUniform(15), sex, nAgeGroup, 
+								(chol-1), diab, (bmi-1), &nHDL ) )
+	{
+		hdl = (HDL_STATE) (nHDL+1);
+	}
+	
+	// Lookup failed, assign a category arbitrarily
+	else 
+	{ 
+		hdl = 	HDL_MED;
+	}
+	*/
+	// Assign exact initial values for BP, CHOL and HDL
+	//AssignExactValueForBpCholHDL();
+
+	hook_ImputeInitialStatesNotOnStartPop();
+};
+
+
+
+

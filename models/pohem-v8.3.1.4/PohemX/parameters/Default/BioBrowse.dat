@@ -1,0 +1,16 @@
+parameters {
+	int	EcrireDebugLogEntry = -1; //EN EcrireDebugLogEntry
+
+	 //EN Filter for debug log
+	int	CasesDebugLogEntry[cLOWER_UPPER_BOUNDS] = {
+		(2) -1, 
+	};
+
+	 //EN Filter for digit tables
+	logical	FilterDigitTable[DIGITS][DIGIT_ORDER] = {
+		(10) {
+			(5) TRUE, 
+		},
+	};
+};
+

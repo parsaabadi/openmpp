@@ -1,0 +1,131 @@
+parameters {
+
+	 //EN Diabetes mortality relative risk: non-spline coefficients
+	double	pDiabetes_RR_Mortality[DIABETES_RECENCY][DIABETES_RR_MORTALITY] = {
+		133.8740948441, -0.00415440643, -0.00058603427, 
+		-64.10162822, -0.005209527, -0.003356729, 
+	};
+
+	 //EN Diabetes mortality relative risk: age cubic spline coefficients
+	double	DiabetesMortalityRelRiskAgeSplineLocationCoef[DIABETES_RECENCY][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// DIAB_RECENT
+		23, 41, 58, 75, 93, (15) -9, 
+		-0.35303223636, 1.11760481478, -1.16375267905, (17) 0, 
+		// DIAB_REMOTE
+		23, 41, 58, 75, 93, (15) -9, 
+		-0.390334256, 1.2481216267, -1.390078951, (17) 0, 
+	};
+
+	 //EN Diabetes mortality relative risk: age cubic spline companion
+	double	DiabetesMortalityRelRiskAgeSplineCompanion[DIABETES_RECENCY][CUBIC_SPLINE_COMPANION] = {
+		(2) {
+			0, 99, 0.66666666666666667, (3) 0, 
+		},
+	};
+
+	 //EN Diabetes mortality relative risk: year cubic spline coefficients
+	double	DiabetesMortalityRelRiskYearSplineLocationCoef[DIABETES_RECENCY][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] = {
+		// DIAB_RECENT
+		1997, 2004, 2011, (17) -9, 
+		0.05987452071, (19) 0, 
+		// DIAB_REMOTE
+		1996, 2001, 2007, 2012, (16) -9, 
+		-0.282773805, 0.7749599553, (18) 0, 
+	};
+
+	 //EN Diabetes mortality relative risk: year cubic spline companion
+	double	DiabetesMortalityRelRiskYearSplineCompanion[DIABETES_RECENCY][CUBIC_SPLINE_COMPANION] = {
+		0, 2012, 0.66666666666666667, 0, -0.0649453653, 0,
+		0, 2012, 0.66666666666666667, 0, 0.03456773, 0,
+	};
+	double	pDiabetes_SURVIVAL_INTERVAL = 0.08333333333333330; //EN Diabetes event clock tick unit (0.083 is 1 month)
+	double	TimeHorizonForDport = 2.0; //EN Time horizon used in the implementation of DPoRT
+
+	 //EN DPoRT
+	double	pDiabetes_Mean[SEX][DIABETES_BETA] = {
+		//females
+		0.0,		// n/a scale
+		0.0,		// n/a beta0
+		0.1436226,	// hypertension proportion
+		0.1332411,	// non-white proportion
+		0.2163053,	// immigration proportion
+		0.5739063,	// post-secondary proportion
+		0.0,		// n/a heart disease
+		0.0,		// n/a smoker
+		//males
+		0.0,		// n/a scale
+		0.0,		// n/a beta0
+		0.1144411,	// hypertension proportion
+		0.1347944,	// non-white proportion
+		0.0,		// n/a immigration proportion
+		0.5969713,	// post-secondary proportion
+		0.052599,	// heart disease 
+		0.3026165	// smoker 
+	};
+
+	 //EN pDiabetes_Mean_BMI_Age
+	double	pDiabetes_Mean_BMI_Age[SEX][BMI_DIABETES_STATE][AGE_DIABETES_GROUP] = {
+		// FEMALE
+		0.0123618, 0.0098331, 0.0045935, 
+		0.2512388, 0.1003796, 0.05721, 
+		0.0827428, 0.0598397, 0.0325738, 
+		0.1065455, 0.1034126, 0.0538381, 
+		0.0377685, 0.0352627, 0.0160744, 
+		0.0179023, 0.0135982, 0.0048246, 
+		// MALE
+		0.0035647, (2) 0.003139, 
+		0.1399233, (2) 0.0825035, 
+		0.1240203, (2) 0.0973676, 
+		0.2051421, (2) 0.1935401, 
+		0.0610875, (2) 0.0595341, 
+		0.0158017, (2) 0.0143761, 
+	};
+
+	 //EN pDiabetes_Beta
+	double	pDiabetes_Beta[SEX][DIABETES_BETA] = {
+		//females
+		0.7814,		// scale
+		10.5474,	// beta0
+		-0.2865,	// hypertension proportion
+		-0.4309,	// non-white proportion
+		-0.293,		// immigration proportion
+		0.2042,		// post-secondary proportion
+		0.0,		// n/a heart disease
+		0.0,		// n/a smoker
+		//males
+		0.8049,		// scale
+		10.5971,	// beta0
+		-0.2624,	// hypertension proportion
+		-0.6316,	// non-white proportion
+		0.0,		// immigration proportion
+		0.2344,		// post-secondary proportion
+		-0.5355,	// n/a heart disease
+		-0.1765,	// n/a smoker
+	};
+
+	 //EN pDiabetes_Beta_BMI_Age
+	double	pDiabetes_Beta_BMI_Age[SEX][BMI_DIABETES_STATE][AGE_DIABETES_GROUP] = {
+		// FEMALE
+		-1.1328, -1.726, -1.8284, 
+		0.0, 0.0711, -1.0823, 
+		-0.5432, -0.7011, -1.1419, 
+		-0.8453, -1.4167, -1.5999, 
+		-1.4104, -2.215, -1.9254, 
+		-2.0483, -2.2695, -2.1959, 
+		// MALE
+		(3) 0.0, 
+		0.0, (2) -1.9794, 
+		-1.2378, (2) -2.4426, 
+		-1.549, (2) -2.8488, 
+		-2.5437, (2) -3.3179, 
+		-3.4717, (2) -3.5857, 
+	};
+
+	 //EN Alteration of DPoRT linear predictor by sex and age
+	double	DportAlterationSpecs[SEX][FROM_25_TO_90_BY_5] = {
+		0.25, 3.0, (4) 0, -0.20, -0.5, -0.25, (3) -0.5, -0.75, (2) -1.0, 
+		0.5, 3.0, 0.1, 0.08, -0.25, (2) 0.25, (2) -0.25, (3) -0.5, (2) -1.0, -1.7, 
+	};
+	logical	DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR = FALSE; //EN Use altered DPoRT linear predictor in correction for diabetes prevalence
+};
+

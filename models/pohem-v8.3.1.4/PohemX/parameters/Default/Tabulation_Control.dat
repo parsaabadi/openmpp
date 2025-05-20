@@ -1,0 +1,16 @@
+parameters {
+	
+	int    TableFilterAge      [cLOWER_UPPER_BOUNDS] = {0,9999};
+	int    TableFilterAgeStart [cLOWER_UPPER_BOUNDS] = {0,9999};
+	int    TableFilterYear     [cLOWER_UPPER_BOUNDS] = {0,9999};
+	int    TableFilterYearStart[cLOWER_UPPER_BOUNDS] = {0,9999};
+
+	logical TableFilterSex      [SEX               ] = {( 2) TRUE, } ; //EN Tabulation restriction: Sex 
+	logical TableFilterProvince [PROVINCE          ] = {(10) TRUE, } ; //EN Tabulation restriction: Province
+	logical TableFilterDoor     [cPopulationSource ] = {( 3) TRUE, } ; //EN Tabulation restriction: Entry point/door
+	logical TableFilterEducation[EDUCATION         ] = {( 4) TRUE, } ; //EN Tabulation restriction: Education
+	logical TableFilterIncome   [INCOME_QUARTILE   ] = {( 4) TRUE, } ; //EN Tabulation restriction: Income quartile
+	logical TableFilterAlcohol     [ALCOHOL5       ] = {( 5) TRUE, };
+	logical TableFilterAlcoholStart[ALCOHOL5       ] = {( 5) TRUE, };
+};
+

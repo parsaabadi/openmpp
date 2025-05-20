@@ -1,0 +1,357 @@
+#include "pohem.h"
+//FILE_LABEL (EN) Mortality_MPoRT_V2 
+/* FILE_NOTE(EN) 
+	This file implements mortality using the MPoRT V2 algorithm. 
+*/
+
+
+// Customized "include"
+// Structure of MPP Files
+// classifications, ranges, partitions
+// Parameters
+// Person state variable declarations
+// (functions)
+// Person Events
+// Presimulation code
+
+
+classification MPORT_V2_MAIN_TERMS {	//EN MPoRT V2 risk algorithm main terms (non-cubic spline)
+    MPORT_V2_MAIN_SMOKER_CURRENT,           //EN Current smoker
+    MPORT_V2_MAIN_SMOKER_FORMER_LT5,        //EN Former smoker quit less than 5 years ago
+    MPORT_V2_MAIN_SMOKER_FORMER_GT5,        //EN Former smoker quit 5 years ago or more
+    MPORT_V2_MAIN_DRINK_FORMER,             //EN Former drinker
+	MPORT_V2_MAIN_EDUC_LT_HIGH_SCHOOL,      //EN Less than high school education
+	MPORT_V2_MAIN_EDUC_HIGH_SCHOOL,         //EN High school graduate
+	MPORT_V2_MAIN_EDUC_SOME_PS,             //EN Some post-secondary education
+	MPORT_V2_MAIN_HYPERTENSION,             //EN Hypertension
+	MPORT_V2_MAIN_HEART_DISEASE,            //EN Has heart disease
+	MPORT_V2_MAIN_PREVIOUS_STROKE,          //EN Suffers from a previous stroke
+	MPORT_V2_MAIN_DIABETES,                 //EN Has diabetes
+	MPORT_V2_MAIN_CANCER ,                   //EN Has cancer
+	MPORT_V2_MAIN_DEMENTIA                   //EN Has dementia
+};
+
+
+
+classification MPORT_V2_INTERACTION_TERMS  {	//EN MPoRT V2 risk algorithm interaction coefficients 
+    MPORT_V2_INTER_AGE_SMOKER_CURRENT,       //EN Interaction Age * current smoker
+    MPORT_V2_INTER_AGE_SMOKER_FORMER_LT5,    //EN Interaction Age * former smoker quit less than 5 years ago
+    MPORT_V2_INTER_AGE_SMOKER_FORMER_GT5,    //EN Interaction Age * former smoker quit 5 years ago or more
+	MPORT_V2_INTER_AGE_DRINK_FORMER,         //EN Interaction Age * former drinker
+	MPORT_V2_INTER_AGE_EDUC_LT_HIGH_SCHOOL,  //EN Interaction Age * less than high school education
+	MPORT_V2_INTER_AGE_EDUC_HIGH_SCHOOL,     //EN Interaction Age * high school graduate
+	MPORT_V2_INTER_AGE_EDUC_SOME_PS,         //EN Interaction Age * some PS education
+	MPORT_V2_INTER_AGE_HYPERTENSION,         //EN Interaction Age * hypertension
+	MPORT_V2_INTER_AGE_HEART_DISEASE,        //EN Interaction Age * heart disease
+	MPORT_V2_INTER_AGE_PREVIOUS_STROKE,      //EN Interaction Age * stroke
+	MPORT_V2_INTER_AGE_DIABETES,             //EN Interaction Age * diabetes
+	MPORT_V2_INTER_AGE_CANCER,               //EN Interaction Age * cancer
+	MPORT_V2_INTER_AGE_DEMENTIA,             //EN Interaction Age * dementia
+
+	MPORT_V2_INTER_AGE_PACK_YEARS  ,         //EN Interaction Age * pack years
+	MPORT_V2_INTER_AGE_DRINKS_LAST_WEEK,     //EN Interaction Age * drinks last week
+	MPORT_V2_INTER_AGE_PA_MET,               //EN Interaction Age * physical activity MET
+	MPORT_V2_INTER_AGE_BMI                   //EN Interaction Age * BMI
+};
+
+
+
+
+parameters {
+
+	//MPoRT V2
+	double  MportV2LogBaseCumulativeHazard[SEX][COORDINATES_X_Y][SCATTER_PLOT_ELEMENTS]; //EN MPoRT V2 mortality risk: log baseline cumulative hazard
+	double  MportV2Baseline                   [SEX]                             ; //EN MPoRT V2 mortality risk: 5 year baseline cumulative hazard
+	double	MportV2MainTermsMeans             [SEX][MPORT_V2_MAIN_TERMS       ] ; //EN MPoRT V2 mortality risk: main non-spline terms means 
+	double	MportV2MainTermsCoefficients      [SEX][MPORT_V2_MAIN_TERMS       ] ; //EN MPoRT V2 mortality risk: main non-spline terms coefficients
+	double	MportV2InteractionCoefficients    [SEX][MPORT_V2_INTERACTION_TERMS] ; //EN MPoRT V2 mortality risk: interaction terms
+	
+
+	double  MportV2AgeSplineLocationCoef      [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: age cubic spline coefficients 
+	double  MportV2AgeSplineCompanion         [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: age cubic spline companion 
+
+	double  MportV2PackYearsSplineLocationCoef[SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: pack years cubic spline coefficients 
+	double  MportV2PackYearsSplineCompanion   [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: pack years cubic spline companion 
+
+	double  MportV2DrinksSplineLocationCoef   [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: drinks last week cubic spline coefficients 
+	double  MportV2DrinksSplineCompanion      [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: drinks last week cubic spline companion 
+
+	double  MportV2MetsSplineLocationCoef     [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: METs cubic spline coefficients 
+	double  MportV2MetsSplineCompanion        [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: METs cubic spline companion 
+
+	double  MportV2BmiSplineLocationCoef      [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: BMI cubic spline coefficients 
+	double  MportV2BmiSplineCompanion         [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: BMI cubic spline companion 
+
+	double  MportV2ImmigSplineLocationCoef    [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX];  //EN MPoRT V2 mortality risk: Cdn resident percent cubic spline coefficients 
+	double  MportV2ImmigSplineCompanion       [SEX][CUBIC_SPLINE_COMPANION];                                             //EN MPoRT V2 mortality risk: Cdn resident percent cubic spline companion 
+
+	double  MportV2AlterationSpecs[SEX][FROM_25_TO_90_BY_5];    //EN Alteration of mortality log hazard by sex and age (for MPoRT V2 engine)
+	
+	model_generated double mgMportV2SumMainTermsCoefMeanCovariate[SEX];
+	model_generated double mgMportV2SumInteractionCoefMeanCovariate[SEX];
+
+};
+
+
+
+
+parameter_group pgMORTALITY_MPORT_V2 { //EN MPoRT V2	
+	  MportV2Baseline         ,   
+	  MportV2LogBaseCumulativeHazard ,
+	  MportV2MainTermsMeans  ,
+	  MportV2MainTermsCoefficients  ,
+	  MportV2InteractionCoefficients  ,
+
+	  MportV2AgeSplineLocationCoef,   
+	  MportV2AgeSplineCompanion   ,    
+	  MportV2PackYearsSplineLocationCoef,
+	  MportV2PackYearsSplineCompanion,
+	  MportV2DrinksSplineLocationCoef ,
+	  MportV2DrinksSplineCompanion,
+	  MportV2MetsSplineLocationCoef ,
+	  MportV2MetsSplineCompanion    ,
+	  MportV2BmiSplineLocationCoef ,
+	  MportV2BmiSplineCompanion    ,
+	  MportV2ImmigSplineLocationCoef  , 
+	  MportV2ImmigSplineCompanion,
+	  MportV2AlterationSpecs
+};
+
+actor Person            // Core Individual
+{
+	double gBMI4_mport_v2 =  gBMI_PHAC ;
+
+	/* Compiler did not like this so MortalityEngine != MORTALITY_ENGINE_MPORT_V2 check removed and moved into functions
+	double mport_v2_spline_age        = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplineAge       (lifespan_age           );
+	double mport_v2_spline_bmi        = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplineBmi       (gBMI4_mport_v2         ); 
+	double mport_v2_spline_pack_years = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplinePackYears (total_packyears_smoked ); 
+	double mport_v2_spline_alcohol    = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplineAlcohol   (number_drinks_past_week); // icitte will need to make number_drinks_past_week dynamic
+	double mport_v2_spline_met        = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplineMet       (physical_activity_met  );     
+	double mport_v2_spline_residency  = MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 : UpdateMportV2SplineResidency (proportion_in_canada   );     
+	*/
+
+	double mport_v2_spline_age        = UpdateMportV2SplineAge       (lifespan_age, sex);
+	double mport_v2_spline_bmi        = UpdateMportV2SplineBmi       (gBMI4_mport_v2, sex);
+	double mport_v2_spline_pack_years = UpdateMportV2SplinePackYears (total_packyears_smoked, sex);
+	double mport_v2_spline_alcohol    = UpdateMportV2SplineAlcohol   (number_drinks_past_week, sex); // icitte will need to make number_drinks_past_week dynamic
+	double mport_v2_spline_met        = UpdateMportV2SplineMet       (physical_activity_met, sex);
+	double mport_v2_spline_residency  = UpdateMportV2SplineResidency (proportion_in_canada, sex);
+	
+	event   timeMportV2MortalityEvent, MportV2MortalityEvent; // , 0;  //  default low priority    
+};
+
+
+double UpdateMportV2SplineAge       (int    x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2AgeSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] , 
+				 (double*)MportV2AgeSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2AgeSplineCompanion   [sexe]      ) ;
+};
+	
+double UpdateMportV2SplineBmi       (double x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2BmiSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] ,
+				 (double*)MportV2BmiSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2BmiSplineCompanion   [sexe]      ) ;
+};
+	
+double UpdateMportV2SplinePackYears (double x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2PackYearsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] ,
+				 (double*)MportV2PackYearsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2PackYearsSplineCompanion   [sexe]      ) ;
+};
+	
+double UpdateMportV2SplineAlcohol   (int    x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2DrinksSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] ,
+				 (double*)MportV2DrinksSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2DrinksSplineCompanion   [sexe]      ) ;
+};
+	
+double UpdateMportV2SplineMet       (double x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2MetsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] ,
+				 (double*)MportV2MetsSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2MetsSplineCompanion   [sexe]      ) ;
+};
+	
+double UpdateMportV2SplineResidency (double x, SEX sexe)
+{
+	return  MortalityEngine != MORTALITY_ENGINE_MPORT_V2 ? 0.0 
+		     :  CubicSpline((double)x, (double*)MportV2ImmigSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_LOCATION   ] ,
+				 (double*)MportV2ImmigSplineLocationCoef[sexe][CUBIC_SPLINE_KNOTS_COEFFICIENT] ,
+				 (double*)MportV2ImmigSplineCompanion   [sexe]      ) ;
+};
+
+
+
+
+TIME Person::timeMportV2MortalityEvent()
+{
+	TIME time_next ;
+
+	if(MortalityEngine == MORTALITY_ENGINE_MPORT_V2)
+	{
+		const double *main_coefs   = MportV2MainTermsCoefficients   [sex];
+		const double *interactions = MportV2InteractionCoefficients [sex];
+		
+		double hazard ;
+		//BEGIN Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+		hazard =  interactions[ MPORT_V2_INTER_AGE_SMOKER_CURRENT      ] *  (smoking_status4==LIGHT_smoker || smoking_status4==HEAVY_smoker)  
+				+ interactions[ MPORT_V2_INTER_AGE_SMOKER_FORMER_LT5   ] *  (smoking_status4==FORMER_smoker)*(time_since_quit_smoking <  4 )  
+				+ interactions[ MPORT_V2_INTER_AGE_SMOKER_FORMER_GT5   ] *  (smoking_status4==FORMER_smoker)*(time_since_quit_smoking >= 4 )  
+				+ interactions[	MPORT_V2_INTER_AGE_PACK_YEARS          ] *  total_packyears_smoked
+				+ interactions[	MPORT_V2_INTER_AGE_DRINK_FORMER        ] *  ( gAlcohol5 == ALCOHOL_FORMER )                                    
+				+ interactions[	MPORT_V2_INTER_AGE_DRINKS_LAST_WEEK    ] *  number_drinks_past_week
+				+ interactions[	MPORT_V2_INTER_AGE_EDUC_LT_HIGH_SCHOOL ] *  ( gEducation == EDUC1 )                                             
+				+ interactions[	MPORT_V2_INTER_AGE_EDUC_HIGH_SCHOOL    ] *  ( gEducation == EDUC2 )                                             
+				+ interactions[	MPORT_V2_INTER_AGE_EDUC_SOME_PS        ] *  ( gEducation == EDUC3 )                                             
+				+ interactions[	MPORT_V2_INTER_AGE_PA_MET              ] *  physical_activity_met
+				+ interactions[	MPORT_V2_INTER_AGE_BMI                 ] *  gBMI4_mport_v2
+				+ interactions[	MPORT_V2_INTER_AGE_HYPERTENSION        ] *  ( gBP_PA == HIGH_BP_YES )                                         
+				+ interactions[	MPORT_V2_INTER_AGE_HEART_DISEASE       ] *  ( acute_myocardial_infract == CVDPORT_AMI_YES ) // ( gHeartDisease_PA == HEART_DISEASE_YES )                           
+				+ interactions[	MPORT_V2_INTER_AGE_PREVIOUS_STROKE     ] *  ( stroke == CVDPORT_STROKE_YES )                                             
+				+ interactions[	MPORT_V2_INTER_AGE_DIABETES            ] *  ( gDiabetes_use == DIAB_YES )                                       
+				+ interactions[	MPORT_V2_INTER_AGE_CANCER              ] *  ( gCancer == CANCER_YES )
+				+ interactions[ MPORT_V2_INTER_AGE_DEMENTIA] * (dementia == DEMENTIA_YES);  // got sum_k   coef_k  * Xk  so far
+		hazard = hazard	- mgMportV2SumInteractionCoefMeanCovariate[sex]  ;   // got ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )  so far
+		hazard *= (lifespan_age - MportV2AgeSplineCompanion[sex][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM]);  //MportV2AgeSplineCompanion[sex][..] contains mean age
+		//END Step 1: sum_k   coef_k * (age - mean_age ) * (Xk - mean_Xk)  =  (age - mean_age ) * ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  )
+
+		//BEGIN Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+		hazard  = hazard
+			    + main_coefs[MPORT_V2_MAIN_SMOKER_CURRENT      ] *  ( smoking_status4==LIGHT_smoker || smoking_status4==HEAVY_smoker )   
+		        + main_coefs[MPORT_V2_MAIN_SMOKER_FORMER_LT5   ] *  ( smoking_status4==FORMER_smoker)*(time_since_quit_smoking <  4 )   
+		        + main_coefs[MPORT_V2_MAIN_SMOKER_FORMER_GT5   ] *  ( smoking_status4==FORMER_smoker)*(time_since_quit_smoking >= 4 )   
+		        + main_coefs[MPORT_V2_MAIN_DRINK_FORMER        ] *  ( gAlcohol5 == ALCOHOL_FORMER )                                     
+		        + main_coefs[MPORT_V2_MAIN_EDUC_LT_HIGH_SCHOOL ] *  ( gEducation == EDUC1 )        
+		        + main_coefs[MPORT_V2_MAIN_EDUC_HIGH_SCHOOL    ] *  ( gEducation == EDUC2 ) 
+		        + main_coefs[MPORT_V2_MAIN_EDUC_SOME_PS        ] *  ( gEducation == EDUC3 ) 
+		        + main_coefs[MPORT_V2_MAIN_HYPERTENSION        ] *  ( gBP_PA == HIGH_BP_YES )  
+		        + main_coefs[MPORT_V2_MAIN_HEART_DISEASE       ] *  ( acute_myocardial_infract == CVDPORT_AMI_YES ) // ( gHeartDisease_PA == HEART_DISEASE_YES )  
+		        + main_coefs[MPORT_V2_MAIN_PREVIOUS_STROKE     ] *  ( stroke == CVDPORT_STROKE_YES )  
+		        + main_coefs[MPORT_V2_MAIN_DIABETES            ] *  ( gDiabetes_use == DIAB_YES )  
+		        + main_coefs[MPORT_V2_MAIN_CANCER              ] *  ( gCancer == CANCER_YES )
+				+ main_coefs[MPORT_V2_MAIN_DEMENTIA] * (dementia == DEMENTIA_YES); // added sum_k   coef_k  * Xk   so far
+		hazard = hazard - mgMportV2SumMainTermsCoefMeanCovariate[sex]  ;   // substract sum_k   coef_k  * mean_Xk    so step 2 is done
+		//END   Step 2: add on sum_k   coef_k *  (Xk - mean_Xk)  =   ( sum_k   coef_k  * Xk -  sum_k   coef_k  * mean_Xk  ) over main terms (interactions and splines excluded)
+
+		//BEGIN Step 3: add on splines to complete the computation of MPoRT's score  
+		hazard  = hazard
+			    + mport_v2_spline_age 
+		        + mport_v2_spline_bmi 
+		        + mport_v2_spline_pack_years
+		        + mport_v2_spline_alcohol 
+			    + mport_v2_spline_met   
+		        + mport_v2_spline_residency  ;
+		//END   Step 3: add on splines to complete the computation of MPoRT's score  (at this point, local variable hazard contains MPoRT's score)
+		
+		hazard = hazard + MportV2AlterationSpecs[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)];
+		
+		hazard = exp(hazard); //  hazard = baseline * exp(score) with baseline handled below.
+
+		if (MportV2Baseline[sex] >= 0)
+			hazard *= MportV2Baseline[sex] / 5.0; //baseline = 5 year cumulative hazard / 5. 
+		else
+		{
+			double log_cum_haz_age, log_cum_haz_agep1;
+
+			log_cum_haz_age   = PieceLinearLookup(lifespan_age    , MportV2LogBaseCumulativeHazard[sex][COORDINATES_X],
+				                                                    MportV2LogBaseCumulativeHazard[sex][COORDINATES_Y], SIZE(SCATTER_PLOT_ELEMENTS));
+			log_cum_haz_agep1 = PieceLinearLookup(lifespan_age + 1, MportV2LogBaseCumulativeHazard[sex][COORDINATES_X],
+				                                                    MportV2LogBaseCumulativeHazard[sex][COORDINATES_Y], SIZE(SCATTER_PLOT_ELEMENTS));
+
+			hazard *= (exp(log_cum_haz_agep1) - exp(log_cum_haz_age)); //baseline hazard over [age,age+1] = H(age+1)-H(age)
+		}
+		
+		time_next = WAIT( - TIME( log( RandUniform(147) ) / hazard ) ) ;
+		/*
+		if(case_id<1000 )
+		{
+			char line[199];
+			snprintf(line,199,"%i, %15.1f, %15.9f, %15.9f  \n",(int)case_id, (double)case_seed, WAIT(0), hazard);               
+			WriteDebugLogEntry(line);
+		}
+		*/
+
+		if (EcrireDebugLogEntry == 6 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND])
+		{
+			char line[999];
+			snprintf(line, 999, "%i, %15.1f, %15.9f, %i, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f  \n", (int)case_id, (double)case_seed, WAIT(0), int(sex), double(lifespan_age), double(total_packyears_smoked), double(number_drinks_past_week), double(physical_activity_met), double(gBMI4_dementia), double(proportion_in_canada), int(smoking_status4 == LIGHT_smoker || smoking_status4 == HEAVY_smoker), int((smoking_status4 == FORMER_smoker) * (time_since_quit_smoking < 4)), int((smoking_status4 == FORMER_smoker) * (time_since_quit_smoking >= 4)), int(gAlcohol5 == ALCOHOL_FORMER), int(gEthnicityNonWhite == ETHNICITY_NONWHITE), int(gEducation == EDUC1), int(gEducation == EDUC2), int(gEducation == EDUC3), int(gDiabetes_use == DIAB_YES), int(gBP_PA == HIGH_BP_YES), int(acute_myocardial_infract == CVDPORT_AMI_YES), int(stroke == CVDPORT_STROKE_YES), int(gCancer == CANCER_YES), int(dementia == DEMENTIA_YES), double(mport_v2_spline_age), double(mport_v2_spline_pack_years), double(mport_v2_spline_alcohol), double(mport_v2_spline_met), double(mport_v2_spline_bmi), double(mport_v2_spline_residency), hazard);
+			WriteDebugLogEntry(line);
+		}
+
+		if (EcrireDebugLogEntry == 8 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND] && WAIT(0) == calendar_year_start)
+		{
+			char line[999];
+			snprintf(line, 999, "%i, %15.1f, %i, %i, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %15.9f, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i, %i  \n", (int)case_id, (double)case_seed, (int)calendar_year_start, int(sex), double(lifespan_age), double(total_packyears_smoked), double(number_drinks_past_week), double(physical_activity_met), double(gBMI4_dementia), double(proportion_in_canada), int(smoking_status4 == LIGHT_smoker || smoking_status4 == HEAVY_smoker), int((smoking_status4 == FORMER_smoker) * (time_since_quit_smoking < 4)), int((smoking_status4 == FORMER_smoker) * (time_since_quit_smoking >= 4)), int(gAlcohol5 == ALCOHOL_FORMER), int(gEducation == EDUC1), int(gEducation == EDUC2), int(gEducation == EDUC3), int(gDiabetes_use == DIAB_YES), int(gBP_PA == HIGH_BP_YES), int(acute_myocardial_infract == CVDPORT_AMI_YES), int(stroke == CVDPORT_STROKE_YES), int(gCancer == CANCER_YES), int(dementia == DEMENTIA_YES));
+			WriteDebugLogEntry(line);
+		}
+	}
+	else  //MortalityEngine != MORTALITY_ENGINE_MPORT_V2
+		time_next = TIME_INFINITE;
+
+	return time_next;
+};
+
+void hook_MportV2MortalityEvent() {};
+
+void Person::MportV2MortalityEvent()
+{
+	CheckFinish(MortalityEngine == MORTALITY_ENGINE_MPORT_V2);
+
+	hook_MportV2MortalityEvent();
+};
+
+
+
+void PreSimulation()
+{
+	//BEGIN check alignment of MPORT_V2_INTERACTION_TERMS and MPORT_V2_MAIN_TERMS
+	if (MPORT_V2_INTER_AGE_SMOKER_CURRENT      != MPORT_V2_MAIN_SMOKER_CURRENT     ) ModelExit("MPORT_V2_INTER_AGE_SMOKER_CURRENT      != MPORT_V2_MAIN_SMOKER_CURRENT     .");
+	if (MPORT_V2_INTER_AGE_SMOKER_FORMER_LT5   != MPORT_V2_MAIN_SMOKER_FORMER_LT5  ) ModelExit("MPORT_V2_INTER_AGE_SMOKER_FORMER_LT5   != MPORT_V2_MAIN_SMOKER_FORMER_LT5  .");
+	if (MPORT_V2_INTER_AGE_SMOKER_FORMER_GT5   != MPORT_V2_MAIN_SMOKER_FORMER_GT5  ) ModelExit("MPORT_V2_INTER_AGE_SMOKER_FORMER_GT5   != MPORT_V2_MAIN_SMOKER_FORMER_GT5  .");
+	if (MPORT_V2_INTER_AGE_DRINK_FORMER        != MPORT_V2_MAIN_DRINK_FORMER       ) ModelExit("MPORT_V2_INTER_AGE_DRINK_FORMER        != MPORT_V2_MAIN_DRINK_FORMER       .");
+	if (MPORT_V2_INTER_AGE_EDUC_LT_HIGH_SCHOOL != MPORT_V2_MAIN_EDUC_LT_HIGH_SCHOOL) ModelExit("MPORT_V2_INTER_AGE_EDUC_LT_HIGH_SCHOOL != MPORT_V2_MAIN_EDUC_LT_HIGH_SCHOOL.");
+	if (MPORT_V2_INTER_AGE_EDUC_HIGH_SCHOOL    != MPORT_V2_MAIN_EDUC_HIGH_SCHOOL   ) ModelExit("MPORT_V2_INTER_AGE_EDUC_HIGH_SCHOOL    != MPORT_V2_MAIN_EDUC_HIGH_SCHOOL   .");
+	if (MPORT_V2_INTER_AGE_EDUC_SOME_PS        != MPORT_V2_MAIN_EDUC_SOME_PS       ) ModelExit("MPORT_V2_INTER_AGE_EDUC_SOME_PS        != MPORT_V2_MAIN_EDUC_SOME_PS       .");
+	if (MPORT_V2_INTER_AGE_HYPERTENSION        != MPORT_V2_MAIN_HYPERTENSION       ) ModelExit("MPORT_V2_INTER_AGE_HYPERTENSION        != MPORT_V2_MAIN_HYPERTENSION       .");
+	if (MPORT_V2_INTER_AGE_HEART_DISEASE       != MPORT_V2_MAIN_HEART_DISEASE      ) ModelExit("MPORT_V2_INTER_AGE_HEART_DISEASE       != MPORT_V2_MAIN_HEART_DISEASE      .");
+	if (MPORT_V2_INTER_AGE_PREVIOUS_STROKE     != MPORT_V2_MAIN_PREVIOUS_STROKE    ) ModelExit("MPORT_V2_INTER_AGE_PREVIOUS_STROKE     != MPORT_V2_MAIN_PREVIOUS_STROKE    .");
+	if (MPORT_V2_INTER_AGE_DIABETES            != MPORT_V2_MAIN_DIABETES           ) ModelExit("MPORT_V2_INTER_AGE_DIABETES            != MPORT_V2_MAIN_DIABETES           .");	
+	if (MPORT_V2_INTER_AGE_CANCER              != MPORT_V2_MAIN_CANCER             ) ModelExit("MPORT_V2_INTER_AGE_CANCER              != MPORT_V2_MAIN_CANCER             .");	
+	if (MPORT_V2_INTER_AGE_DEMENTIA			   != MPORT_V2_MAIN_DEMENTIA		   ) ModelExit("MPORT_V2_INTER_AGE_DEMENTIA            != MPORT_V2_MAIN_DEMENTIA           .");
+	//END   check alignment of MPORT_V2_INTERACTION_TERMS and MPORT_V2_MAIN_TERMS
+
+
+	for(int sex_looper=0; sex_looper<SIZE(SEX); sex_looper++)
+	{
+		//BEGIN get mgMportV2SumMainTermsCoefMeanCovariate[sex_looper]
+		mgMportV2SumMainTermsCoefMeanCovariate[sex_looper]=0;
+		for(int x_looper=0; x_looper<SIZE(MPORT_V2_MAIN_TERMS) ; x_looper++)
+			mgMportV2SumMainTermsCoefMeanCovariate[sex_looper] += MportV2MainTermsCoefficients[sex_looper][x_looper] * MportV2MainTermsMeans[sex_looper][x_looper] ;
+		//END   get mgMportV2SumMainTermsCoefMeanCovariate[sex_looper]
+
+		//BEGIN get mgMportV2SumInteractionCoefMeanCovariate[sex_looper] 
+		mgMportV2SumInteractionCoefMeanCovariate[sex_looper]=0;
+		for(int x_looper=0; x_looper<SIZE(MPORT_V2_MAIN_TERMS) ; x_looper++)  // NOTA BONE alignment of MPORT_V2_INTERACTION_TERMS and MPORT_V2_MAIN_TERMS and used here
+			mgMportV2SumInteractionCoefMeanCovariate[sex_looper] += MportV2InteractionCoefficients[sex_looper][x_looper] * MportV2MainTermsMeans[sex_looper][x_looper] ;
+
+		//Need to add on PackYears, DrinksLastWeek, MET, BMI not covered above
+		mgMportV2SumInteractionCoefMeanCovariate[sex_looper] += MportV2InteractionCoefficients[sex_looper][MPORT_V2_INTER_AGE_PACK_YEARS      ] * MportV2PackYearsSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM] ;
+		mgMportV2SumInteractionCoefMeanCovariate[sex_looper] += MportV2InteractionCoefficients[sex_looper][MPORT_V2_INTER_AGE_DRINKS_LAST_WEEK] * MportV2DrinksSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM] ;
+		mgMportV2SumInteractionCoefMeanCovariate[sex_looper] += MportV2InteractionCoefficients[sex_looper][MPORT_V2_INTER_AGE_PA_MET          ] * MportV2MetsSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM] ;
+		mgMportV2SumInteractionCoefMeanCovariate[sex_looper] += MportV2InteractionCoefficients[sex_looper][MPORT_V2_INTER_AGE_BMI             ] * MportV2BmiSplineCompanion[sex_looper][CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM] ;
+
+		//END   get mgMportV2SumInteractionCoefMeanCovariate[sex_looper]
+
+	}
+	
+
+};

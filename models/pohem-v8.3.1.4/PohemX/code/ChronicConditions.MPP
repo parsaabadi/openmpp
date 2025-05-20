@@ -1,0 +1,829 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Chronic Conditions 
+/* FILE_NOTE(EN) 
+To be filled later
+*/
+
+partition FROM_30_TO_90_BY_10 { 30, 40, 50, 60, 70, 80, 90 }; //EN Age group
+partition FROM_40_TO_80_BY_10 {     40, 50, 60, 70, 80     }; //EN Age group
+
+classification CC_classification {  //EN Chronic Conditions
+	CC_BP,        //EN Hypertension
+	CC_CANCER,    //EN Cancer
+	CC_DIAB,      //EN Diabetes
+	CC_HD,        //EN Heart Disease
+	CC_MORT       //EN Mortality
+};
+classification Onset_or_Cure {Onset, Cure};
+
+classification HEART_DISEASE_STATE {		//EN Heart disease
+	HEART_DISEASE_NO,						//EN No Heart disease reported
+	HEART_DISEASE_YES						//EN Heart disease reported
+};
+classification CANCER_STATE {		//EN Cancer
+	CANCER_NO,						//EN No Cancer reported
+	CANCER_YES						//EN Cancer reported
+};
+
+
+classification CC_MAIN_LINEAR_PREDICTOR {
+	CC_MAIN_LP_INTERCEPT, //EN Intercept
+	CC_MAIN_LP_CALENDAR_TIME, //EN Calendar time
+	CC_MAIN_LP_FEMALE,  //EN Female
+	CC_MAIN_LP_MALE,  //EN Male
+	CC_MAIN_LP_ETHNICITY_WHITE, //EN Ethnicitiy white
+	CC_MAIN_LP_ETHNICITY_NONWHITE, //EN Ethnicitiy non-white
+	CC_MAIN_LP_ABORIGINAL_NO, //EN Not aboriginal
+	CC_MAIN_LP_ABORIGINAL_YES, //EN Aboriginal
+	CC_MAIN_LP_ATLANTIC, //EN Region: Atlantic
+	CC_MAIN_LP_QUEBEC,   //EN Region: Quebec
+	CC_MAIN_LP_ONTARIO,  //EN Region: Ontario
+	CC_MAIN_LP_PRAIRIES, //EN Region: Prairies
+	CC_MAIN_LP_BCregion, //EN Region: British Columbia
+	CC_MAIN_LP_INCOME_Q1,	//EN Income quartile 1 (poorest)
+	CC_MAIN_LP_INCOME_Q2,	//EN Income quartile 2 (lower middle)
+	CC_MAIN_LP_INCOME_Q3,	//EN Income quartile 3 (upper middle)
+	CC_MAIN_LP_INCOME_Q4,   //EN Income quartile 4 (richest)
+	CC_MAIN_LP_AGE_GROUP5_LT30, //EN 5 year age group : [0,30[
+	CC_MAIN_LP_AGE_GROUP5_30_35, //EN 5 year age group : [30,35[
+	CC_MAIN_LP_AGE_GROUP5_35_40, //EN 5 year age group : [35,40[
+	CC_MAIN_LP_AGE_GROUP5_40_45, //EN 5 year age group : [40,45[
+	CC_MAIN_LP_AGE_GROUP5_45_50, //EN 5 year age group : [45,50[
+	CC_MAIN_LP_AGE_GROUP5_50_55, //EN 5 year age group : [50,55[
+	CC_MAIN_LP_AGE_GROUP5_55_60, //EN 5 year age group : [55,60[
+	CC_MAIN_LP_AGE_GROUP5_60_65, //EN 5 year age group : [60,65[
+	CC_MAIN_LP_AGE_GROUP5_65_70, //EN 5 year age group : [65,70[
+	CC_MAIN_LP_AGE_GROUP5_70_75, //EN 5 year age group : [70,75[
+	CC_MAIN_LP_AGE_GROUP5_75_80, //EN 5 year age group : [75,80[
+	CC_MAIN_LP_AGE_GROUP5_80plus, //EN 5 year age group : 80+
+	CC_MAIN_LP_AGE_PAST_85,			//EN Age past 85
+	CC_MAIN_LP_BMI_CAT1, //EN BMI < 18.5
+	CC_MAIN_LP_BMI_CAT2, //EN 18.5 <= BMI < 25
+	CC_MAIN_LP_BMI_CAT3, //EN 25 <= BMI < 30
+	CC_MAIN_LP_BMI_CAT4, //EN 30 <= BMI < 35
+	CC_MAIN_LP_BMI_CAT5, //EN BMI >= 35
+	CC_MAIN_LP_CANCER_NO,					//EN No cancer reported
+	CC_MAIN_LP_CANCER_YES	,				//EN Cancer reported
+	CC_MAIN_LP_HYPERTENSION_NO,				//EN No hypertension reported
+	CC_MAIN_LP_HYPERTENSION_YES,			//EN Hypertension reported
+	CC_MAIN_LP_DIAB_NO,						//EN No diabetes reported
+	CC_MAIN_LP_DIAB_YES	,					//EN Diabetes reported
+	CC_MAIN_LP_HEART_DISEASE_NO,			//EN No heart disease reported
+	CC_MAIN_LP_HEART_DISEASE_YES,			//EN Heart disease reported
+	CC_MAIN_LP_CC_COUNT_EX4_NONE,  //EN No chronic condition (excluding CA, HD, DB, HPB)
+	CC_MAIN_LP_CC_COUNT_EX4_1 ,    //EN One chronic condition (excluding CA, HD, DB, HPB)
+	CC_MAIN_LP_CC_COUNT_EX4_2,     //EN Two chronic conditions (excluding CA, HD, DB, HPB)
+	CC_MAIN_LP_CC_COUNT_EX4_3plus, //EN Three or more chronic conditions (excluding CA, HD, DB, HPB)
+    CC_MAIN_LP_ALCOHOL_NEVER,    //EN Alcohol: Never drank alcohol
+    CC_MAIN_LP_ALCOHOL_FORMER,   //EN Alcohol: Former drinker
+    CC_MAIN_LP_ALCOHOL_LIGHT ,   //EN Alcohol: Less than 2 drinks per week
+    CC_MAIN_LP_ALCOHOL_MODERATE, //EN Alcohol: 2-14 (2-9) drinks per week for male (female)
+    CC_MAIN_LP_ALCOHOL_HEAVY,    //EN Alcohol: More than 14 (9) drinks per week for male (female)
+	CC_MAIN_LP_NEVER_SMOKER,			//EN Never Smoker
+	CC_MAIN_LP_FORMER_SMOKER,			//EN Former Smoker
+	CC_MAIN_LP_CURRENT_SMOKER,			//EN Current Smoker
+	CC_MAIN_LP_BIKE_NO,                     //EN Biking for errands : none
+	CC_MAIN_LP_BIKE_YES,					//EN Biking for errands : some
+	CC_MAIN_LP_USUAL_DAY_SIT,               //EN Usual day : Sit
+	CC_MAIN_LP_USUAL_DAY_STAND_WALK ,       //EN Usual day : Stand or walk quite a lot 
+	CC_MAIN_LP_USUAL_DAY_LIFT,              //EN Usual day : Usually lift or carry light loads 
+	CC_MAIN_LP_USUAL_DAY_HEAVY_WORK  ,      //EN Usual day : Do heavy work or carry very heavy loads
+	CC_MAIN_LP_LTPA_NO,                     //EN physical activity from leisure time : No 
+	CC_MAIN_LP_LTPA_0_30 ,                  //EN physical activity from leisure time : 0-30 minutes/day 
+	CC_MAIN_LP_LTPA_30_60,                  //EN physical activity from leisure time : 30-60 minutes/day 
+	CC_MAIN_LP_LTPA_60_plus,                //EN physical activity from leisure time : 60+ minutes/day 
+	CC_MAIN_LP_WALK_NO,                     //EN Walk for errands : None 
+	CC_MAIN_LP_WALK_0_5 ,                   //EN Walk for errands : 0 to 5 hrs/week
+	CC_MAIN_LP_WALK_6_10,                   //EN Walk for errands : 6 to 10 hrs/week 
+	CC_MAIN_LP_WALK_11_plus                 //EN Walk for errands : 11+ hrs/week 
+
+
+};
+
+
+
+parameter_group pgCURE_HYPERTENSION_PA { //EN Cure/remission hypertension (NPHS)
+ HypertensionCureMainLinearPred 
+};
+
+
+parameter_group pgCURE_CANCER_PA { //EN Cure/remission cancer (NPHS)
+ CancerCureMainLinearPred,
+
+ CURE_CANCER_Malesex_inter_Clone_age_group_t  
+};
+
+parameter_group pgCURE_DIABETES_PA { //EN Cure/remission diabetes (NPHS)
+ DiabetesCureMainLinearPred
+};
+
+
+parameter_group pgCURE_HEART_DISEASE_PA { //EN Cure/remission heart disease (NPHS)
+ HeartDiseaseCureMainLinearPred
+};
+
+
+parameter_group pgHYPERTENSION_PA { //EN Incidence/onset hypertension (NPHS)
+ HypertensionOnsetMainLinearPred,
+
+ BP_Bmi_cat5_t_inter_Clone_age_group_t ,
+ BP_Ever_diabetes_t_inter_Clone_age_group_t ,
+ BP_T_leisure_rindex_t_inter_Clone_age_group_t 
+};
+
+
+parameter_group pgCANCER_PA { //EN Incidence/onset cancer (NPHS)
+ CancerOnsetMainLinearPred,
+
+ CANCER_Malesex_inter_Clone_age_group_t 
+};
+
+
+parameter_group pgDIABETES_PA { //EN Incidence/onset diabetes (NPHS)
+ DiabetesOnsetMainLinearPred,
+
+ DIAB_Bmi_cat5_t_inter_Clone_age_group_t 
+};
+
+
+parameter_group pgHEART_DISEASE_PA { //EN Incidence/onset heart disease (NPHS)
+ HeartDiseaseOnsetMainLinearPred,
+
+ HD_Age_group10_40_t_inter_Hbpcomb_t ,
+ HD_Sp1_age_t_1_inter_Hbpcomb_t 
+};
+
+
+parameter_group pgMORTALITY_NPHS { //EN Mortality (NPHS)
+ MortalityOnsetMainLinearPred,
+
+ MORT_Age_group10_40_t_inter_Cancer_t ,
+ MORT_Malesex_inter_Cancer_t,
+ MORT_Sp1_age_t_1_inter_Cancer_t 
+};
+                   
+
+
+parameter_group pgCHRONIC_CONDITIONS_CONTROL { //EN Chronic Conditions Control 
+CC_BootstrapIndexMultiplier,
+CC_BootstrapOffset,
+CC_CalendarTimeCap,
+CC_hazard_multiplier, 
+CC_hazard_cap, 
+CC_OnsetMultiplier,
+CC_OnsetMultiplierSwitch,
+
+
+
+Mortality_hazard_multiplier_caltime, 
+Mortality_hazard_multiplier_caltime_switch  
+};
+
+parameter_group pgCHRONIC_CONDITIONS_PA { // Chronic Conditions (NPHS+CCHS)
+	pgCHRONIC_CONDITIONS_CONTROL ,
+	pgHYPERTENSION_PA,
+	pgCANCER_PA,
+	pgDIABETES_PA,
+	pgHEART_DISEASE_PA ,
+	pgCURE_HYPERTENSION_PA,
+	pgCURE_CANCER_PA,
+	pgCURE_DIABETES_PA,
+	pgCURE_HEART_DISEASE_PA ,
+	pgMORTALITY_NPHS ,
+	pgCC_COUNT_PA
+};
+
+parameters 
+{
+	int	CC_BootstrapIndexMultiplier; //EN Allow the use of bootstrap replicates (1) or not (0)    
+	int	CC_BootstrapOffset; //EN First bootstrap replicate to be used   
+
+
+double CC_CalendarTimeCap[CC_classification][Onset_or_Cure] ;  //EN Cap on time trend for chronic conditions
+double CC_hazard_multiplier[CC_classification][Onset_or_Cure]  ; //EN Chronic conditions hazard multiplier (on/off switches)
+double CC_hazard_cap[CC_classification][Onset_or_Cure]  ; //EN Chronic conditions hazard cap
+
+double CC_OnsetMultiplier[CC_classification][SEX ][AGE_GROUP_from30_to80_by10];  //EN calibration adjustment for the onset of some chronic conditions
+logical CC_OnsetMultiplierSwitch[CC_classification];                             //EN turns on or off the calibration adjustment for  the onset of some chronic conditions
+
+logical	Mortality_hazard_multiplier_caltime_switch; //EN turns on or off the calibration adjustment for mortality (by calendar years) 
+
+double Mortality_hazard_multiplier_caltime[SEX][FROM_30_TO_90_BY_10][RANGE_FROM_2001_TO_2099]; //EN calibration adjustment for mortality (by calendar years) 
+
+
+//BEGIN hazard functions estimated on NPHS
+
+//HypertensionCure
+double HypertensionCureMainLinearPred  [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for hypertension cure/remission model 
+
+//DiabetesCure
+double DiabetesCureMainLinearPred      [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for diabetes cure/remission model 
+
+//HeartDiseaseCure
+double HeartDiseaseCureMainLinearPred  [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for heart disease cure/remission model 
+
+//CancerCure
+double CancerCureMainLinearPred        [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for cancer cure/remission model 
+double CURE_CANCER_Malesex_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][SEX ];        //EN Interaction terms for cancer remission model : sex*(age group with perfect gradient forced)
+
+
+
+//HypertensionOnset
+double HypertensionOnsetMainLinearPred [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for hypertension onset/incidence model 
+double BP_Bmi_cat5_t_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][BMI5CAT ];          //EN Interaction terms for hypertension onset model : (BMI category)*(age group with perfect gradient forced)
+double BP_Ever_diabetes_t_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][DIAB_STATE ];  //EN Interaction terms for hypertension onset model : diabetes*(age group with perfect gradient forced)
+double BP_T_leisure_rindex_t_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][LTPA_4CAT ];//EN Interaction terms for hypertension onset model : (leisure time physical activity)*(age group with perfect gradient forced)
+
+//CancerOnset
+double CancerOnsetMainLinearPred       [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for cancer onset/incidence model 
+double CANCER_Malesex_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][SEX ];             //EN Interaction terms for cancer onset model : sex*(age group with perfect gradient forced)
+
+//DiabetesOnset
+double DiabetesOnsetMainLinearPred     [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for diabetes onset/incidence model 
+double DIAB_Bmi_cat5_t_inter_Clone_age_group_t [BOOTSTRAP_INDEX_39][BMI5CAT ];        //EN Interaction terms for diabetes onset model : (BMI category)*(age group with perfect gradient forced)
+
+//HeartDiseaseOnset
+double HeartDiseaseOnsetMainLinearPred [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for heart disease onset/incidence model 
+double HD_Age_group10_40_t_inter_Hbpcomb_t [BOOTSTRAP_INDEX_39][FROM_40_TO_80_BY_10 ];//EN Interaction terms for heart disease onset model : hypertension*(age group)
+double HD_Sp1_age_t_1_inter_Hbpcomb_t [BOOTSTRAP_INDEX_39];                           //EN Interaction terms for heart disease onset model : hypertension*max(0,age-85)
+
+
+//MortalityOnsetMainLinearPred
+double MortalityOnsetMainLinearPred    [BOOTSTRAP_INDEX_39][CC_MAIN_LINEAR_PREDICTOR];//EN Main regression coefficients for mortality model 
+double MORT_Malesex_inter_Cancer_t [BOOTSTRAP_INDEX_39][SEX ];                        //EN Interaction terms for mortality model : cancer*sex
+double MORT_Age_group10_40_t_inter_Cancer_t[BOOTSTRAP_INDEX_39][FROM_40_TO_80_BY_10 ];//EN Interaction terms for mortality model : cancer*(age group)
+double MORT_Sp1_age_t_1_inter_Cancer_t [BOOTSTRAP_INDEX_39];                          //EN Interaction terms for mortality model : cancer*max(0,age-85)
+
+//END hazard functions estimated on NPHS
+};
+
+actor Person            // Core Individual
+{
+	// STATES
+	CANCER_STATE        gCancer;            //EN Self-reported cancer
+	DIAB_STATE			gDiabetes_PA;		//EN Self-reported Diabetes status
+    HEART_DISEASE_STATE gHeartDisease_PA;   //EN Self-reported Heart Disease
+	HIGH_BP_STATE       gBP_PA; 		    //EN Self-reported High Blood Pressure (N/Y)
+
+	//double gBMI4CC = BmiSourceIsPhac ? gBMI_PHAC :  gBMI;
+	double gBMI4CC =  gBMI_PHAC ;
+
+	RANGE_FROM_2001_TO_2099 calendar_year_2001_2099 =  COERCE(RANGE_FROM_2001_TO_2099 , calendar_year );  //EN Year   
+
+
+	double BP_hazard           ={0.0};  // hazard of onset of BP
+	double Diabetes_PA_hazard  ={0.0};  // hazard of onset of Diabetes
+	double HeartDisease_hazard ={0.0};  // hazard of onset of Heart Disease
+	double Cancer_hazard       ={0.0};  // hazard of onset of Cancer
+    double Mortality_hazard    ={0.0};  // hazard of Mortality
+
+	double CURE_BP_hazard           ={0.0};  // hazard of cure/remission of BP
+	double CURE_Diabetes_PA_hazard  ={0.0};  // hazard of cure/remission of Diabetes
+	double CURE_HeartDisease_hazard ={0.0};  // hazard of cure/remission of Heart Disease
+	double CURE_Cancer_hazard       ={0.0};  // hazard of cure/remission of Cancer
+
+	int    CC_BootstrapIndex={0};
+
+	// EVENTS
+				
+    event timeUpdateBP          ,UpdateBP;
+    event timeUpdateDiabetes    ,UpdateDiabetes;
+    event timeUpdateHeartDisease,UpdateHeartDisease;
+    event timeUpdateCancer      ,UpdateCancer;
+    event timeUpdateMortality   ,UpdateMortality;
+    event timeUpdateCURE_BP          ,UpdateCURE_BP;
+    event timeUpdateCURE_Diabetes    ,UpdateCURE_Diabetes;
+    event timeUpdateCURE_HeartDisease,UpdateCURE_HeartDisease;
+    event timeUpdateCURE_Cancer      ,UpdateCURE_Cancer;
+
+
+		// FUNCTIONS
+
+    void  UpdateBP_hazard();
+    void  UpdateDiabetes_PA_hazard();
+    void  UpdateHeartDisease_hazard();
+    void  UpdateCancer_hazard();
+	void  UpdateMortality_hazard();
+    void  UpdateCURE_BP_hazard();
+    void  UpdateCURE_Diabetes_PA_hazard();
+    void  UpdateCURE_HeartDisease_hazard();
+    void  UpdateCURE_Cancer_hazard();
+
+	double ComputeChronicConditionLinearPredictor(const double * Coefficients, double CalendarTimeCap);
+	
+    void  Update_all_CC_hazard();
+	hook  Update_all_CC_hazard, HealthHazardUpdatesEmptyHub, 20; // 20 = execution number, the higher the value, the later the execution
+ 
+
+	void  ReadFromStartPopChronicConditions(); 
+	hook  ReadFromStartPopChronicConditions,ReadFromStartPop, 50; // 50 = execution number, the higher the value, the later the execution
+
+	void Initialize_CC_stuff();
+	hook Initialize_CC_stuff, InitializationEmptyHub, 20; // 20 = execution number, the higher the value, the later the execution
+};
+
+void Person::Initialize_CC_stuff()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	CC_BootstrapIndex =CC_BootstrapOffset + CC_BootstrapIndexMultiplier*(GetCaseSample() % (SIZE(BOOTSTRAP_INDEX_39)-CC_BootstrapOffset));
+
+	hook_Initialize_CC_stuff();
+}
+
+void  Person::ReadFromStartPopChronicConditions()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gCancer          = (       CANCER_STATE) int( record_to_be_read[cDb_PA_cancer] );
+	gBP_PA           = (      HIGH_BP_STATE) int( record_to_be_read[cDb_SP_HBP] ); 
+	gDiabetes_PA     = (         DIAB_STATE) int( record_to_be_read[cDb_SP_DM] );	
+	gHeartDisease_PA = (HEART_DISEASE_STATE) int( record_to_be_read[cDb_SP_HRT] );        
+};
+
+
+
+
+
+
+double Person::ComputeChronicConditionLinearPredictor(const double * Coefficients, double CalendarTimeCap)
+{
+	return
+		Coefficients[CC_MAIN_LP_INTERCEPT                                                            ] 
+	  + Coefficients[CC_MAIN_LP_CALENDAR_TIME                                                        ]  * (min(time, CalendarTimeCap) -1992.0)
+	  + Coefficients[CC_MAIN_LP_ABORIGINAL_NO      + gAboriginal                                     ]
+	  + Coefficients[CC_MAIN_LP_AGE_GROUP5_LT30    + SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)  ]
+	  + Coefficients[CC_MAIN_LP_AGE_PAST_85                                                          ]  * (max(truncated_age,85.0) -85.0)
+	  + Coefficients[CC_MAIN_LP_BMI_CAT1           + SPLIT(gBMI4CC ,BMI5CAT)                         ]
+	  + Coefficients[CC_MAIN_LP_CANCER_NO          + gCancer                                         ]
+	  + Coefficients[CC_MAIN_LP_CC_COUNT_EX4_NONE  + gCC_count_ex4_cap3                              ]
+	  + Coefficients[CC_MAIN_LP_ALCOHOL_NEVER      + gAlcohol5                                       ]
+	  + Coefficients[CC_MAIN_LP_DIAB_NO            + gDiabetes_PA                                    ]
+	  + Coefficients[CC_MAIN_LP_HYPERTENSION_NO    + gBP_PA                                          ]
+	  + Coefficients[CC_MAIN_LP_HEART_DISEASE_NO   + gHeartDisease_PA                                ]
+	  + Coefficients[CC_MAIN_LP_INCOME_Q1          + gIncomeQuartile                                 ]
+	  + Coefficients[CC_MAIN_LP_FEMALE             + sex                                             ]
+	  + Coefficients[CC_MAIN_LP_ETHNICITY_WHITE    + gEthnicityNonWhite                              ]
+	  + Coefficients[CC_MAIN_LP_ATLANTIC           + gRegion                                         ]
+	  + Coefficients[CC_MAIN_LP_NEVER_SMOKER       + smoking_cancer_dynamic                                      ]
+	  + Coefficients[CC_MAIN_LP_USUAL_DAY_SIT      + gPA_usual_day                                   ]
+	  + Coefficients[CC_MAIN_LP_LTPA_NO            + gLTPA_cat                                       ]
+	  + Coefficients[CC_MAIN_LP_BIKE_NO            + gBike_errands                                   ]
+	  + Coefficients[CC_MAIN_LP_WALK_NO            + gWalk_errands                                   ] 
+	  ;
+
+}
+
+
+
+/* BEGIN BP, Diabetes, HeartDisease, Cancer and Mortality*/
+
+void  Person::Update_all_CC_hazard()
+{
+  //MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+  UpdateBP_hazard();
+  UpdateDiabetes_PA_hazard();
+  UpdateHeartDisease_hazard();
+  UpdateCancer_hazard();
+  UpdateCURE_BP_hazard();
+  UpdateCURE_Diabetes_PA_hazard();
+  UpdateCURE_HeartDisease_hazard();
+  UpdateCURE_Cancer_hazard();
+  UpdateMortality_hazard();
+}
+
+void hook_UpdateBP_hazard() {};
+
+void Person::UpdateBP_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if ( gBP_PA == HIGH_BP_NO &&  CC_hazard_multiplier[CC_BP][Onset] ) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(HypertensionOnsetMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_BP][Onset]);
+		linear_predictor += (BP_Bmi_cat5_t_inter_Clone_age_group_t [CC_BootstrapIndex][SPLIT(gBMI4CC ,BMI5CAT) ]
+                          + BP_Ever_diabetes_t_inter_Clone_age_group_t [CC_BootstrapIndex][gDiabetes_PA ]
+                          + BP_T_leisure_rindex_t_inter_Clone_age_group_t [CC_BootstrapIndex][gLTPA_cat ])
+							  *( SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)+4.0); // add on interaction terms 
+
+        BP_hazard =  min(CC_hazard_multiplier[CC_BP][Onset] * exp(linear_predictor)/2.0,CC_hazard_cap[CC_BP][Onset]);
+		if(CC_OnsetMultiplierSwitch[CC_BP])
+		{
+			BP_hazard *= CC_OnsetMultiplier[CC_BP][sex][age_group_from_30_to_80_by_10] ; 
+		} 
+	}
+	else BP_hazard=0.0; 
+
+	hook_UpdateBP_hazard();
+};
+
+void hook_UpdateDiabetes_PA_hazard() {};
+
+void Person::UpdateDiabetes_PA_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if ( gDiabetes_PA == DIAB_NO && CC_hazard_multiplier[CC_DIAB][Onset]) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(DiabetesOnsetMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_DIAB][Onset]);
+	    linear_predictor += DIAB_Bmi_cat5_t_inter_Clone_age_group_t [CC_BootstrapIndex][SPLIT(gBMI4CC ,BMI5CAT)]
+		              *( SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)+4.0); // add on interaction terms  
+
+        Diabetes_PA_hazard =  min(CC_hazard_multiplier[CC_DIAB][Onset] * exp(linear_predictor)/2.0,CC_hazard_cap[CC_DIAB][Onset]);	
+		if(CC_OnsetMultiplierSwitch[CC_DIAB])
+		{
+			Diabetes_PA_hazard *= CC_OnsetMultiplier[CC_DIAB][sex][age_group_from_30_to_80_by_10] ; 
+		}
+        //Diabetes_PA_hazard = 0.01; 
+	}
+	else Diabetes_PA_hazard=0.0; 
+
+	hook_UpdateDiabetes_PA_hazard();
+};
+
+void hook_UpdateHeartDisease_hazard() {};
+
+void Person::UpdateHeartDisease_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if (gHeartDisease_PA == HEART_DISEASE_NO &&  CC_hazard_multiplier[CC_HD][Onset]) 
+	{	 
+		linear_predictor = ComputeChronicConditionLinearPredictor(HeartDiseaseOnsetMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_HD][Onset]);
+		linear_predictor += HD_Age_group10_40_t_inter_Hbpcomb_t [CC_BootstrapIndex][SPLIT(truncated_age,FROM_40_TO_80_BY_10) ]*gBP_PA
+                            + HD_Sp1_age_t_1_inter_Hbpcomb_t [CC_BootstrapIndex]* gBP_PA *(max(truncated_age,85.0) -85.0);// add on interaction terms  
+
+		/*
+		if(case_id <= 10000)
+		{
+			char line[199];
+			snprintf(line,199,"%i, %15.1f,  %15.9f,  %i, %i, %15.9f \n",(int)case_id, (double)case_seed, (double)time, (int)gHeartDisease_PA , (int) gSmoking_NPHS, linear_predictor);               
+			WriteDebugLogEntry(line);
+		}	
+		*/
+
+        HeartDisease_hazard = min(CC_hazard_multiplier[CC_HD][Onset]*  exp(linear_predictor)/2.0,CC_hazard_cap[CC_HD][Onset]);
+		if(CC_OnsetMultiplierSwitch[CC_HD])
+		{
+			HeartDisease_hazard *=  CC_OnsetMultiplier[CC_HD][sex][age_group_from_30_to_80_by_10] ; 
+		}
+        //HeartDisease_hazard=0.01; 
+	}
+	else HeartDisease_hazard=0.0; 
+
+	//if (gDiabetes_PA == DIAB_YES) HeartDisease_hazard=99.0;
+
+	hook_UpdateHeartDisease_hazard();
+};
+
+void hook_UpdateCancer_hazard() {};
+
+void Person::UpdateCancer_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if ( gCancer == CANCER_NO && CC_hazard_multiplier[CC_CANCER][Onset]) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(CancerOnsetMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_CANCER][Onset] );
+        linear_predictor += CANCER_Malesex_inter_Clone_age_group_t [CC_BootstrapIndex][sex ]
+							  *( SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)+4.0); // add on interaction terms  
+
+        Cancer_hazard = min(CC_hazard_multiplier[CC_CANCER][Onset] *  exp(linear_predictor)/2.0,CC_hazard_cap[CC_CANCER][Onset]); 
+		if(CC_OnsetMultiplierSwitch[CC_CANCER])
+		{
+			Cancer_hazard *= CC_OnsetMultiplier[CC_CANCER][sex][age_group_from_30_to_80_by_10] ; 
+		}
+       //Cancer_hazard=0.01; 
+
+        //interaction_term = CANCER_Malesex_inter_Clone_age_group_t [CC_BootstrapIndex][sex ]*( SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)+4.0);
+	}
+	else Cancer_hazard=0.0; 
+
+	hook_UpdateCancer_hazard();
+};
+
+void hook_UpdateMortality_hazard() {};
+
+void Person::UpdateMortality_hazard()
+{
+	double linear_predictor=0.0;	
+
+	//if (  alive && CC_hazard_multiplier[CC_MORT][Onset]) 
+	if (  alive_NPHS && CC_hazard_multiplier[CC_MORT][Onset]) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(MortalityOnsetMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_MORT][Onset] );
+        linear_predictor += MORT_Age_group10_40_t_inter_Cancer_t[CC_BootstrapIndex][SPLIT(truncated_age,FROM_40_TO_80_BY_10) ]*gCancer
+						+ MORT_Sp1_age_t_1_inter_Cancer_t [CC_BootstrapIndex]*gCancer* (max(truncated_age,85.0) -85.0) \
+						+ MORT_Malesex_inter_Cancer_t [CC_BootstrapIndex][sex ]*gCancer; // add on interaction terms  
+
+        Mortality_hazard = min(CC_hazard_multiplier[CC_MORT][Onset] *  exp(linear_predictor)/2.0, CC_hazard_cap[CC_MORT][Onset]); 
+		if(CC_OnsetMultiplierSwitch[CC_MORT])
+		{
+			Mortality_hazard *= CC_OnsetMultiplier[CC_MORT][sex][age_group_from_30_to_80_by_10] ; 
+		}
+		if(Mortality_hazard_multiplier_caltime_switch)
+		{
+			Mortality_hazard *= Mortality_hazard_multiplier_caltime[sex][SPLIT(truncated_age,FROM_30_TO_90_BY_10)][RANGE_POS( RANGE_FROM_2001_TO_2099, calendar_year_2001_2099 ) ] ; 
+		}
+         //Mortality_hazard=0.1;
+	}
+	else Mortality_hazard=0.0; 
+
+	hook_UpdateMortality_hazard();
+};
+
+void hook_UpdateCURE_BP_hazard() {};
+
+void Person::UpdateCURE_BP_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if (  gBP_PA == HIGH_BP_YES && CC_hazard_multiplier[CC_BP][Cure] ) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(HypertensionCureMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_BP][Cure]);//no interaction   
+        CURE_BP_hazard =  min(CC_hazard_multiplier[CC_BP][Cure] * exp(linear_predictor)/2.0,CC_hazard_cap[CC_BP][Cure] );
+	}
+	else CURE_BP_hazard=0.0; 
+
+	hook_UpdateCURE_BP_hazard();
+};
+
+void hook_UpdateCURE_Diabetes_PA_hazard() {};
+
+void Person::UpdateCURE_Diabetes_PA_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if (  gDiabetes_PA == DIAB_YES && CC_hazard_multiplier[CC_DIAB][Cure]) 
+	{	 
+		linear_predictor = ComputeChronicConditionLinearPredictor(DiabetesCureMainLinearPred[CC_BootstrapIndex],CC_CalendarTimeCap[CC_DIAB][Cure]);//no interaction   
+        CURE_Diabetes_PA_hazard = min(CC_hazard_multiplier[CC_DIAB][Cure] * exp(linear_predictor)/2.0, CC_hazard_cap[CC_DIAB][Cure]);	
+	}
+	else CURE_Diabetes_PA_hazard=0.0; 
+
+	hook_UpdateCURE_Diabetes_PA_hazard();
+};
+
+void hook_UpdateCURE_HeartDisease_hazard() {};
+
+void Person::UpdateCURE_HeartDisease_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if ( gHeartDisease_PA == HEART_DISEASE_YES && CC_hazard_multiplier[CC_HD][Cure]) 
+	{	 
+		linear_predictor = ComputeChronicConditionLinearPredictor(HeartDiseaseCureMainLinearPred[CC_BootstrapIndex],CC_CalendarTimeCap[CC_HD][Cure]);//no interaction 
+        CURE_HeartDisease_hazard = min(CC_hazard_multiplier[CC_HD][Cure] *  exp(linear_predictor)/2.0, CC_hazard_cap[CC_HD][Cure]);
+
+		/*
+		if(case_id <= 10000)
+		{
+			char line[199];
+			snprintf(line,199,"%i, %15.1f,  %15.9f,  %i, %i, %15.9f \n",(int)case_id, (double)case_seed, (double)time, (int)gHeartDisease_PA , (int) gSmoking_NPHS, linear_predictor);                            
+			WriteDebugLogEntry(line);
+		}
+		*/
+	}
+	else CURE_HeartDisease_hazard=0.0; 
+
+	hook_UpdateCURE_HeartDisease_hazard();
+};
+
+void hook_UpdateCURE_Cancer_hazard() {};
+
+void Person::UpdateCURE_Cancer_hazard()
+{
+	double linear_predictor=0.0;	
+
+	if (  gCancer == CANCER_YES && CC_hazard_multiplier[CC_CANCER][Cure]) 
+	{	
+		linear_predictor = ComputeChronicConditionLinearPredictor(CancerCureMainLinearPred[CC_BootstrapIndex], CC_CalendarTimeCap[CC_CANCER][Cure]);
+        linear_predictor += CURE_CANCER_Malesex_inter_Clone_age_group_t [CC_BootstrapIndex][sex ]
+							  *( SPLIT(truncated_age,AGE_GROUP_from30_to80_by5)+4.0); // add on interaction terms  
+
+        CURE_Cancer_hazard = min(CC_hazard_multiplier[CC_CANCER][Cure] *  exp(linear_predictor)/2.0, CC_hazard_cap[CC_CANCER][Cure] ); 
+	}
+	else CURE_Cancer_hazard=0.0; 
+
+	hook_UpdateCURE_Cancer_hazard();
+};
+
+
+TIME Person::timeUpdateBP()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when hypertension onset occurs (gBP_PA switched to HIGH_BP_YES)
+	double U;// for debug tracking
+
+	if ( BP_hazard > 0.0 ) // continuous time implementation
+	{
+		U=RandUniform(96);
+		event_time = WAIT( - TIME( log( U ) / BP_hazard ) ); 
+	}
+	return event_time;
+};
+
+TIME Person::timeUpdateDiabetes()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Diabetes onset occurs (gDiabetes_PA  switched to DIAB_YES)
+
+	if ( Diabetes_PA_hazard > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(97) ) / Diabetes_PA_hazard ) ); 
+	}
+	return event_time;
+};
+
+
+TIME Person::timeUpdateHeartDisease()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Heart Disease onset occurs (gHeartDisease_PA  switched to HEART_DISEASE_YES)
+
+	if ( HeartDisease_hazard  > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(100) ) / HeartDisease_hazard  ) ); 
+	}
+	return event_time;
+};
+
+
+
+TIME Person::timeUpdateCancer()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Cancer onset occurs (gCancer  switched to CANCER_YES)
+
+	if ( Cancer_hazard  > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(101) ) / Cancer_hazard  ) ); 
+	}
+	return event_time;
+};
+
+TIME Person::timeUpdateMortality()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Death occurs (alive_NPHS  switched to FALSE)
+
+	if ( Mortality_hazard  > 0.0 ) // continuous time implementation
+	{  
+		/*
+        if (truncated_age > 95)		{			event_time = WAIT( 0.5 ); 		}
+		else 		{	event_time = WAIT( - TIME( log( RandUniform() ) / Mortality_hazard  ) ); 		}
+		*/
+		event_time = WAIT( - TIME( log( RandUniform(102) ) / Mortality_hazard  ) ); 
+	}
+	return event_time;
+};
+
+
+TIME Person::timeUpdateCURE_BP()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when hypertension cure/remission occurs (gBP_PA switched to HIGH_BP_NO)
+
+	if ( CURE_BP_hazard > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(103) ) / CURE_BP_hazard ) ); 
+	}
+	return event_time;
+};
+
+TIME Person::timeUpdateCURE_Diabetes()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Diabetes cure/remission occurs (gDiabetes_PA  switched to DIAB_NO)
+
+	if ( CURE_Diabetes_PA_hazard > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(104) ) / CURE_Diabetes_PA_hazard ) ); 
+	}
+	return event_time;
+};
+
+
+TIME Person::timeUpdateCURE_HeartDisease()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Heart Disease cure/remission occurs (gHeartDisease_PA  switched to HEART_DISEASE_NO)
+
+	if ( CURE_HeartDisease_hazard  > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(105) ) / CURE_HeartDisease_hazard  ) ); 
+	}
+	return event_time;
+};
+
+
+
+TIME Person::timeUpdateCURE_Cancer()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when Cancer cure/remission occurs (gCancer  switched to CANCER_NO)
+
+	if ( CURE_Cancer_hazard  > 0.0 ) // continuous time implementation
+	{
+		event_time = WAIT( - TIME( log( RandUniform(106) ) / CURE_Cancer_hazard  ) ); 
+	}
+	return event_time;
+};
+
+void hook_UpdateBP() {};
+
+void Person::UpdateBP()
+{
+	gBP_PA = HIGH_BP_YES;  // onset has occured
+    BP_hazard=0.0;  // no more onset for now
+	UpdateCURE_BP_hazard();   // wakes up clock for return trip
+
+	hook_UpdateBP();
+}
+void hook_UpdateDiabetes() {};
+
+void Person::UpdateDiabetes()
+{
+	gDiabetes_PA = DIAB_YES;  // onset has occured
+	Diabetes_PA_hazard=0.0;  // no more onset for now
+	UpdateCURE_Diabetes_PA_hazard();   // wakes up clock for return trip
+
+	hook_UpdateDiabetes();
+}
+
+void hook_UpdateHeartDisease() {};
+
+void Person::UpdateHeartDisease()
+{
+	gHeartDisease_PA = HEART_DISEASE_YES;  // onset has occured
+	HeartDisease_hazard=0.0;  // no more onset for now
+	UpdateCURE_HeartDisease_hazard();   // wakes up clock for return trip
+
+	hook_UpdateHeartDisease();
+}
+
+void hook_UpdateCancer() {};
+
+void Person::UpdateCancer()
+{
+	gCancer = CANCER_YES;  // onset has occured
+	Cancer_hazard=0.0;  // no more onset for now	
+	UpdateCURE_Cancer_hazard();   // wakes up clock for return trip
+
+	hook_UpdateCancer();
+}
+     
+void hook_UpdateMortality() {};
+
+void Person::UpdateMortality()
+{
+    Mortality_hazard=0.0;  // no more NPHS death
+	//alive_new_mortality = FALSE;
+	alive_NPHS = FALSE;
+	CheckFinish(MortalityEngine == MORTALITY_ENGINE_NPHS);
+
+	hook_UpdateMortality();
+}
+
+void hook_UpdateCURE_BP() {};
+
+void Person::UpdateCURE_BP()
+{
+	gBP_PA = HIGH_BP_NO;  // cure/remission has occured
+    CURE_BP_hazard=0.0;  // no more cure/remission for now
+	UpdateBP_hazard();   // wakes up clock for return trip
+
+	hook_UpdateCURE_BP();
+}
+
+void hook_UpdateCURE_Diabetes() {};
+
+void Person::UpdateCURE_Diabetes()
+{
+	gDiabetes_PA = DIAB_NO;  // cure/remission has occured
+	CURE_Diabetes_PA_hazard=0.0;  // no more cure/remission for now
+	UpdateDiabetes_PA_hazard();   // wakes up clock for return trip
+
+	hook_UpdateCURE_Diabetes();
+}
+
+void hook_UpdateCURE_HeartDisease() {};
+
+void Person::UpdateCURE_HeartDisease()
+{
+	gHeartDisease_PA = HEART_DISEASE_NO;  // cure/remission has occured
+	CURE_HeartDisease_hazard=0.0;  // no more cure/remission for now
+	UpdateHeartDisease_hazard();   // wakes up clock for return trip
+
+	hook_UpdateCURE_HeartDisease();
+}
+
+void hook_UpdateCURE_Cancer() {};
+
+void Person::UpdateCURE_Cancer()
+{
+	gCancer = CANCER_NO;  // cure/remission has occured
+
+	CURE_Cancer_hazard=0.0;  // no more cure/remission for now	
+	UpdateCancer_hazard();   // wakes up clock for return trip
+
+	hook_UpdateCURE_Cancer();
+}
+
+
+/* END BP, Diabetes, HeartDisease, Cancer and Mortality*/
+	

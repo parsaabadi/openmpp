@@ -1,0 +1,560 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Osteoarthritis (OA)
+/* FILE_NOTE(EN) 
+	This file implements incidence of osteoarthritis (OA) and progression to surgery.
+	including multiple visits to orthopaedic surgeons.
+*/
+
+range OA_AGE_RANGE	{0, 100};			//EN Range of ages 
+range OA_SURVIVAL_INTERVALS {-1, 120};	//EN 10 years of monthly points 
+
+partition	OA_AGE_GROUP {5,10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90 }; //EN Five year age groups
+partition	OA_SURV_AGE_GROUP	{50, 60, 70, 80};		//EN Partition of age for survival curves
+partition	COST_AGE_GROUP {50, 60, 70, 80, 90}; //EN Partition of age for computation of cost
+
+
+classification OA_EVENT_STATE {	//EN OA states from diagnosis to surgery
+	OA_None,			//EN OA has not yet been diagnosed 
+		OA_Diagnosis,		//EN Diagnosis of OA
+		OA_OS1_Visit,		//EN First Visit to an orthopaedic surgeon (OS)
+		OA_OS2_Visit,		//EN Second Visit to an orthopaedic surgeon (OS)
+		OA_OS3_Visit,		//EN Third+ Visit to an orthopaedic surgeon (OS)
+		OA_Primary_Surgery,	//EN Primary surgery for OA (max 4)
+		OA_Revision_Surgery	//EN Revision surgery for OA (max 4?)
+};
+
+classification OA_PREVALENCE_STATES { //EN OA prevalence states
+	OAP_None,
+		OAP_Diagnosis,			
+		OAP_OS1_Visit,				
+		OAP_OS2_Visit,			
+		OAP_OS3_Visit,			
+		OAP_Primary_Surgery1,	
+		OAP_Primary_Surgery2,
+		OAP_Primary_Surgery3,
+		OAP_Primary_Surgery4,
+		OAP_Revision_Surgery1,
+		OAP_Revision_Surgery2,
+		OAP_Revision_Surgery3,
+		OAP_Revision_Surgery4
+};
+
+classification OA_PROGRESSION {	//EN OA progression pathways
+	Dx_OS,
+		OS1_OS2,
+		OS2_OS3,
+		OS3_OS10,
+		OS1_PR,
+		OS2_PR,
+		OS3_PR,
+		PR_PR,
+		PR_RE,
+		RE_PR,
+		RE_RE,
+		Dx_PR
+};
+
+classification OA_Type {	//EN Types of OA states
+	OA_Visits,
+		OA_Surgery,
+		OA_Revision
+};
+classification OA_COST_ONGOING_TYPE {	//EN Types of OA direct cost ongoing types
+	OA_Cost_Ongoing_Type_Drug_Otc,      //EN DRUGS OTC(over the Counter)
+	OA_Cost_Ongoing_Type_Drug_Prs,		//EN DRUGS PRS(Prescription)
+	OA_Cost_Ongoing_Type_Physician		//EN Physician and other procedures
+};
+
+
+parameter_group pgOA {		//EN Osteoarthritis
+pgOA_Incidence,
+pgOA_Prevalence,
+pgOA_Progression,
+OA_Cost_ongoing,
+OA_Cost_event
+};
+
+
+parameter_group pgOA_Incidence { //EN	OA Incidence
+OA_IncidenceRate_Observed,
+OA_IncidenceRate_Baseline,
+OA_BMI_HR
+};
+parameter_group pgOA_Prevalence { //EN	OA Prevalence
+OA_PrevalenceRate_Target,
+OA_PrevalenceRate_Baseline,
+SROA_RelativeRisk,
+SROA_PredictorProbability,
+OA_Prevalence_Modifier,
+OAP_Conditional_on_SROA_at_StartUp,
+OA_PrevalenceState_DistributionAtStart,
+OA_PrevalenceState_DurationAtStart,
+OA_Prevalence_SurvivalTimeOffset
+};
+parameter_group pgOA_Progression { //EN	OA Progression (Survival)
+OA_Weibull,
+pOA_SURVIVAL_INTERVAL,
+pOA_Ctr
+};
+
+
+parameters 
+{
+	/* NOTE ( OA_BMI_HR, EN )
+	Hazard ratios of BMI on OA incidence and prevalence. Using ratios estimated for incidence from NPHS. 
+	Estimated from NPHS by Jacek's team.
+	*/ 
+	double OA_BMI_HR[SEX][BMI_STATE]; // Hazard ratios of BMI on OA incidence	
+
+	/* NOTE ( OA_IncidenceRate_Baseline, EN )
+	Baseline incidence rates estimated through model calibration, which takes into account
+	the population distribution of risk factors (BMI) and their associated risk for 
+	developing OA.
+	>For calibation exercise, initial guess for baseline values are the observed values.
+	>Note: OA prevalence should be calibrated first using Observed incidence rates and no
+	impact from BMI (set hazard ratios to 0).
+	*/
+	double OA_IncidenceRate_Baseline[SEX][LIFE]; //EN Baseline incidence rate
+
+	/* NOTE ( OA_IncidenceRate_Observed, EN )
+	Observed (or target) incidence rates in the population in the simulation start year.
+	[ BC.AOA2: (Def 2)	From excel file, 2007/02/27 ]
+	*/
+	double OA_IncidenceRate_Observed[SEX][LIFE]; //EN Observed incidence rate
+
+	/* NOTE ( OA_Weibull, EN )
+	Time to next event, based on survival analysis.
+	This data is based on definition 2 of OA from admin data
+	[ Résultats avec AOA2 - vient de aoa2_os_age_sex.xls ]
+	*/
+	double OA_Weibull[OA_PROGRESSION][SEX][OA_SURV_AGE_GROUP][WEIBULL_PARAMETER]; //EN Time to next event; Weibull parameters from survival analysis
+
+	/* NOTE (pOA_Ctr,EN)
+	maximum number of OS visits, surgeries and revisions
+	From Jacek's team
+	*/
+	int pOA_Ctr[OA_Type];  // maximum number of OS visits, surgeries and revisions
+
+	/* NOTE ( pOA_SURVIVAL_INTERVAL , EN )
+	Discrete time interval from OA events used to reconstruct survival curves via tables
+	> 1 month interval is 0.08333333333333330 years
+	> 3 months interval is 0.25 years
+	> 6 month interval is 0.5 years
+	> 1 year interval is 1 year
+	> The shorter the interval, the slower the simulation will be.
+	*/
+	double	pOA_SURVIVAL_INTERVAL; //EN Clock interval for OA events
+
+	double OA_Cost_ongoing[OA_COST_ONGOING_TYPE][SEX][COST_AGE_GROUP][OA_DRUG_STATE][OA_DRUG_CYCLE]; //EN Direct cost of OA_ongoing including physician and surgeon visits and all hospital procedures(excluding replacement surgery)
+	double OA_Cost_event[OA_PREVALENCE_STATES]; //EN Direct cost of OA_event including primary replacement surgery and reviison surgery
+};
+
+actor Person            // Core Individual
+{
+	int Cost_age =split( truncated_age, COST_AGE_GROUP); //EN Age group
+	double OA_direct_cost_ongoing_drug_otc = OA_Cost_ongoing[OA_Cost_Ongoing_Type_Drug_Otc][sex][Cost_age][Drug_state][Drug_cycle]; //EN OA Direct Cost_Ongoing for DRUGS OTC(over the Counter)
+	double OA_direct_cost_ongoing_drug_prs = OA_Cost_ongoing[OA_Cost_Ongoing_Type_Drug_Prs][sex][Cost_age][Drug_state][Drug_cycle]; //EN OA Direct Cost_Ongoing for DRUGS PRS(Prescription)
+	double OA_direct_cost_ongoing_physician = OA_Cost_ongoing[OA_Cost_Ongoing_Type_Physician][sex][Cost_age][Drug_state][Drug_cycle]; //EN OA Direct Cost_Ongoing for Physician and other procedures
+	double OA_direct_cost_ongoing_drug_total = OA_direct_cost_ongoing_drug_otc + OA_direct_cost_ongoing_drug_prs; //EN OA Direct Cost_Ongoing for all drugs 
+	double OA_direct_cost_ongoing= OA_direct_cost_ongoing_physician + OA_direct_cost_ongoing_drug_total; //EN OA Direct Cost_Ongoing Total
+    double OA_direct_cost_event = OA_Cost_event[OA_prevalence_state]; //EN OA Direct Cost_Event
+	double	gBMI_at_OA={0.0};		// BMI at OA incidence
+	double	IndexOA_hazard={0.0}; // Initial OA Event hazard adjusted for risks
+	TIME	age_IndexOA = { TIME_INFINITE };	// age at first OA event
+	TIME	age_OAevent = { TIME_INFINITE };	// age at OA event ( reset multiple times) 
+	TIME	age_OAP_ReportYear = { TIME_INFINITE };	// age in ReportYear 
+	TIME	age_OA_First_Primary = { 0.0};			// age at 1st primary surgery
+	TIME	age_OA_First_Revision= { 0.0};			// age at 1st revision surgery
+	TIME	age_OA_OS_visit = { TIME_INFINITE };	// age at OS visit (multiple)
+	TIME	age_OA_Primary = { TIME_INFINITE };		// age at OA primary surgery (multiple) 
+	TIME	age_OA_Revision = { TIME_INFINITE };	// age at OA revision surgery (multiple) 
+	TIME    OA_time_to_Primary_Surgery={TIME_INFINITE};	// Time to Primary Surgery
+	TIME    OA_time_to_Revision_Surgery={TIME_INFINITE}; // Time to Revision Surgery
+	TIME    OA_time_to_Visit_to_OS={TIME_INFINITE}; // Time to next visit to OS
+	int     OA_Number_Primary_Surgeries={0};		// Number of primary surgeries, limited by pOA_Ctr[OA_Surgery]
+	int     OA_Number_Revision_Surgeries={0};		// Number of primary surgeries, limited by pOA_Ctr[OA_Revision]
+	int     OA_Number_Visits_to_OS={0};				//EN Number of primary surgeries, limited by pOA_Ctr[OA_Visits]
+	int     OA_surv_age_group = split( truncated_age, OA_SURV_AGE_GROUP ); //EN Partition of age used for OA_Weibull (i.e. survival curves after incidence of OA)
+	logical	FirstOA_event = { FALSE };				//EN True if OA incidence occurs (set only for new incidence)
+	logical	IndexOA_event = { FALSE };			    //EN True if OA has occurred (set for incidence and prevalence)
+	logical LastOSVisit_before_FirstSurgery={ FALSE };//EN Marks the last OS visit before first primary surgery for OA
+	logical OA_OS_visit_UpdateHUI ={ FALSE };		//EN Signals need to change HUI at OS visit
+	logical	OA_event = { FALSE };		 	        //EN True if OA or any subsequent event has occurred, false otherwise
+	logical	OA_Primary_Surgery_Event = {FALSE};		//EN True from time of first primary surgery
+	logical OA_OS_Visits = {FALSE};					//EN True while OA state is an OS visit
+	logical OA_OS_Visit_Ever = {FALSE};				//EN True while OA state is an OS visit
+	logical	PrevOA_event = { FALSE };				//EN True if has OA at start of simulation
+	logical gOA = gSROA || IndexOA_event;           //EN Has Self-reported OA
+
+	OA_EVENT_STATE	OA_Event_State = {OA_None};				//EN OA state 
+	OA_EVENT_STATE	OA_Event_State_Previous = {OA_None};	//EN Previous OA state 	
+	OA_PREVALENCE_STATES OA_prevalence_state = {OAP_None};	//EN OA prevalence state 
+	OA_PREVALENCE_STATES OAP_state_ReportYear ={OAP_None};	//EN OA prevalence state in ReportYear
+	OA_SURVIVAL_INTERVALS gIndexOAClock = {0};				//EN Time survived from time of Index OA 
+	OA_SURVIVAL_INTERVALS gOAClock = {0};					//EN Time survived from time of OA Events 
+
+	YEARS	year_at_OAevent;						
+	YEARS	year_at_IndexOAevent;					
+
+	//	logical at_risk_OA = ( truncated_age < age_IndexOA ); // could be useful in tables
+	event	timeIndexOAEvent,  IndexOAEvent;  
+	event	timeOA_OSvisit,  OA_OSvisit;  
+	event	timeOA_PrimarySurgery,  OA_PrimarySurgery;  
+	event	timeOA_RevisionSurgery,  OA_RevisionSurgery;  
+	void	IndexOACheck();
+	hook	IndexOACheck, HealthHazardUpdatesEmptyHub, 30; // 30 = execution number, the higher the value, the later the execution
+	event	timeIndexOAClock,  IndexOAClock;  
+	event	timeOAClock,  OAClock;  
+};
+
+void hook_IndexOACheck() {};
+
+void Person::IndexOACheck()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	double IndexOA_Prob=0;		// Probability of OA - Reset to 0 to make sure it is recomputed each time
+	//   double IndexOA_p=0;
+
+	IndexOA_hazard=0; 
+
+	if ( pDisease[DM_OA][ROW_1] && truncated_age >= MIN( OA_AGE_RANGE ) && !IndexOA_event )
+	{	// see previous versions of POHEM_OA for other/previous methods
+		IndexOA_Prob = 	OA_IncidenceRate_Baseline[sex][truncated_age];
+		//			IndexOA_p = 1- pow(1-IndexOA_Prob,OA_BMI_HR[sex][bmi]);	// probability for discrete implementation
+		IndexOA_hazard = (-log( 1 - IndexOA_Prob ))*OA_BMI_HR[sex][bmi];	// Hazard for continuous time implementation
+	}
+
+	hook_IndexOACheck();
+};
+
+TIME Person::timeIndexOAEvent()
+{
+	TIME event_time = {TIME_INFINITE};  // Time when OA occurs
+
+	// continuous time implementation
+	if ( IndexOA_hazard > 0 ) 
+	{
+		event_time = WAIT( - TIME( log( RandUniform(16) ) / IndexOA_hazard ) ); 
+	}
+	return event_time;
+};
+
+void hook_IndexOAEvent() {};
+
+void Person::IndexOAEvent()
+{
+	IndexOA_hazard = 0; // the initial event is over - Continuous mode
+	IndexOA_event = TRUE;
+	FirstOA_event = TRUE;
+	gBMI_at_OA=gBMI;
+
+	OA_time_to_Visit_to_OS=TIME_INFINITE;
+	OA_time_to_Revision_Surgery=TIME_INFINITE;
+	OA_time_to_Primary_Surgery=TIME_INFINITE;
+	OA_event = FALSE;
+	OA_event = TRUE;
+
+	OA_Event_State_Previous = OA_Event_State;
+	OA_Event_State = OA_Diagnosis;
+
+	//OA survival code
+	OA_prevalence_state = OAP_Diagnosis;
+	gOAClock = -1; //reset
+	gOAClock = 0; //reset
+	age_OAevent = age;
+	year_at_OAevent = calendar_year;
+	year_at_IndexOAevent = calendar_year;
+	age_IndexOA = age;
+
+	// time to "first visit to OS" from diagnosis (day units)
+	OA_time_to_Visit_to_OS=PiecewiseInverseWeibull( RandUniform(46),
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_uFixed],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_tFixed],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_lambda1],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_beta1],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_lambda2],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_beta2],
+		OA_Weibull[Dx_OS][sex][OA_surv_age_group][Weibull_rr])
+		/DaysPerYear;
+
+	hook_IndexOAEvent();
+
+};		// noticed that time_infinite when in unit of days is equal to about 89 years.
+		// ... survival curves should never have been estimated in units of days (units of months would have been sufficiently precise)
+
+
+
+// Time to next OS visit, including first visit after diagnosis
+TIME Person::timeOA_OSvisit()
+{
+	return WAIT(OA_time_to_Visit_to_OS);
+};
+
+void hook_OA_OSvisit() {};
+
+void Person::OA_OSvisit()
+{
+	// Declare local variables
+	int		nOS_PR_Index;	//EN OA progression index from OS visit[i] to Primary surgery
+	int		nOS_OS_Index;	//EN OA progression index from OS to OS visits 
+
+	// Assign OA state variables
+
+	OA_time_to_Visit_to_OS=TIME_INFINITE;
+	OA_time_to_Revision_Surgery=TIME_INFINITE;
+	OA_time_to_Primary_Surgery=TIME_INFINITE;
+	OA_event = FALSE;
+	OA_event = TRUE;
+	OA_OS_Visits = FALSE;
+	OA_OS_Visits = TRUE;
+	OA_OS_Visit_Ever = TRUE;
+
+	// Mise-à-jour du compteur
+	OA_Number_Visits_to_OS++;
+	if (OA_Number_Visits_to_OS >= 3) 
+	{
+		nOS_OS_Index = 3;
+	}
+	else 
+	{ 
+		nOS_OS_Index = OA_Number_Visits_to_OS; 
+	};
+	nOS_PR_Index = nOS_OS_Index + 3;
+
+	//OA survival code
+	OA_Event_State_Previous = OA_Event_State;
+	OA_Event_State = (OA_EVENT_STATE) ( nOS_OS_Index+1 );	// OS1, OS2 or OS3+
+	OA_prevalence_state = (OA_PREVALENCE_STATES) ( nOS_OS_Index+1 );
+
+	gOAClock = -1;			// reset
+	gOAClock = 0;			// reset
+	age_OA_OS_visit = age;	// reset
+	age_OAevent = age;		// reset
+	year_at_OAevent = calendar_year;
+
+	//Set waiting times to next OS visit and to Primary Surgery
+	if (OA_Number_Visits_to_OS <= pOA_Ctr[OA_Visits]) 
+	{
+		OA_time_to_Visit_to_OS=PiecewiseInverseWeibull( RandUniform(50),
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_uFixed],	
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_tFixed],
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_lambda1],
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_beta1],
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_lambda2],
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_beta2],
+			OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group][Weibull_rr])
+			/DaysPerYear;
+	}
+	else
+	{
+		OA_time_to_Visit_to_OS=TIME_INFINITE;
+	};
+	
+	OA_time_to_Primary_Surgery=PiecewiseInverseWeibull( RandUniform(51),
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_uFixed],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_tFixed],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_lambda1],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_beta1],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_lambda2],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_beta2],
+		OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group][Weibull_rr])
+		/DaysPerYear;
+
+	// Mark the last OS visit before first primary surgery
+	if ( OA_time_to_Primary_Surgery < OA_time_to_Visit_to_OS ) 
+	{
+		LastOSVisit_before_FirstSurgery=TRUE;
+	}
+
+	hook_OA_OSvisit();
+};
+
+TIME Person::timeOA_PrimarySurgery()
+{
+	return WAIT(OA_time_to_Primary_Surgery);
+};
+
+void hook_OA_PrimarySurgery() {};
+
+void Person::OA_PrimarySurgery()
+{
+	OA_OS_Visit_Ever = FALSE;
+	OA_Primary_Surgery_Event = TRUE;
+	OA_Event_State_Previous = OA_Event_State;
+	OA_Event_State = OA_Primary_Surgery;
+
+	OA_time_to_Visit_to_OS=TIME_INFINITE;
+	OA_time_to_Primary_Surgery=TIME_INFINITE;
+	OA_time_to_Revision_Surgery=TIME_INFINITE;
+	OA_event = FALSE;
+	OA_event = TRUE;
+	OA_OS_Visits = FALSE;
+
+	OA_Number_Primary_Surgeries++;
+
+	age_OA_First_Primary = age;	// reset
+
+	//OA survival code
+	OA_prevalence_state = (OA_PREVALENCE_STATES) (OA_Number_Primary_Surgeries+4);
+	gOAClock = -1;			//reset
+	gOAClock = 0;			// reset
+	age_OA_Primary = age;	// reset
+	age_OAevent = age;		// reset
+	year_at_OAevent = calendar_year;
+
+	//Set waiting times to another Primary Surgery
+	if (OA_Number_Primary_Surgeries<pOA_Ctr[OA_Surgery]) {	// limits number of primaries allowed
+		OA_time_to_Primary_Surgery=PiecewiseInverseWeibull( RandUniform(52),
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_uFixed],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_tFixed],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_lambda1],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_beta1],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_lambda2],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_beta2],
+			OA_Weibull[PR_PR][sex][OA_surv_age_group][Weibull_rr])
+			/DaysPerYear;
+	};
+	//Set waiting times to Revision Surgery
+	if (OA_Number_Revision_Surgeries<pOA_Ctr[OA_Revision]) {	// limits number of revisions allowed
+		OA_time_to_Revision_Surgery=PiecewiseInverseWeibull( RandUniform(53),
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_uFixed],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_tFixed],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_lambda1],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_beta1],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_lambda2],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_beta2],
+			OA_Weibull[PR_RE][sex][OA_surv_age_group][Weibull_rr])
+			/DaysPerYear;
+	};
+
+	hook_OA_PrimarySurgery();
+};
+TIME Person::timeOA_RevisionSurgery()
+{
+	return WAIT(OA_time_to_Revision_Surgery);
+};
+
+void hook_OA_RevisionSurgery() {};
+
+void Person::OA_RevisionSurgery()
+{
+	OA_Event_State_Previous = OA_Event_State;
+	OA_Event_State = OA_Revision_Surgery;
+
+	OA_time_to_Visit_to_OS=TIME_INFINITE;
+	OA_time_to_Primary_Surgery=TIME_INFINITE;
+	OA_time_to_Revision_Surgery=TIME_INFINITE;
+	OA_event = FALSE;
+	OA_event = TRUE;
+	OA_Number_Revision_Surgeries++;
+		
+
+	if (OA_Number_Revision_Surgeries==1) 
+	{ 
+		age_OA_First_Revision = age;	
+	};
+
+	//OA survival code
+	OA_prevalence_state = (OA_PREVALENCE_STATES) (OA_Number_Revision_Surgeries+8);
+	gOAClock = -1; //reset
+	gOAClock = 0; //reset
+	age_OA_Revision =age;
+	age_OAevent = age;
+	year_at_OAevent = calendar_year;
+
+	//Set waiting times to Primary Surgery
+	if (OA_Number_Primary_Surgeries<pOA_Ctr[OA_Surgery]) {	// limits number of revisions allowed
+		OA_time_to_Primary_Surgery=PiecewiseInverseWeibull( RandUniform(126),
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_uFixed],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_tFixed],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_lambda1],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_beta1],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_lambda2],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_beta2],
+			OA_Weibull[RE_PR][sex][OA_surv_age_group][Weibull_rr])
+			/DaysPerYear;
+	};
+	//Set waiting times to Revision Surgery
+	if (OA_Number_Revision_Surgeries<pOA_Ctr[OA_Revision]) {	// limits number of revisions allowed
+		OA_time_to_Revision_Surgery=PiecewiseInverseWeibull( RandUniform(127),
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_uFixed],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_tFixed],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_lambda1],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_beta1],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_lambda2],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_beta2],
+			OA_Weibull[RE_RE][sex][OA_surv_age_group][Weibull_rr])
+			/DaysPerYear;
+	};
+
+	hook_OA_RevisionSurgery();
+};
+
+TIME Person::timeIndexOAClock()
+{
+	// Increments clock at regular intervals from time of index OA event
+	TIME	event_time = {TIME_INFINITE};
+
+	if ( IndexOA_event ) {
+		event_time = WAIT( pOA_SURVIVAL_INTERVAL );
+	};
+	return event_time;
+};
+
+void hook_IndexOAClock() {};
+
+void Person::IndexOAClock()
+{
+	gIndexOAClock = COERCE( OA_SURVIVAL_INTERVALS, gIndexOAClock +1 );
+
+	hook_IndexOAClock();
+};
+
+TIME Person::timeOAClock()
+{
+	// Increments clock at regular intervals; clock is reset at each node in OA progression
+	TIME	event_time = {TIME_INFINITE};
+
+	if ( OA_Event_State != OA_None ) 
+	{
+		event_time = WAIT( pOA_SURVIVAL_INTERVAL );
+	};
+	return event_time;
+};
+
+void hook_OAClock() {};
+
+void Person::OAClock()
+{
+	gOAClock = COERCE( OA_SURVIVAL_INTERVALS, gOAClock +1 );
+
+	hook_OAClock();
+};
+//end Bill oa survival code
+
+void hook_OAPrevalenceReportYear() {};
+
+void Person::OAPrevalenceReportYear()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if (calendar_year >= pReportYear ) 
+	{
+		if (calendar_year == pReportYear ) 
+		{
+			OAP_state_ReportYear = OA_prevalence_state;
+			age_OAP_ReportYear = age;
+		}
+		else
+		{
+			if ( OAP_state_ReportYear != OA_prevalence_state ) 
+			{
+				OAP_state_ReportYear = OAP_None;	// as soon as a subsequent event occurs turn off this state
+			}
+		}
+	};
+
+	hook_OAPrevalenceReportYear();
+};
+

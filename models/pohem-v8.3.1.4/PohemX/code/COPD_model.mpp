@@ -1,0 +1,765 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) COPD
+//The credit of COPD module goes to Shahzad Ghanbarian and Mohsen Sadatsafavi. 
+//The COPD module is developed under CIHR grant for Evaluation Platform in COPD (EPIC) project (#142238) in Sep 2015-Dec 2018.
+//EPIC is a discrete-event simulation model of Canadians 40 years of age or older. A complete description of the model can be 
+//found in: 
+//"Sadatsafavi M, Ghanbarian S, Adibi A, Johnson K, FitzGerald JM, Flanagan W, Bryan S, Sin D, Canadian Respiratory Research Network. 
+//Development and validation of the Evaluation Platform In COPD (EPIC): a population-based outcomes model of COPD for Canada.  Medical Decision Making. 2019 Feb;39(2):152-67.
+
+										
+										
+										
+										
+
+
+/* FILE_NOTE(EN) 
+	This file implements prevalence and incidence of COPD.
+*/
+
+range       COPD_AGE_RANGE	            {40, 100};			                           //EN Range of ages 
+range       COPD_YEAR_RANGE             {2001, 2050};
+range	    REPORT_TIME_WITH_COPD		{0, 30};	                                   //EN Years lived with COPD 
+
+
+
+classification COPD_STAGE {                      //EN COPD Stages 
+	
+	COPD_STAGE0,                                //EN Stage 0 means no COPD, 
+	COPD_STAGE1,							    //EN Mild COPD, GOLD 1
+	COPD_STAGE2,								//EN Moderate COPD, GOLD 2
+	COPD_STAGE3,                                //EN Severe COPD, GOLD 3
+	COPD_STAGE4                                 //EN Very severe COPD, GOLD 4
+};
+
+classification  COLLAPSED_COPD_STAGE {          // EN Collapsed COPD stages, we needed it at somepoint for the comparision with litrature
+
+	C_COPD_STAGE0,                              // EN Stage 0 means no COPD 
+    C_COPD_STAGE1,                              // EN Mild COPD
+	C_COPD_STAGE2,                              // EN Moderate COPD	                             
+	C_COPD_STAGE34                              // EN Severe or very severe COPD	
+};
+
+aggregation COLLAPSED_COPD_STAGE, COPD_STAGE
+{
+	C_COPD_STAGE0 , COPD_STAGE0,
+	C_COPD_STAGE1 , COPD_STAGE1,
+	C_COPD_STAGE2 , COPD_STAGE2,
+	C_COPD_STAGE34, COPD_STAGE3,
+	C_COPD_STAGE34, COPD_STAGE4
+	
+};
+
+
+classification EXAC_STAGE {                      // EN Exacerbation Stages 
+    
+	EXAC_STAGE0,                                // EN No Exac 
+	EXAC_STAGE1,							    // EN Mild Exac
+	EXAC_STAGE2,								// EN Moderate Exac	
+	EXAC_STAGE3,                                // EN Severe Exac
+	EXAC_STAGE4                                 // EN Very severe 
+};
+
+
+
+
+
+classification COPD_DX_STATUS {	      // Diganosis has not modelled in a perfect way, it will be added later as part of Kate Johnson's PhD program
+	   
+	    COPD_YES,			// EN COPD has been diagnosed 
+		COPD_NO	        	// EN COPD has not yet been diagnosed
+	
+};
+
+classification FEV1_T_BETA {  
+	     
+	    CP_AGE_BASE,        // EN Baseline age
+        CP_SEX,             // EN Sex 
+		CP_WEIGHT_BASE,     // EN Baseline weight
+		CP_HEIGHT,          // EN Height 
+		CP_HEIGHT_SQ,       // EN Height squared 
+		CP_SMOKING_ST,      // EN Smoking status  
+		CP_HEIGHT_SQ_AGE,   // EN Height_square*age
+		CP_FOLLOW_UP_YEAR   // EN Follow up year with COPD
+};
+
+classification COPD_EQUATION { //EN COPD equation
+	COPD_EQ_INTERCEPT,       //EN Intercept
+	COPD_EQ_AGE,             //EN Age
+	COPD_EQ_AGE_SQ,          //EN Age squared
+	COPD_EQ_WEIGHT,          //EN Weight 
+	COPD_EQ_HEIGTH,          //EN Height 
+	COPD_EQ_HEIGTH_SQ,       //EN Height squared
+	COPD_EQ_HEIGTH_SQ_AGE,   //EN Height squared * Age
+	COPD_EQ_SMOKING_CURRENT, //EN Current smoker
+	COPD_EQ_SMOKING_PY,      //EN Pack years
+	COPD_EQ_FEV,             //EN FEV1
+	COPD_EQ_DURATION         //EN Time with copd
+
+};
+
+parameters {  //EN COPD parameter   these parameters will be showed in the parameter input so can be twicked without going through the code
+	
+	double intercept_exac_hazard;                                 //EN Intercept for COPD exacerbation hazard (calibration) 
+	double intercept_mortality;                                   //EN COPD intercep for COPD_Mortality (calibration) 
+	double COPD_Mortality[EXAC_STAGE];                            //EN COPD_Mortality coefficients per Exacerbation Stage (calibration)
+	double COPD_exac_hazard[COPD_STAGE];                          //EN coefficients COPD exacerbation hazard per COPD stage Stage (calibration)
+	double COPD_CostGOLD[COPD_STAGE];                             //EN COPD direct cost per GOLD stage per year
+	double COPD_indirectCostGOLD[COPD_STAGE];                     //EN COPD indirect cost per GOLD stage per year
+//	double COPD_CostExacerbation[COPD_STAGE][EXAC_STAGE];         //EN exacerbation cost by GOLD stage and exacerbation stage  
+	double COPD_CostExacerbation[EXAC_STAGE];                     //EN exacerbation cost by GOLD stage and exacerbation stage   
+    double COPD_UtilityGOLD[COPD_STAGE];                          //EN COPD utility per GOLD stage 
+	double	Slope_FEV1_t_beta[SEX][FEV1_T_BETA];                  //EN FEV1 decline over time, Zafar's equation    
+    double	COPD_Exacerbation_disutility[COPD_STAGE][EXAC_STAGE]; //EN Dis-Utility per GOLD stage per exacerbation
+
+	double CopdProb           [SEX][COPD_EQUATION]; //EN Probability of COPD at start
+	double CopdHazard         [SEX][COPD_EQUATION]; //EN COPD hazard
+
+	double CopdFev1Base       [SEX][COPD_EQUATION]; //EN FEV1 coefficients for ordinary people  icitte
+	double CopdFev1Prevalence [SEX][COPD_EQUATION]; //EN FEV1 coefficients for people with initially prevalent COPD 
+	double CopdFev1Incidence  [SEX][COPD_EQUATION]; //EN FEV1 coefficients for people with incident COPD 
+	double CopdFev1Ongoing    [SEX][COPD_EQUATION]; //EN FEV1 coefficients for people with ongoing COPD 
+	double CopdPef            [SEX][COPD_EQUATION]; //EN PEF coefficients 
+
+	double CopdExacerbation   [SEX][COPD_EQUATION]; //EN Excerbation stage
+	double CopdExacerbationStage[COPD_STAGE];//EN Excerbation stage (COPD stage terms)
+}; 
+
+parameter_group pgCopdOnset{ //EN Onset
+	 CopdProb,
+	 CopdHazard
+};
+parameter_group pgCopdFev{ //EN FEV
+	 CopdFev1Base,
+	 CopdFev1Prevalence,
+	 CopdFev1Incidence,
+	 CopdFev1Ongoing,
+	 CopdPef,
+	 Slope_FEV1_t_beta
+};
+parameter_group pgCopdExacerbation{ //EN Exacerbation
+
+	 intercept_exac_hazard,
+	 COPD_exac_hazard,
+	 CopdExacerbation,
+	 CopdExacerbationStage
+};
+parameter_group pgCopdQaly{ //EN Utility/Mortality
+	 COPD_UtilityGOLD,
+	 COPD_Exacerbation_disutility,
+	 intercept_mortality,
+	 COPD_Mortality
+};
+parameter_group pgCopdCosts{ //EN Costs
+	 COPD_CostGOLD,
+	 COPD_indirectCostGOLD,
+	 COPD_CostExacerbation
+};
+hide(Slope_FEV1_t_beta);
+parameter_group pgCOPD{ //EN COPD
+	pgCopdOnset,
+	pgCopdFev,
+	pgCopdExacerbation,
+	pgCopdQaly,
+	pgCopdCosts
+};
+//-----------------------------------------------------------------------------------------------------------------
+
+actor Person            // Core Individual
+
+{
+	logical          has_copd_initially ={FALSE};                 //EN TRUE if person has COPD at the begining of the simulation 2002 
+	logical          has_copd_incidence ={FALSE};                 //EN TRUE if peron develops COPD during his/her lifetime     
+	logical          has_copd ={FALSE};                           //EN TRUE if person either has COPD at the begining of the simulation 2002 or developes it during his/her lifetime 
+	logical          COPD_death ={FALSE};                         //EN TRUE if the person dies due to exacerbation  
+	logical          has_exac ={FALSE};                            
+	
+	
+	logical          COPD_death_exac1={FALSE};                    //EN COPD Death duo to mild exacerbation, it is zero but added for the purpose of calibration
+	logical          COPD_death_exac2={FALSE};                    //EN COPD Death duo to moderate exacerbation, it is zero but added for the purpose of calibration 
+	logical          COPD_death_exac3={FALSE};                    //EN COPD Death duo to severe exacerbation
+	logical          COPD_death_exac4={FALSE};                    //EN COPD Death duo to very severe exacerbation 
+
+		
+	
+	logical          clinical_sample_TORCH={FALSE};               //EN Flag for patients who have the inclusion criteria of TORCH clinical trial, it is added for External validation 
+	logical          clinical_sample_UPLIFT={FALSE};              //EN Flag for patients who have the inclusion criteria of UPLIFT clinical trial, it is added for External validation
+	logical          copd_instant ={FALSE};                       //EN it is the status of copd (incidence or prevalence) before updating FEV1 
+	logical          diagnosed_COPD ={FALSE};                     //EN True if copd is diagnosed, the diagonisis is modelled for the sake of external validation and will be replaced late by Mohsen's team  
+
+
+
+	double           FEV1={0};                                         //EN Initial value of FEV1 coming from Prevalnce or Incidence event
+	double           FEV1_t={0};                                       //EN Updated value  of FEV1, updating happens every year at NewyearEvent
+	double           FEV1_base_prevalence;                             //EN baseline value of FEV1 at creation  
+	double           FEV1_base_incidence;                              //EN baseline value of FEV1 at incidence 
+
+	double           PY= total_packyears_smoked;                       //EN Total packyears smoked    
+ 
+	
+ 
+	double            year_increase_COPD;                              //EN Follow up time   
+	double            time_copd_incidence;                             //EN Time of COPD incidence
+	double            exac_hazard;                                     //EN hazard of exacerbation
+  
+
+
+	integer          exa_contour={0};    	                 //EN Exa contour
+	
+	 
+
+
+//----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	// Random variables which are defined for each person only once at the point of creation
+	
+	
+	double            x_exac_severity;                       //EN random variable for severity of exacerbation
+    double            x_rate_exacerbation_random_effect;     //EN random variable for the rate of exacerbation from AJE paper by Mohsen
+
+	
+
+//-----------------------------------------------------------------------------------------------------------------------------------------
+
+	double            time_exac;          //EN time of exacerbation  
+	double            time_exac_exit;     //EN time of exit from exacerbation 
+	double            intercept_2;        //EN Intercept of FEV1 slope from Zafar CMAJ   
+	
+    double            PEF;                //EN Predicted FEV1, calculated using the equation from (NHANES)       
+          
+
+	double            FEV1_PEF;           //EN FEV1 percent predicted. This shows the ratio of FEV1 to predicted FEV1 (NHANES) 
+	
+	
+	double            log_Hazard_copd;    //EN log of hazard of copd, by taking exponential of this variable we calculate the probabilty of COPD incidence 
+	double            copd_hazard;        //EN copd probability 
+	
+	double            x_inc_female;       //EN the random term for the baseline FEV1 of incidence cases for female
+	double            x_inc_male;         //EN the random term for the baseline FEV1 of incidence cases for male
+	double            x_prev_female;      //EN the random term for the baseline FEV1 of prevalence cases for female
+	double            x_prev_male;        //EN the random term for the baseline FEV1 of prevalence cases for male
+
+
+	double            age_base;                     //EN Baseline age for copd incidence cases 
+	double            gMass_kg_base;                //EN Baseline weigth for copd incidence cases 
+	double            pkyr_base;                    //EN Baseline packyear for copd incidence cases  
+	double            RAND_TAIL_FEV1_t ;            //EN Minimum value of FEV1 for each individual, 
+	                                                // For each individual, a randome number is defined from a gaussian function, 
+	                                                // the mean and standard deviation is coming from analysis of COLD data 
+	
+	
+	double            COPD_mortality_rate;          //EN rate of COPD mortality, as a function of age (coeeficient was provided by Mohsen) and severity of exacerbation (calibration-target --> 10% of severe & very severe exacerbations)
+	double            COPD_Mortality_probability;   //EN COPD mortality probability  
+	double            p_utility={0.85};             //EN The default utility for no-copd population (weighted age average from  Johnson JA, Pickard AS (2000) Comparison of the EQ-5D and SF-12 health surveys in a general population survey in Alberta, Canada. Med Care 38: 115–121.)
+	double            disqualy;                     //EN Disqualy for COPD population stratified by stage 
+
+	COLLAPSED_COPD_STAGE       collapsed_copd_stage = aggregate(copd_stage, COLLAPSED_COPD_STAGE); //EN Collapsed COPD stage         
+    COPD_STAGE	               copd_stage = {COPD_STAGE0};                   //EN COPD stage 
+	EXAC_STAGE                 exac_stage = {EXAC_STAGE0};                   //EN Exacerbation stage
+
+	
+
+
+	event            timeCOPDincidence, COPDincidenceEvent;                  //EN COPD Incidence event 
+	event            timeCOPDexa, COPDexaEvent;                              //EN Exacerbation event 
+	event            timeCOPDexa_exit, COPDexa_exitEvent;                    //EN Exit from exacerbation event    
+	event            timeYearsLivedWithCOPDEvent, YearsLivedWithCOPDEvent;   //EN Time lived with COPD event 
+                                 
+	
+	void             FEV1incidence();                                        // EN The function for calculating FEV1 at incidence
+    void             FEV1_updateEvent();                                     // EN FEV1 updating function 
+
+	void             copd_check();                                           // Check the log Hazard of COPD and log_Hazard_exa                              
+    void             COPD_person_random_variable_FEV1();                     // Provide the random variable for FEV1 baseline ( intercept_1 and intercept_2 )
+
+	double           ComputeXBeta(const double *beta, logical use_base_covar);     // Compute Xbeta for beta/parameter of the form COPD_EQUATION
+	
+	void             COPD_person_random_variable();    
+	hook             COPD_person_random_variable, Start, 50; // 50 = execution number, the higher the value, the later the execution
+	
+	void             PEF_COPD_Stage();  
+	
+	void	         COPDPrevalenceStartCheck();
+	hook	         COPDPrevalenceStartCheck, Start, 52; // 52 = execution number, the higher the value, the later the execution
+//	hook	         COPDPrevalenceStartCheck, BirthdayEvent, 60; // 60 = execution number, the higher the value, the later the execution
+
+	
+	void             output_calibration_COPD();
+//	hook             output_calibration_COPD,  NewYearsEvent, 10; // 10 = execution number, the higher the value, the later the execution 
+	
+	void             COPD_mortality();
+//	hook             COPD_mortality, Start, 54; // 54 = execution number, the higher the value, the later the execution
+	hook             COPD_mortality,COPDexaEvent;  
+//	hook             COPD_mortality, NewYearsEvent;
+
+
+	hook             copd_check,       Start, 56; // 56 = execution number, the higher the value, the later the execution             
+	hook             copd_check,       BirthdayEvent, 62; // 62 = execution number, the higher the value, the later the execution    
+//	hook             FEV1incidence,    BirthdayEvent;                     // EN Updating FEV1 on the Birthday event  
+//	hook             FEV1incidence,    COPDincidenceEvent;                // EN Updating FEV1 on the COPD incidence Event 
+	hook	         FEV1_updateEvent, NewYearsEvent, 12;                 // EN Updating FEV1 on the New Year event 
+
+  
+ 
+
+	hook             PEF_COPD_Stage, Start, 58; // 58 = execution number, the higher the value, the later the execution
+//	hook             PEF_COPD_Stage, FEV1incidence;
+	hook             PEF_COPD_Stage, FEV1_updateEvent;
+
+
+	COPD_AGE_RANGE          copd_age_range  = COERCE(COPD_AGE_RANGE,integer_age);  
+	COPD_YEAR_RANGE         copd_year_range = COERCE(COPD_YEAR_RANGE,calendar_year); 
+
+	REPORT_TIME_WITH_COPD   time_with_copd = {0};	                      // EN Years lived with COPD
+
+};
+//-----------------------------------
+
+void Person::COPD_person_random_variable_FEV1()  // Provide the random variable for FEV1 baseline ( intercept_1 and intercept_2 )
+{    
+	
+	 double mu_intercept_1= 1427.5;      // EN Intercept of FEV1 for baseline FEV1 (Zafar, CMAJ) after Amin's modification 
+     double mu_intercept_2= -154.3;      // EN Intercept of rate of FEV1  (Zafar, CMAJ) 
+     double var_int_1= 0.1006;           // EN Variance of  Intercept of FEV1 for baseline FEV1 (Zafar, CMAJ) G_matrix[1,1] 
+	 double var_int_2= 0.000759;         // EN Variance of  Intercept of rate of FEV1  (Zafar, CMAJ)  G_matrix[2,2] 
+  // double cov_int_12= 0.00087;         // EN Covarient of two intercepts  
+	 double ro_int_12= 0.099563;         // EN correlation coefficient between two intercepts  (ro=Covarient/sqrt(variance1*variance2)
+	
+	
+	 //Baseline FEV1 from Zafar's CMAJ without intercept plus Amin's modification
+      
+	 double            FEV1_base_cmaj;     //EN Baseline FEV1 calculated from Zafar CMAJ, it does not include the intercept 
+	
+	 FEV1_base_cmaj = ComputeXBeta(CopdFev1Base[sex], TRUE) * 0.001;
+
+	 double   z_COPD = FEV1 - FEV1_base_cmaj;     //EN the difference between FEV1_CanCoLD and  FEV1_base_cmaj
+	 
+	 double            intercept_1;        //EN Intercept of FEV1 from Zafar CMAJ    
+	// Conditional Bivariate Normal distribution 
+/*	 intercept_1 = RandNormal(141);
+	 intercept_2 = ro_int_12*intercept_1+sqrt(1-ro_int_12*ro_int_12)*RandNormal(142);
+	 intercept_1 = mu_intercept_1 + sqrt(var_int_1)*intercept_1;
+	 intercept_2 = mu_intercept_2 + sqrt((var_int_2)/(var_int_1))*ro_int_12*(z_COPD-mu_intercept_1)+var_int_2*(1-ro_int_12*ro_int_12)*intercept_2 ;
+*/	
+	 
+	  intercept_1 = mu_intercept_1+sqrt(var_int_1)*RandNormal(161); 	 
+	  intercept_2 = (mu_intercept_2+sqrt(var_int_2/var_int_1)*ro_int_12*(z_COPD-mu_intercept_1)) + var_int_2*(1-(ro_int_12*ro_int_12))*RandNormal(162);
+	
+}
+
+//-----------------------------------
+void Person::COPD_person_random_variable()
+{    
+	
+	
+	{
+   
+	// Random numbers for log hazard of exacerbations from Mohsen's regression on MACRO dataset
+   
+	x_inc_male=0.557*RandNormal(163);
+	x_inc_female =0.3789*RandNormal(164);
+	x_prev_male = 0.6147*RandNormal(165);
+	x_prev_female = 0.4328*RandNormal(166);
+
+
+
+	
+	/* 
+	 double mu_x_exac1= 0.5931;
+	 double mu_x_exac2= 2.61;
+	 double std_x_exac1= 0.06330; 
+	 double std_x_exac2= 0.5706; 
+	 //double cov_exac= -0.02713;
+	 double ro_exac= -0.7511; //-0.02713/(0.06330*0.5706);
+
+	 x_exac1=RandNormal(137);
+	 x_exac2=ro_exac*x_exac1+sqrt(1-ro_exac*ro_exac)*RandNormal(138);
+	 x_exac1=mu_x_exac1+std_x_exac1*x_exac1;
+	 x_exac2=mu_x_exac2+std_x_exac2*x_exac2; */	 
+	   
+	 
+	 //----------------------------------------------------
+	 
+//	 x_exac_stage = sqrt(2.6144)*RandNormal(1089);
+	 x_exac_severity = 1.442*RandNormal(1090);                     // Random number for the severity of exacerbation
+
+	 RAND_TAIL_FEV1_t = std::abs(sqrt(0.1845)*RandNormal(1087)+ 0.827);
+	 x_rate_exacerbation_random_effect= sqrt(0.55)*RandNormal(167);
+	}
+}
+
+double  Person::ComputeXBeta(const double *beta, logical use_base_covar)
+{
+	double this_age, this_mass, this_PY;
+
+	if (use_base_covar)
+	{
+		this_age  = age_base;
+		this_mass = gMass_kg_base;
+		this_PY   = pkyr_base;
+	}
+	else
+	{
+		this_age  = double(integer_age);
+		this_mass = gBMI;
+		this_PY   = PY;
+	}
+
+	return 
+		      beta[COPD_EQ_INTERCEPT      ] 
+		    + beta[COPD_EQ_AGE            ] * this_age
+	    	+ beta[COPD_EQ_AGE_SQ         ] * this_age * this_age
+		    + beta[COPD_EQ_WEIGHT         ] * this_mass
+		    + beta[COPD_EQ_HEIGTH         ] * gHeight_m
+		    + beta[COPD_EQ_HEIGTH_SQ      ] * gHeight_m * gHeight_m
+		    + beta[COPD_EQ_HEIGTH_SQ_AGE  ] * gHeight_m * gHeight_m * this_age
+		    + beta[COPD_EQ_SMOKING_CURRENT] * (smoking_status3 == SMOKING_STATE3_CURRENT)
+		    + beta[COPD_EQ_SMOKING_PY     ] * this_PY
+		    + beta[COPD_EQ_FEV            ] * FEV1_t
+		    + beta[COPD_EQ_DURATION       ] * time_with_copd;
+}
+void Person:: copd_check()
+{	
+  // EN Calculating COPD hazard from Amin's equation- Sep 25th 2017
+						
+		// EN Calculating COPD hazard from Amin's equation- July 26th 2017
+  log_Hazard_copd = (copd_stage == COPD_STAGE0 && integer_age >= 40) ? ComputeXBeta(CopdHazard[sex],FALSE) : -100000;		 
+		  
+  copd_hazard = exp(log_Hazard_copd);
+
+  // EN log of exacerbation hazard from Mohsen (Macro) and gold stages 
+  
+  double            log_exac_hazard;    //EN log of hazard of exacerbation as a function of age and GOLD stages (calibration) 
+  
+  log_exac_hazard =  ( has_copd ==TRUE && sex == MALE )   ? intercept_exac_hazard + 0.04082*0.1*(integer_age) +COPD_exac_hazard[copd_stage]+ x_rate_exacerbation_random_effect: 
+	                 ( has_copd ==TRUE && sex == FEMALE ) ? intercept_exac_hazard + 0.04082*0.1*(integer_age) +COPD_exac_hazard[copd_stage]+ x_rate_exacerbation_random_effect: -10000; 
+  
+  exac_hazard = exp(log_exac_hazard);
+
+  if (copd_stage == COPD_STAGE1 && exac_hazard >= 0.4 && diagnosed_COPD == FALSE) {diagnosed_COPD = TRUE;}  
+  if (copd_stage == COPD_STAGE2 && exac_hazard >= 0.7 && diagnosed_COPD == FALSE) {diagnosed_COPD = TRUE;}  
+  if (copd_stage == COPD_STAGE3 && exac_hazard >= 0.8 && diagnosed_COPD == FALSE) {diagnosed_COPD = TRUE;}  
+  if (copd_stage == COPD_STAGE4 && exac_hazard >= 0.3 && diagnosed_COPD == FALSE) {diagnosed_COPD = TRUE;}   
+} 
+
+TIME  Person::timeYearsLivedWithCOPDEvent()
+{	
+	TIME 	event_time = { TIME_INFINITE };
+
+	if ( has_copd ) 
+	{
+		event_time = WAIT( TIME( 1.0 ));
+
+	}
+	return  event_time; 
+}
+
+
+void  Person::YearsLivedWithCOPDEvent()
+{
+	time_with_copd = (has_copd_incidence == TRUE )? COERCE( REPORT_TIME_WITH_COPD, time_with_copd +1): COERCE( REPORT_TIME_WITH_COPD, calendar_year - calendar_year_start +1) ; 
+} 
+
+
+TIME Person::timeCOPDincidence()
+
+{   
+	if (!pDisease[DM_COPD][ROW_1] || has_copd_incidence == TRUE || has_copd_initially == TRUE || log_Hazard_copd < -100) {
+
+        return TIME_INFINITE; // EN Return Time to infinit if the person already has COPD, incidence should not be considered for this person
+
+    }  else {
+
+            if (copd_hazard > 0.0) {
+
+                return WAIT(-log(RandUniform(1182)) / copd_hazard); // EN Time to get COPD
+
+            } else {
+
+				return TIME_INFINITE;
+
+            }
+	}
+}
+
+
+void Person::COPDincidenceEvent()     
+
+{    
+	if (alive == TRUE) {
+       has_copd_incidence =  TRUE ; 
+	   has_copd = TRUE;
+	   time_copd_incidence = time;                                               // Recording the time of COPD incidence
+	   age_base = age;
+	   gMass_kg_base = gMass_kg ;
+	   pkyr_base = PY;
+	   FEV1incidence();
+	   PEF_COPD_Stage();
+	   copd_instant= TRUE;
+
+	}
+	
+} 
+
+
+
+TIME Person::timeCOPDexa()
+
+{   
+	if   ( has_copd == TRUE && has_exac == FALSE   ) 
+	  {
+		  if ( exac_hazard > 0.0 ) return WAIT(-log(RandUniform(5456))/exac_hazard);   // Time to Have exacerbation
+		  else{ return TIME_INFINITE;}
+	  }
+     else{ return TIME_INFINITE;}
+	
+}
+
+//void hook_COPDexaEvent() {}; //openM wants it but modgen does not like it.  Weird because it is fine with others (e.g. hook_InitializeAlcohol).  Comment out for now.
+
+void Person::COPDexaEvent()
+{    
+	
+	has_exac= TRUE;
+    time_exac= time;
+	exa_contour= exa_contour+1;
+	
+	double slop_adj = CopdExacerbationStage[copd_stage];
+	double p_exac_stage_xbeta = ComputeXBeta(CopdExacerbation[sex],FALSE) + x_exac_severity + slop_adj;
+	//p_exac_stage_xbeta = x_exac_severity+8;
+	double abc= 1.6; //2.25;
+	double po1= 1.091+abc;
+	double po2= 1.902+abc;
+	double po3= 5.208+abc;
+                   
+	double p1_exac_stage=1/(1+exp(-(p_exac_stage_xbeta+po1)));                                             //EN Probability of mild exacerbation
+	double p2_exac_stage=1/(1+exp(-(p_exac_stage_xbeta+po2)))- 1/(1+exp(-(p_exac_stage_xbeta+po1)));       //EN Probability of moderate exacerbation
+	double p3_exac_stage=1/(1+exp(-(p_exac_stage_xbeta+po3)))- 1/(1+exp(-(p_exac_stage_xbeta+po2)));       //EN Probability of severe exacerbation
+	double p4_exac_stage=1-(p3_exac_stage+p2_exac_stage+p1_exac_stage);                                    //EN Probability of very severe exacerbation
+	
+	double            rand_exac;                             //EN Random number to determine the type(severity level) of exacerbation   
+    rand_exac=RandUniform(168);
+	if (rand_exac<p1_exac_stage)                                                                  	   {exac_stage=EXAC_STAGE1; }
+	if (rand_exac>=p1_exac_stage && rand_exac<p2_exac_stage+p1_exac_stage)                             {exac_stage=EXAC_STAGE2; }
+	if (rand_exac>=p2_exac_stage+p1_exac_stage && rand_exac<p3_exac_stage+p2_exac_stage+p1_exac_stage) {exac_stage=EXAC_STAGE3; }
+	if (rand_exac>=(p3_exac_stage+p2_exac_stage+p1_exac_stage))                                        {exac_stage=EXAC_STAGE4; } 
+	
+	//gCost_COPD_exacerbation_test= gCost_COPD_exacerbation_test+ COPD_CostExacerbation[exac_stage];
+	disqualy= disqualy+COPD_Exacerbation_disutility[copd_stage][exac_stage]; // icitte non-decreasing.  Is this what they intended?
+	
+	hook_COPDexaEvent();
+}
+
+
+TIME Person::timeCOPDexa_exit()
+{
+	if   ( has_exac == TRUE )
+	{
+		//return WAIT(0.0136); 
+		return WAIT(0.0274);
+	}
+	else{ return TIME_INFINITE;}
+}
+
+void Person::COPDexa_exitEvent()
+{    
+	has_exac = FALSE;
+	time_exac_exit= time-time_exac;
+	exac_stage = EXAC_STAGE0;
+	COPD_Mortality_probability=0;
+	COPD_mortality_rate=-1000000;
+	
+} 
+
+void	Person::COPDPrevalenceStartCheck()  
+{
+   
+	double	          Initial_COPD_Probability;     //EN probability of having COPD at the begining of the simulation (prevalence) 
+
+	if (pDisease[DM_COPD][ROW_1] &&  integer_age >= 40 &&  calendar_year == calendar_year_start)     
+	{ 
+		     // CanCOLD equation
+			 double    ww = ComputeXBeta(CopdProb[sex],FALSE);		 
+        	 Initial_COPD_Probability = 1/(1+exp(-ww)) ;   
+	}
+	else {Initial_COPD_Probability =0;}
+  
+	double unif = RandUniform(169);
+	if      (unif <= Initial_COPD_Probability ) {
+			   has_copd_initially= TRUE;
+			   has_copd= TRUE;
+	
+			   FEV1 = ComputeXBeta(CopdFev1Prevalence[sex],FALSE) + (sex == FEMALE ? x_prev_female : x_prev_male);
+			   			  
+			   if (alive==TRUE)
+				   
+			   {
+				   FEV1 = max(FEV1, RAND_TAIL_FEV1_t);
+				   FEV1_t = FEV1;
+			   }
+			   else 
+				   FEV1_t = 0;
+           //-------------------------------- 
+			   FEV1_base_prevalence=FEV1;
+			   age_base = integer_age;
+	           gMass_kg_base = gMass_kg;
+			   pkyr_base = PY;
+			   time_copd_incidence = time;
+		       COPD_person_random_variable_FEV1();
+			 
+
+	}
+	
+
+};
+
+
+
+void Person:: FEV1incidence()
+{
+	
+ if (has_copd_incidence == TRUE && time_with_copd == 0)
+ {
+	if (alive == TRUE)
+	{   /* FEV1 regression equation from CANCOLD based on LLN from NHANCES, the last term in the equation in the condition 
+						     that FEV1/FVC is less than LLN of this ratio */
+						  	                            
+			 FEV1 = ComputeXBeta(CopdFev1Incidence[sex], TRUE) + (sex == FEMALE ? x_inc_female : x_inc_male);
+			 FEV1_t = max(FEV1, RAND_TAIL_FEV1_t);
+
+			 COPD_person_random_variable_FEV1();  			
+	};
+ };
+
+
+
+}
+
+void Person::COPD_mortality()   
+{  
+
+	if ( has_exac==TRUE  && has_copd == TRUE )
+	{	 
+	     COPD_mortality_rate = intercept_mortality+ log(1.05)*age + COPD_Mortality[exac_stage] ; 
+		 COPD_Mortality_probability = 1/(1+exp(-1*COPD_mortality_rate));
+	}
+	else 
+		COPD_Mortality_probability = 0;
+  
+    double x_rand_mortality_exa= RandUniform(170);
+
+	if ( x_rand_mortality_exa <= COPD_Mortality_probability )
+	{
+		
+		if (exac_stage == EXAC_STAGE1) {COPD_death_exac1= TRUE;}
+	    if (exac_stage == EXAC_STAGE2) {COPD_death_exac2= TRUE;}
+		if (exac_stage == EXAC_STAGE3) {COPD_death_exac3= TRUE;}
+		if (exac_stage == EXAC_STAGE4) {COPD_death_exac4= TRUE;}
+		
+		COPD_death= TRUE;
+		CheckFinish(MortalityEngine == MORTALITY_ENGINE_DEMOGRAPHY);  //This function call only kill if using MORTALITY_ENGINE_DEMOGRAPHY
+
+	}
+
+}
+
+
+//void hook_FEV1_updateEvent() {};  //openM wants it but modgen does not like it.  Weird because it is fine with others (e.g. hook_InitializeAlcohol).  Comment out for now.
+
+void Person::FEV1_updateEvent()   // Updating the value of FEV1 according to Zafar's equation
+{  
+	
+    if ( has_copd_incidence == TRUE ||  has_copd_initially == TRUE )
+	{
+		//Zafar's cmaj equation
+		
+		if (alive==TRUE )
+		{
+			copd_instant= FALSE;	
+			
+			double  FEV1_slope;                   //EN FEV1 slope calculated from Zafar's CMAJ
+			FEV1_slope = (intercept_2 + ComputeXBeta(CopdFev1Ongoing[sex],TRUE) ) * 0.001;
+
+		    double  fv = FEV1+(FEV1_slope*time_with_copd);
+			FEV1_t = max(fv, RAND_TAIL_FEV1_t);
+		}
+		else 
+			FEV1_t = 0;
+    };
+    hook_FEV1_updateEvent();
+ }
+
+
+void Person::PEF_COPD_Stage() 
+{
+	PEF = ComputeXBeta(CopdPef[sex],FALSE) ;
+	FEV1_PEF = (FEV1_t/PEF)*100;
+
+	if ( (has_copd_incidence == TRUE && alive==TRUE ) || (has_copd_initially== TRUE && alive==TRUE ) )
+	{
+		if (FEV1_PEF >= 80) { copd_stage = COPD_STAGE1; }
+		else if (FEV1_PEF >= 50 && FEV1_PEF < 80) { copd_stage = COPD_STAGE2; }
+		else if (FEV1_PEF >= 30 && FEV1_PEF < 50) { copd_stage = COPD_STAGE3; }
+		else if (FEV1_PEF < 30 && FEV1_PEF != 0 ) { copd_stage = COPD_STAGE4; }
+	};
+	
+	
+	if (has_copd == TRUE && calendar_year ==2015 && (smoking_status3 == SMOKING_STATE3_CURRENT || smoking_status3 == SMOKING_STATE3_FORMER) && PY >= 10 && FEV1_PEF <= 60 && age < 80 ) { clinical_sample_TORCH = TRUE; }
+	if (has_copd == TRUE && calendar_year ==2015 && PY >= 10 && FEV1_PEF <= 70) { clinical_sample_UPLIFT = TRUE; }
+	p_utility=COPD_UtilityGOLD[copd_stage]; 
+
+}
+
+/*
+void Person::output_calibration_COPD()
+{
+ 	
+	char line[1456]; 
+	int ff=0;
+	double n_count=0;
+//---------------------------------------------------------------------------------------------------------------------------------
+	// Exteracting sample similar to TORCH 
+	//if (  clinical_sample_TORCH == TRUE && calendar_year <= 2019 && calendar_year >= 2015 )
+	//if (clinical_sample_TORCH == TRUE )
+    if (n_count <= 100000) {   
+	if (calendar_year >= 2015 && calendar_year <= 2030)
+	{
+		//if ( sex==FEMALE) { 
+			    n_count=n_count+1;
+		    	if ( has_copd == TRUE )  ff=1;
+		    	int ds =(smoking_status3 == SMOKING_STATE3_CURRENT)? 2 : (smoking_status3 == SMOKING_STATE3_FORMER)? 1 : 0;
+		        snprintf(line,1456," %d, %d, %d, %d,  %i, %g, %i \n",  case_id, integer_age, calendar_year-2015, sex, ds, total_packyears_smoked, ff );
+				
+				//snprintf(line,9898,"%d\n", case_id );
+		        WriteDebugLogEntry(line); 
+	     };
+	} 
+} */
+
+
+
+
+void Person::output_calibration_COPD()
+{
+ 	
+//---------------------------------------------------------------------------------------------------------------------------------
+	// Exteracting sample similar to TORCH 
+	//if ( diagnosed_COPD == TRUE && clinical_sample_TORCH == TRUE && calendar_year <= 2019 && calendar_year >= 2015 )
+	if (diagnosed_COPD == TRUE && clinical_sample_UPLIFT == TRUE && calendar_year <= 2020 && calendar_year > 2015  )
+		
+		//if (clinical_sample_TORCH == TRUE )
+	{
+		char line[1456];
+		//if ( alive==TRUE) { 
+			 //   n_count=n_count+1;
+		    	
+		    	int ds =(smoking_status3 == SMOKING_STATE3_CURRENT)? 1 : 0;
+		        snprintf(line,1456," %d, %d, %d, %d,  %d, %0.2f, %0.6f, %0.2f, %0.4f, %i, %i \n",  int(case_id), int(integer_age), int(calendar_year), int(sex), int(ds), double(gHeight_m), double(PY), double(FEV1_PEF), double(FEV1_t), int(time_copd_incidence), int(exa_contour)  );
+				//snprintf(line,9898,"%d\n", case_id );
+		        WriteDebugLogEntry(line); 
+	    // };
+	} 
+} 	
+//---------------------------------------------------------------------------------------------------------------------------------
+
+

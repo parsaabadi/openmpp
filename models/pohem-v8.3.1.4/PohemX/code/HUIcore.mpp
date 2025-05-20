@@ -1,0 +1,742 @@
+//FILE_LABEL (EN) Add-on HUI models
+/* FILE_NOTE(EN) 
+This file includes "Add-on HUI models" for impact of drug use for OA, last visit to OS prior to surgery, and surgeries.
+The "Add-on HUI models" are also "added on" to HUI model since it does not explicitly capture this. The same approach
+has been taken to add on the effects from these models.
+
+Note that the HUI model 1 code (HUImodel1.mpp) and the Add-on code (found in HUIcore.mpp) has been revised to better organize the updating of HUI. 
+For example, the updating of HUI is no longer done inside oa.mpp, but rather in this routine conditional on OA status. The goal is to 
+have code that updates HUI in a module devoted to updating HUI. The status of other parts of the model may influence
+HUI (eg, change in OA status), but HUI is only changed in here. The exception for the moment in a way, is that we 
+HUI model2 is found in a HUImodel2.mpp. HUI model 1 should be removed completely but is left for backward compatibility 
+and testing. 
+
+---------------------------------
+Previous notes by PF regarding development on impact of drug and the likes on HUI
+
+(2) Distribution du type de médicament (en fonction de l'âge, du sexe et de l'état)
+Tirer un nombre au hasard => selon la valeur du nombre et la fonc. cumulative, on obtient le type de médicament
+(3) Durée moyenne d'utilisation du type de médicament (en fonction de l'âge, du sexe et de l'état) => NON
+(4) Distribution des niveaux de douleur possibles selon niveau de HUI
+(5) Réduction de la douleur (proportion en fonction du type de médicament)
+L'effet dure seulement pendant que le médicament est utilisé
+(6) Risque supplémentaire d'effet secondaire (5 types possibles) en fonction du médicament (par rapport au placebo)
+Mais quel est le risque du placebo? => NON
+(7) Diminution du HUI en fonction du type d'effet secondaire
+La diminution due à la dyspepsie et à l'effet générique dure seulement pendant que le médicament est utilisé;
+Cependant, pour le trouble gastro-intestinal, la maladie cardiovasculaire et la "stroke", l'effet dure toute la vie.
+(8) Probabilité de décès en fonction du type d'effet secondaire
+---------------------------------
+*/
+#include "pohem.h"
+
+range HUI_PAIN_NBLEVELS {0,4}; // Number of levels of pain in HUI
+partition	HUI_AGE_GROUP {20, 30, 40, 50, 60, 70, 80}; //EN Partition of age for computation of delta HUI (except for OS visit)
+partition	HUI_AGE_GROUPB {60, 70, 80};				//EN Partition of age for computation of delta HUI for OS visit
+partition   HUI_GROUP {0.85, 0.95};						//EN Partition of HUI for drugs +
+partition	SIDE_AGE_GROUP {60, 70, 80};				//EN Partition of age for computation of side effct of drugs for differnt age groups
+partition   HUI_DISABILITY_GROUP { 0.70 , 0.885 };      //EN HUI group (disability group)
+partition FROM_20_TO_80_BY_10 { 20, 30, 40, 50, 60, 70, 80}; //EN Ten year age groups (20-80) 
+
+
+classification HUI_MODEL_MENU { //EN HUI model menu
+	HUI_MODEL_MENU_1,   //EN HUI model 1
+	HUI_MODEL_MENU_2,   //EN HUI model 2
+	HUI_MODEL_MENU_3    //EN HUI model 3 (recommended)
+};
+
+classification OA_DRUG_CYCLE {	//EN Values of time period for which the same drug can be used for the same OA state	
+	LESS2Y, // < 2 years
+	TWO_5Y, // 2 to 5 years
+	MORE5Y  // > 5 years
+}; 
+classification OA_DRUG_SIDE_EFFECT {// Side effects for type of OA drugs
+	GI,		// Gastro-intestinal
+	CVD,	// Cardio-vascular disease
+	STR,	// Stroke
+	DYSPEPSIA,
+	OTH_GEN
+};
+
+classification OA_DRUG_STATE {	//EN OA state used for drugs only
+		NO_OA,				//EN Does not haveOA
+		OA_AT_DIAGNOSIS,	//EN OA diagnosis
+		OA_OS_VISIT,		//EN OS visit
+		OA_PRIMARY_SURGERY, //EN OA primary surgery
+		OA_REVISION_SURGERY	//EN OA revision surgery
+};
+
+classification OA_DRUG_TYPE {// Type of OA drugs 
+	ACETA,	// Acetaminophen
+	NSAID,	// NSAIDS
+	COXIB,	// COXIB
+	OPIOID	// OPIOID
+};
+parameter_group pgHUI { //EN Health utilities
+	HuiModelPreference,
+	ReportHuiAsAlteredByOsteoArthritis,
+	//pgHuiModel1,
+	pgHuiModel2,
+	pgHuiModel3,
+	pgHuiAddons,
+	HUI_Relative_Variation,
+	HUIAlterationSpecs
+};
+
+parameter_group pgHuiAddons { //EN HUI add-on models for OA (drugs, os visit, surgery) 
+	pgHUI_OS,
+	pgHUI_OA_Surgery,
+	pgHUI_Drug
+};
+parameter_group pgHUI_Drug { //EN HUI Drug model
+Pain,
+PainDist,
+Drug_PainReduction,
+DrugDist,
+DrugSideEffect,
+SideEffect,
+DrugSideEffectMortality
+};
+
+parameter_group pgHUI_OS {		//EN HUI OS visit model
+pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT,
+HUI_at_os_beta_age,
+HUI_at_os_beta_int,
+HUI_at_os_beta_scale,
+HUI_at_os_beta_sex
+};
+
+parameter_group pgHUI_OA_Surgery {		//EN HUI OA surgery model
+HUI_post_surg_beta_baseline,
+HUI_post_surg_beta_age,
+HUI_post_surg_beta_int
+};
+hide( pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT); // not used
+
+
+
+parameters {
+
+	/* NOTE ( HUI_at_os_beta_age, EN )
+	Value of beta for age category used for computation of delta HUI due to 1st or last visit to OS
+	From Jacek's team
+	*/
+	double HUI_at_os_beta_age[HUI_AGE_GROUPB]; // Value of beta for age category used for computation of delta HUI due to 1st or last visit to OS
+
+	/* NOTE ( HUI_at_os_beta_int, EN )
+	Value of intercept used for computation of delta HUI due to 1st or last visit to OS
+	From Jacek's team
+	*/
+	double HUI_at_os_beta_int;  // Value of intercept used for computation of delta HUI due to 1st or last visit to OS
+
+	/* NOTE ( HUI_at_os_beta_scale, EN )
+	Represents the random noise for model of HUI at 1st or last visit to OS. 
+	From Jacek's team
+	*/
+	double HUI_at_os_beta_scale; // Represents the random noise for model of HUI at 1st or last visit to OS	
+
+	/* NOTE ( HUI_at_os_beta_sex, EN )
+	Value of beta for sex used for computation of delta HUI due to 1st or last visit to OS
+	From Jacek's team
+	*/
+	double HUI_at_os_beta_sex[SEX];  // Value of beta for sex used for computation of delta HUI at 1st or last visit to OS	
+
+
+	/* NOTE ( HUI_post_surg_beta_baseline, EN )
+	Value of beta for hui used for computation of delta HUI due to surgery
+	From Jacek's team
+	*/
+	double HUI_post_surg_beta_baseline; // Value of beta for hui used for computation of delta HUI due to surgery
+	/* NOTE (HUI_post_surg_beta_age, EN )
+	Value of beta for age used for computation of delta HUI due to surgery
+	From Jacek's team
+	*/
+	double HUI_post_surg_beta_age; // Value of beta for age used for computation of delta HUI due to surgery
+	/* NOTE ( HUI_post_surg_beta_int, EN )
+	Value of intercept used for computation of delta HUI due to surgery
+	From Jacek's team
+	*/
+	double HUI_post_surg_beta_int; // Value of intercept used for computation of delta HUI due to surgery
+	/* NOTE ( HUI_Relative_Variation, EN )
+	This parameter is used to allow the user include variability (i.e. random noise) in the computation of HUI, 
+	at every update of HUI (age, bmi, OA,post-surgery - not os: os has its own random term, HUI_at_os_beta_scale).
+	It is set to 0.0 and may be modified by the user.  Values different than 0.0 have not been tested.
+	After computation of delta HUI, delta HUI is modified by:
+	delta HUI = delta HUI *(1+ Random Normal*HUI_Relative_Variation).
+	It is this new value of delta HUI that is added to gHUI_rep to give the updated value of gHUI_rep
+	*/
+	double HUI_Relative_Variation; // Relative variation of delta HUI
+
+	double  HUIAlterationSpecs[DEMPORT_STATE][SEX][FROM_30_TO_90_BY_10];  //EN HUIAlterationSpecs
+
+	/* NOTE (pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT,EN)
+	This parameter controls when the pre-OA-surgery model of HUI is applied. ThIS model is meant 
+	to generate a distribution of HUI values more in-line with those observed prior to surgery for OA. 
+	At this time, the history of HUI for this person (based on the NPHS model of change) is suspended
+	until post-surgery.
+	>TRUE applies it at time of last visit to OS priory to surgery.
+	>FALSE applies at first visit to OS.
+	*/
+	//EN Apply new model of HUI at First (FALSE) or Last (TRUE) OS visit.
+	logical pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT; 
+
+	/* NOTE ( PainDist, EN )
+	Distribution of the values of pain for a given maximum value of pain.
+	(from Philippe's analysis on CCHS)
+	*/
+	cumrate PainDist[HUI_PAIN_NBLEVELS][HUI_PAIN_NBLEVELS]; // Distribution of pain by level of pain
+
+	/* NOTE (Drug_PainReduction,EN) 
+	Reduction of pain due to drugs 
+	*/
+	double Drug_PainReduction[OA_DRUG_TYPE]; // Reduction of pain due to drugs 
+	/* NOTE (DrugDist,EN)
+	Probability of taking drugs for OA patients, conditioned on sex, age, OA state, 
+	duration in OA state and by health status (HUI groups).
+	Applied independently for each drug.
+	*/
+	//EN Probability of drug use by OA patients
+	double DrugDist[OA_DRUG_TYPE][SEX][OA_SURV_AGE_GROUP][OA_DRUG_STATE][OA_DRUG_CYCLE][HUI_GROUP]; 
+	/* NOTE (DrugSideEffect,EN) 
+	Relative risk of side effect due to drugs
+	*/
+	double DrugSideEffect[SIDE_AGE_GROUP][OA_DRUG_TYPE][OA_DRUG_SIDE_EFFECT]; // Relative risk of side effect due to drugs
+
+	/* NOTE ( Pain, EN )
+	Values of the coefficient b8 in the computation of HUI (not to be modified)
+	*/
+	double Pain[HUI_PAIN_NBLEVELS]; // Values of the coefficient b8 in the computation of HUI
+	/* NOTE ( SideEffect, EN )
+	Average deterioration of HUI by type of side effect
+	From Jacek's team
+	*/
+	double SideEffect[OA_DRUG_SIDE_EFFECT]; // Average deterioration of HUI by type of side effect
+	double DrugSideEffectMortality[OA_DRUG_SIDE_EFFECT]; //EN Mortality due to drugs
+	
+	//EN Select HUI model 2 by checking the box (uncheck to use HUI model 1 for backwards compatibility)
+
+	int HuiModelPreference[HUI_MODEL_MENU]; //EN Give highest score to HUI model to be reported and give positive scores to HUI models to be run (negative scores not allowed)
+	model_generated HUI_MODEL_MENU mgHuiModelToReport ;
+	logical ReportHuiAsAlteredByOsteoArthritis; //EN Report on HUI as altered by add-ons for OA
+
+};
+
+// Overall HUI state variables for person
+actor Person            // Core Individual
+{
+//	double 	gHUI_rep = ( HUIModel2Chosen ) ? gHUI_model2_person_coerced : gHUI_model1_person_coerced ;
+	double  gHUI_rep_temp    = ReportHuiAsAlteredByOsteoArthritis ? gHUI_coerced_rep : gHUI_model_rep;
+	double 	gHUI_rep         = gHUI_rep_temp * HUIAlterationSpecs[dementia][sex][split(lifespan_age, FROM_30_TO_90_BY_10)];
+
+	double 	gHUI_model_rep   =  ( mgHuiModelToReport == HUI_MODEL_MENU_2 ) ? double(gHUI_model2 )
+							   : double(gHUI_model3) ;
+	double 	gHUI_coerced_rep =  ( mgHuiModelToReport == HUI_MODEL_MENU_2 ) ? double(gHUI_model2_person_coerced )
+							   : double(gHUI_model3_person_coerced) ;
+
+	int  	disability_group = split(gHUI_rep, HUI_DISABILITY_GROUP); //EN Disability group
+
+	//double 	gHUI_model1_person = gHUI_model1 + delta_HUI_Drugs_model1 + delta_HUI_OA_OS_model1 + delta_HUI_OA_surg_model1;	// Add-ons calculated for model 1
+	double 	gHUI_model2_person = gHUI_model2 + delta_HUI_Drugs_model2 + delta_HUI_OA_OS_model2 + delta_HUI_OA_surg_model2;  // Add-ons calculated for model 2
+	double 	gHUI_model3_person = gHUI_model3 + delta_HUI_Drugs_model3 + delta_HUI_OA_OS_model3 + delta_HUI_OA_surg_model3;  // Add-ons calculated for model 3
+
+	//double 	gHUI_model1_person_coerced = CoerceHUI( gHUI_model1_person ); 
+	double 	gHUI_model2_person_coerced = CoerceHUI( gHUI_model2_person );
+	double 	gHUI_model3_person_coerced = CoerceHUI( gHUI_model3_person );
+
+	void    ReadFromStartPopHui();                
+	hook    ReadFromStartPopHui,ReadFromStartPop, 80; // 80 = execution number, the higher the value, the later the execution
+
+	void    ReadFromStartPopHuiComponents();                //move this to the mpp in charge of the HUI components model
+	hook    ReadFromStartPopHuiComponents,ReadFromStartPop, 90; // 90 = execution number, the higher the value, the later the execution //move this to the mpp in charge of the HUI components model
+
+};
+
+
+double CoerceHUI( double dHUI )
+{
+	double dHUI_coerced = ( dHUI > 1.0 ) ? 1.0 : ( dHUI < -0.36 ) ? -0.36 : dHUI ; 
+	return dHUI_coerced;
+};
+
+void hook_ReadFromStartPopHui() {};
+
+void Person::ReadFromStartPopHui() 
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	// Initialize HUI index
+	gHUI_model2 =  (double) record_to_be_read[cDb_HUI]; //keep the 99.999 (if any) for now
+	gHUI_model3 = gHUI_model2; //same deal for model3
+	gHUI = CoerceHUI( gHUI_model2 ); //but coerce initial value for model 1
+
+	hook_ReadFromStartPopHui();
+};
+
+void hook_ReadFromStartPopHuiComponents() {};
+
+void Person::ReadFromStartPopHuiComponents()  //move this to the mpp in charge of the HUI components model
+{
+	// Initialize HUI components and composite HUI: integer values are coerced into appropriate categories for HUI Model 3
+	// AO: disable this code for now, untill the rest of the model is finished
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+
+	/*
+		// HUI components for HUI Model 3 (added in Oct 2013)
+	int	eHUIVis;
+	int	eHUIHer;
+	int	eHUISpe;
+	int	eHUIMob;
+	int	eHUIDex;
+	int	eHUIEmo;
+	int	eHUICog;
+	int	eHUIPad;
+	eHUIVis =   int(record_to_be_read[cDb_HUI_Vis]);
+	eHUIHer =   int(record_to_be_read[cDb_HUI_Her]);
+	eHUISpe =   int(record_to_be_read[cDb_HUI_Spe]);
+	eHUIMob =   int(record_to_be_read[cDb_HUI_Mob]);
+	eHUIDex =   int(record_to_be_read[cDb_HUI_Dex]);
+	eHUIEmo =   int(record_to_be_read[cDb_HUI_Emo]);
+	eHUICog =   int(record_to_be_read[cDb_HUI_Cog]);
+	eHUIPad =   int(record_to_be_read[cDb_HUI_Pad]);
+
+	huiVis = IntTo_HUI_VIS_LEVEL(CoerceHuiVis(eHUIVis));
+	huiHer = IntTo_HUI_HER_LEVEL(CoerceHuiHer(eHUIHer));
+	huiSpe = IntTo_HUI_SPE_LEVEL(CoerceHuiSpe(eHUISpe));
+	huiMob = IntTo_HUI_MOB_LEVEL(CoerceHuiMob(eHUIMob));
+	huiDex = IntTo_HUI_DEX_LEVEL(CoerceHuiDex(eHUIDex));
+	huiEmo = IntTo_HUI_EMO_LEVEL(CoerceHuiEmo(eHUIEmo));
+	huiCog = IntTo_HUI_COG_LEVEL(CoerceHuiCog(eHUICog));
+	huiPad = IntTo_HUI_PAD_LEVEL(CoerceHuiPad(eHUIPad));
+	huiCompAggr = AggregateComponents();
+	*/
+
+	hook_ReadFromStartPopHuiComponents();
+};
+
+
+// --------------------------------------------------
+// HUI ADD-ON MODELS related to OA 
+// --------------------------------------------------
+
+actor Person            // Core Individual
+{
+	
+	//double gBMI4HUI = BmiSourceIsPhac ? gBMI_PHAC :  gBMI;
+	double gBMI4HUI =  gBMI_PHAC ;
+
+	// -----------------------------------------
+	// delta HUI state variables for add-on models (for model 1 and 2)
+	// -----------------------------------------
+	double	delta_HUI_Drugs_model1={0.0};	// delta HUI due to consumption of drugs 
+	double	delta_HUI_OA_OS_model1={0.0};
+	double	delta_HUI_OA_surg_model1={0.0};
+
+	double	delta_HUI_Drugs_model2={0.0};	// delta HUI due to consumption of drugs 
+	double	delta_HUI_OA_OS_model2={0.0};  // delta HUI at OS visit prior to surgery (new HUI)
+	double	delta_HUI_OA_surg_model2={0.0}; // delta HUI after surgery for OA (relative to the HUI of the population)
+
+	double	delta_HUI_Drugs_model3={0.0};	// delta HUI due to consumption of drugs 
+	double	delta_HUI_OA_OS_model3={0.0};  // delta HUI at OS visit prior to surgery (new HUI)
+	double	delta_HUI_OA_surg_model3={0.0}; // delta HUI after surgery for OA (relative to the HUI of the population)
+
+	// -----------------------------------------
+	// state variables related to DRUGS for OA
+	// -----------------------------------------
+	logical side_effect[OA_DRUG_SIDE_EFFECT]; // for each possible side effect, TRUE if side effect is present
+
+	OA_DRUG_CYCLE Drug_cycle;		// Value of cycle (< 2 yrs, 2-5 yrs, > 5 yrs) to use appropriate entry of DrugDist
+	OA_DRUG_STATE Drug_state =	( OA_Event_State == OA_None )				? NO_OA 
+								: ( OA_Event_State == OA_Diagnosis )		? OA_AT_DIAGNOSIS
+								: ( OA_Event_State == OA_Primary_Surgery )	? OA_PRIMARY_SURGERY
+								: ( OA_Event_State == OA_Revision_Surgery )	? OA_REVISION_SURGERY
+								: OA_OS_VISIT;	//EN OA states for drug usage
+
+
+	// Drug events and event variables
+	void	HUIDrugsAgeCheck();
+	hook    HUIDrugsAgeCheck, BirthdayEvent, 0; // 0 = execution number, the higher the value, the later the execution
+
+	OA_PREVALENCE_STATES	oa_state_before_update_drugs;
+	event	timeUpdateDrugs_OAstate, UpdateDrugs_OAstate;  
+	
+	TIME	Drug_time ={TIME_INFINITE};				// time after which a new reading of drug distribution must be done 
+	TIME	Drug_time2={TIME_INFINITE};				// time after which a new reading of drug distribution must be done 
+	TIME	Drug_time5={TIME_INFINITE};				// time after which a new reading of drug distribution must be done 
+	event	timeOADrug2years,  OADrug2years;  
+	event	timeOADrug5years,  OADrug5years;  
+	event   timeUpdateHUIDueToDrugs, UpdateHUIDueToDrugs;
+
+	double	DeltaHUIDrugs( double dHUI_value_person, double delta_hui_drugs_before ); // function that calculates the delta HUI 
+
+
+//	int drug_hui_age_group = split( truncated_age, HUI_AGE_GROUP);
+//	int comp_drugtaken={0};	// this were probably created for "debugging" as globabl variables
+//	int comp_side_effect={0}; // this were probably created for "debugging" as globabl variables
+	
+	// ---- end drug variables -----------------
+
+
+	// -----------------------------------------
+	// state variables for add-on models of HUI related to OA surgery
+	// -----------------------------------------
+
+	double update_hui_at_oa_presurgery_time = {0.0};
+	double update_hui_at_oa_postsurgery_time = {0.0};
+
+	event	timeUpdateHUI_OAPreSurgery_AddOn, UpdateHUI_OAPreSurgery_AddOn;  
+	event	timeUpdateHUI_OAPostSurgery_AddOn, UpdateHUI_OAPostSurgery_AddOn;  
+
+	// ------end oa surgery variables----------------
+
+};
+
+
+// Changes to OA prevalence event state triggers an update of HUI 
+// (updates HUI at oa onset, at each os visit, at each primary and at each revision surgery)
+TIME Person::timeUpdateDrugs_OAstate()
+{
+	TIME	event_time = {TIME_INFINITE};
+
+    if ( OA_prevalence_state != oa_state_before_update_drugs ) 
+	{
+		event_time = WAIT( 0 ); 
+	}
+	return event_time;
+};
+
+void hook_UpdateDrugs_OAstate() {};
+
+void Person::UpdateDrugs_OAstate()
+{
+	oa_state_before_update_drugs = OA_prevalence_state;
+
+	// --------------------------------------------------
+	// Revaluate impact of drug use on HUI given OA state has changed
+	// --------------------------------------------------
+	Drug_time=0.0;         // triggers use of drugs
+	Drug_time2=2.0; 
+	Drug_time5=5.0;
+	Drug_cycle=LESS2Y; 
+
+	hook_UpdateDrugs_OAstate();
+};
+
+void hook_HUIDrugsAgeCheck() {};
+
+void Person::HUIDrugsAgeCheck()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	/* This is done annually  */
+	int Hui_age = SPLIT( truncated_age, HUI_AGE_GROUP);			// Partition of age used for the computation of HUI at each birthday, when age group has changed 
+	int Hui_age_prev = SPLIT( truncated_age-1, HUI_AGE_GROUP);	// Partition of age at previous birthday 
+
+	// Update drug usage for OA patients (new or prevalent in start year) whenever age group changes
+	if ( IndexOA_event ) 
+	{
+		if (Hui_age !=Hui_age_prev) 
+		{
+			// We update drug use based on new age group, but leave duration in OA states as last set (ie <2yrs, 2-5yrs, 5+yrs)
+			Drug_time=0.0;		
+			// Drug_time2=2.0; // ** do not reset time in OA state **
+			// Drug_time5=5.0; // ** do not reset time in OA state **
+		};
+	};
+
+	hook_HUIDrugsAgeCheck();
+};
+
+TIME Person::timeUpdateHUIDueToDrugs()
+{
+	return WAIT(Drug_time);
+};
+
+void hook_UpdateHUIDueToDrugs() {};
+
+void Person::UpdateHUIDueToDrugs()
+{
+	// Control reimplementation of this Event
+	Drug_time=TIME_INFINITE; 
+
+	//delta_HUI_Drugs_model1 = DeltaHUIDrugs( gHUI_model1_person_coerced, delta_HUI_Drugs_model1  );
+	delta_HUI_Drugs_model2 = DeltaHUIDrugs( gHUI_model2_person_coerced, delta_HUI_Drugs_model2  );
+	delta_HUI_Drugs_model3 = DeltaHUIDrugs( gHUI_model3_person_coerced, delta_HUI_Drugs_model3  );
+
+	hook_UpdateHUIDueToDrugs();
+}
+
+double Person::DeltaHUIDrugs( double dHUI_value_person, double delta_hui_drugs_before )
+{
+	// Local variables
+	double delta_HUI_Drugs={0.0};	// delta HUI drugs calculated and returned from this function 
+	double HUI_deterioration={0.0};	// deterioration of HUI due to side effect of drugs
+	double HUI_gain={0.0};			// gain in HUI due to side effect of drugs
+	double dHUI_value;				// HUI value with previous impact of drugs removed
+
+	int Drug_age=SPLIT( truncated_age, OA_SURV_AGE_GROUP);		// Partition of age used from drug distribution 
+	int Side_age=SPLIT( truncated_age, SIDE_AGE_GROUP);			// Partition of age used for the computation of side efffct of drugs
+	int HUI_drug;					// Partition of hui used from drug distribution 
+	int Pain_Nb_Levels={0};			// Most likely number of possible levels of pain according to actual value of HUI
+	int Pain_Actual_Level={0};		// Most likely level of pain according to actual value of HUI and possible number of levels
+	double dTmp={0};
+
+	//--------------------------------------------------
+	// Recover the underlying HUI of person, needed to get the underlying pain level to recompute a new pain level and new HUI
+	// Remove the previous impact of drugs in order to recalculate relative to the "baseline" HUI
+	//--------------------------------------------------
+	dHUI_value = dHUI_value_person - delta_hui_drugs_before;				
+	HUI_drug= SPLIT( dHUI_value, HUI_GROUP );				// Partition of hui used from drug distribution 
+	
+	// ----------------------
+	// Computing level of pain
+	// ----------------------
+	for ( int nPain=0; nPain<SIZE(HUI_PAIN_NBLEVELS); nPain++ ) 
+	{
+		dTmp= (dHUI_value+0.371) / (1.371*Pain[nPain]);
+		if (dTmp <= 1.0) 
+		{
+			Pain_Nb_Levels+= 1;
+		};
+	};
+	// Knowing the Nb of potential levels of pain (given the value of HUI), we assign an actual level of pain
+	if ( Pain_Nb_Levels!=0)
+	{
+		Lookup_PainDist(RandUniform(26), Pain_Nb_Levels-1, &Pain_Actual_Level);
+	}
+
+
+	// --------------------------------------------------
+	// Compute benefits of drugs on HUI, conditional on Actual level of pain and determine if there are side-effects
+	// --------------------------------------------------
+	// Initialize side-effect array
+	for ( int nSideEffect=0; nSideEffect<SIZE(OA_DRUG_SIDE_EFFECT); nSideEffect++ ) 
+	{
+		side_effect[nSideEffect]=FALSE;
+	}
+	// Series of tests for each drug
+	for ( int nOA_drug=0; nOA_drug<SIZE(OA_DRUG_TYPE); nOA_drug++ ) 
+	{
+		// determine if drug(i) is taken
+		if (RandUniform(25) < DrugDist[nOA_drug][sex][Drug_age][Drug_state][Drug_cycle][HUI_drug]) 
+		{ 
+//			comp_drugtaken = comp_drugtaken + int( pow(2,nOA_drug) );  // a way to identify which combination of drugs were taken in a single sequence of numbers
+
+			// compute gain only if for this drug, we are in the case when there is a reduction in pain		
+			// Since we are in a for loop, it means that this statement may be executed up to 4 times (one for each medication); 
+
+			if ( HUI_gain==0.0 ) // Only need to calculate gain from drug once, since it does not vary by type of drug
+			{
+				if (RandUniform(27) <= Drug_PainReduction[nOA_drug]) 
+				{ 
+					HUI_gain=(dHUI_value+0.371)*(1-Pain[Pain_Actual_Level])/Pain[Pain_Actual_Level]; // formula for improvement of HUI when pain is replaced (from its actual level) to level 1
+				};
+			};
+
+			// Side effects of drug(i) being taken
+			// Since we are in a for loop, it means that these statements may be executed up to 4 times (one for each medication)
+			for ( int nSideEffect=0; nSideEffect<SIZE(OA_DRUG_SIDE_EFFECT); nSideEffect++ ) 
+			{
+				if (RandUniform(30) <=DrugSideEffect[Side_age][nOA_drug][nSideEffect]/1000) 		
+				{
+					side_effect[nSideEffect]=TRUE;		
+				};
+			};
+		};
+	};
+
+	// --------------------------------------------------
+	// Compute reduction of HUI due to side-effects of drugs
+	// --------------------------------------------------
+	// The 4 drugs are analysed: let us compute the global impact
+	for ( int nSideEffect=0; nSideEffect<SIZE(OA_DRUG_SIDE_EFFECT); nSideEffect++ ) 
+	{
+		if (side_effect[nSideEffect]) 
+		{
+			HUI_deterioration = HUI_deterioration + SideEffect[nSideEffect];
+//			comp_side_effect = comp_side_effect + int( pow(2,nSideEffect) ); // creates a drug-combination signature for "debugging"
+
+			if ( RandUniform(124) <= DrugSideEffectMortality[nSideEffect] ) 	
+			{
+//				drug_cause_of_death = ( OA_DRUG_SIDE_EFFECT ) nSideEffect;
+				cause_of_death = SIDE_EFFECT_OF_DRUGS_FOR_OA;
+				CheckFinish(MortalityEngine == MORTALITY_ENGINE_DEMOGRAPHY);
+			};
+		};
+	};
+
+	// --------------------------------------------------
+	// Compute the net impact on HUI due to pain reduction and side-effects of drugs, to be applied to the global HUI variable for the person
+	// --------------------------------------------------
+	// HUI_gain has the same value for the 4 drugs: we add it once
+	// deterioration depends only on the side effects (each counted only once)
+	// --------------------------------------------------
+	delta_HUI_Drugs = HUI_gain - HUI_deterioration; 
+
+	return delta_HUI_Drugs;
+};
+
+
+TIME Person::timeOADrug2years()
+{
+	TIME	event_time = {TIME_INFINITE};
+
+	// Need to make this time event sensitive to changes in OA_prevalence_state (and Drug_state might be redundant but no harm)
+	// because relying on Drug_time2 is not enough: if the value of Drug_time2 is currently 2 and is "reset" to 2 after the change to OA state
+	// this event would not re-implement the waiting time when OA status changes; so we force it with the "if condition"
+
+	if ( Drug_state!=NO_OA  && OA_prevalence_state!=OAP_None) // done by Behnam 
+	{
+		event_time = WAIT(Drug_time2);
+	}
+	return event_time;
+};
+
+void hook_OADrug2years() {};
+
+void Person::OADrug2years()
+{
+	Drug_time=0.0;
+	Drug_time2=TIME_INFINITE;
+	Drug_cycle=TWO_5Y; 
+
+	hook_OADrug2years();
+};
+TIME Person::timeOADrug5years()
+{
+	TIME	event_time = {TIME_INFINITE};
+
+	// Need to make this time event sensitive to changes in OA_prevalence_state (and Drug_state might be redundant but no harm)
+	// because relying on Drug_time5 is not enough: if the value of Drug_time5 is currently 5 and is "reset" to 5 after the change to OA state
+	// this event would not re-implement the waiting time when OA status changes; so we force it with the "if condition"
+
+	if ( Drug_state!=NO_OA  && OA_prevalence_state!=OAP_None) // done by Behnam 
+	{
+		event_time = WAIT(Drug_time5);
+	}
+	return event_time;
+};
+
+void hook_OADrug5years() {};
+
+void Person::OADrug5years()
+{
+	Drug_time=0.0;
+	Drug_time5=TIME_INFINITE;
+	Drug_cycle=MORE5Y; 
+
+	hook_OADrug5years();
+};
+
+
+// --------------------------------------------------------------
+// HUI ADD-ON MODEL related to OA pre-surgery (first primary)
+// --------------------------------------------------------------
+// Forced discontinuity in HUI based on proximity to primary surgery
+// because HUI model 1 did not lead to average HUI that were
+// plausible with pre-surgery HUI (estimated from BC data)
+// --------------------------------------------------------------
+
+TIME Person::timeUpdateHUI_OAPreSurgery_AddOn()
+{
+	TIME	event_time = {TIME_INFINITE};
+
+	if (( OA_Number_Visits_to_OS==1		 && !pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT) ||		// First Visit or
+		( LastOSVisit_before_FirstSurgery && pAPPLY_NEW_HUI_MODEL_AT_LAST_OS_VISIT) )		// Last visit
+	{
+		event_time = WAIT( update_hui_at_oa_presurgery_time ); 
+	}
+	return event_time;
+};
+
+void hook_UpdateHUI_OAPreSurgery_AddOn() {};
+
+void Person::UpdateHUI_OAPreSurgery_AddOn()
+{
+	// Control re-implementation of this event
+	update_hui_at_oa_presurgery_time = TIME_INFINITE;
+
+	// local variables
+	int		nAgeGroup = SPLIT( truncated_age, HUI_AGE_GROUPB );
+	double	dnewHUIvalue = {0.0};
+
+	// Create a delta HUI relative to global HUI as a matter of consistency of appraoch
+	dnewHUIvalue = HUI_at_os_beta_int + HUI_at_os_beta_sex[sex] + HUI_at_os_beta_age[nAgeGroup] + ( RandNormal(70) * HUI_at_os_beta_scale );
+
+	// Calculate delta HUI for OA model 1 (for backwards compatibility)
+//	delta_HUI_OA_OS_model1 = dnewHUIvalue - gHUI_model1_person_coerced;
+
+	// Calculate delta HUI for OA model 2
+	delta_HUI_OA_OS_model2 = dnewHUIvalue - gHUI_model2_person_coerced;  
+
+	// Calculate delta HUI for OA model 3
+	delta_HUI_OA_OS_model3 = dnewHUIvalue - gHUI_model3_person_coerced;  
+
+	hook_UpdateHUI_OAPreSurgery_AddOn();
+}
+
+// --------------------------------------------------------------
+// HUI ADD-ON MODEL related to OA post-surgery (first primary)
+// --------------------------------------------------------------
+// Update HUI after (at time of) primary surgery for OA
+// The delta HUI is being calculated relative to the
+// HUI of the general population of the same age
+// --------------------------------------------------------------
+
+TIME Person::timeUpdateHUI_OAPostSurgery_AddOn()
+{
+	TIME	event_time = {TIME_INFINITE};
+
+if ( OA_Event_State == OA_Primary_Surgery )
+	{
+		event_time = WAIT( update_hui_at_oa_postsurgery_time ); 
+	}
+	return event_time;
+};
+
+void hook_UpdateHUI_OAPostSurgery_AddOn() {};
+
+void Person::UpdateHUI_OAPostSurgery_AddOn()
+{
+	// Control re-implementation of this event
+	update_hui_at_oa_postsurgery_time = TIME_INFINITE;
+
+	double z =  RandNormal(1) ;
+
+
+	// Calculate delta HUI for OA model 1 (for backwards compatibility)
+	//delta_HUI_OA_surg_model1 = HUI_post_surg_beta_int + ( truncated_age * HUI_post_surg_beta_age) 
+		//			+ ( gHUI_model1_person_coerced * HUI_post_surg_beta_baseline ) * (1 + z*HUI_Relative_Variation);
+
+	// Calculate delta HUI for OA model 2
+	delta_HUI_OA_surg_model2 = HUI_post_surg_beta_int + ( truncated_age * HUI_post_surg_beta_age) 
+					+ ( gHUI_model2_person_coerced * HUI_post_surg_beta_baseline ) * (1 + z*HUI_Relative_Variation);
+		
+	// Calculate delta HUI for OA model 3
+	delta_HUI_OA_surg_model3 = HUI_post_surg_beta_int + ( truncated_age * HUI_post_surg_beta_age) 
+					+ ( gHUI_model3_person_coerced * HUI_post_surg_beta_baseline ) * (1 + z*HUI_Relative_Variation);
+
+	hook_UpdateHUI_OAPostSurgery_AddOn();
+}
+// --------------------------------------------------
+// End of ADD-ON models for OA
+// --------------------------------------------------
+
+void PreSimulation()
+{
+	int max_score=-1;
+	mgHuiModelToReport=HUI_MODEL_MENU_1;
+	for(int nModel = 0; nModel<SIZE(HUI_MODEL_MENU); nModel++)
+	{
+		if(HuiModelPreference[nModel]>max_score)
+		{
+			mgHuiModelToReport=(HUI_MODEL_MENU)nModel;
+			max_score=HuiModelPreference[nModel];
+		}
+	}
+}

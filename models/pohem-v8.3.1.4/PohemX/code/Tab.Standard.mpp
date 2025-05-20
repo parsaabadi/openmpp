@@ -1,0 +1,565 @@
+//FILE_LABEL (EN) Standard output Tables
+/* FILE_NOTE(EN) 
+	 Standard output Tables
+*/
+// abbreviated version
+partition AGE_GROUP5	{ 18, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80 };
+partition AGE_GROUP18_5	{ 18, 19, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90 };
+partition AGE_GROUP20_5	{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100 };
+partition AGE_GROUP18	{ 18, 19, 30, 40, 50, 60, 70, 80 };
+partition AGE_GROUP3080 { 30, 40, 50, 60, 70, 80 };
+partition AGE_GROUP4565 { 45, 65 };
+
+partition AMI_10YR_RISK_GROUPS_rep { 0.05, 0.10, 0.15, 0.20, 0.25, 0.30 };	// Partition of 10-year predicted risk of AMI
+partition TC_HDL_RATIO_GROUPS { 4, 5, 6, 7 };
+
+partition YEARGROUP {2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+					 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 
+					 2023, 2024, 2025, 2026, 2027};
+
+table_group tgPopulationTables { //EN Population Tables
+	tPopulation,
+	tPopulation_Province,
+	tPopulation_Start,
+	tPopulation_Start_Lean,
+	tPop_Start,
+	tPop_Count,
+	tPopulation_Source
+};
+// Life_Expectancy,
+//	Average_per_year,
+
+table_group tgDiseaseTables { //EN Health Outcomes and costs
+	tHealth_Outcomes_CrossSectional,
+	tHealth_Outcomes_Longitudinal,
+	tCohort_LifeLong,
+	tCVDPoRTAMI,
+	tCVDPoRTAMI5yr,
+	tCVDPoRTStroke,
+	tCVDPoRTStroke5yr,
+	tDementia,
+	tgDementiaTableVariants,
+	tDementia_Costs,
+	tgDementiaCostsTableVariants,
+	tDementia_Mortality,
+	tgDiabetes,
+	OA_All_Tables,
+	tHUI_allyears,
+	tHUI_startage,
+	tHUI_age_5year
+};
+
+table Person tChanges 
+[in_tabulation_scope]
+{
+	population_source+
+		*
+	{
+		changes(sex), 
+		changes(gBMI_PHAC), 
+		changes(gHUI_rep), 
+		changes(gEthnicityNonWhite), 
+		changes(gImmigrantEver), 
+		changes(gEducation), 
+		changes(gRegion), 
+		changes(gIncomeQuartile), 
+		changes(smoking_status), 
+		changes(smoking_status3),
+		changes(smoking_cancer_dynamic), 
+		changes(gAlcohol5), 
+		changes(gLTPA_cat), 
+		changes(gOA), 
+		changes(gDiabetes_DPoRT), 
+		changes(gDiabetes_PA),
+		changes(gCancer),
+		changes(gHeartDisease_PA),
+		changes(gBP_PA),
+		duration()
+	}
+	*sex+
+};
+// Pop output Tables- DH created table to compare POHEM startpop to CANSIM pop in 2001,
+
+
+table Person tPop_Count //EN Population by sex, age, province and year
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	{
+		entrances(alive,FALSE),                 //EN Deaths
+		entrances(alive,FALSE)/duration(),		//EN Death hazard rate  decimals=5
+		nz_delta(duration()),					//EN Population Count
+		duration()								//EN Person-years decimals=1
+	}
+	* gProvince+								//EN Province
+	* sex+										//EN Sex
+	* report_calendar_year						//EN Year
+	* split( lifespan_age, AGE_GROUP20_5)+		//EN Age group
+};
+
+
+
+table Person tPopulation //EN Population by sex, age and year
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	{
+		nz_delta(duration()),					//EN Population count
+		duration()								//EN Person-years decimals=1
+	}
+	* sex+										//EN Sex
+	* report_calendar_year						//EN Year
+	* truncated_age+							//EN Age
+};
+
+
+table Person tPopulation_Province //EN Population by province and year
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	place_of_birth + 							//EN Place of birth
+	* 
+	sex +										//EN Sex		
+	*
+	{
+		nz_delta(duration()),					//EN Population Count
+		duration()								//EN Person-years decimals=1
+	}
+	* gProvince +								//EN Province
+	* report_calendar_year						//EN Year
+};
+
+
+table Person tPopulation_Start_Lean //EN Population by population source, sex, birthplace
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	
+	population_source+							//EN Population source
+	*				
+	{
+		nz_delta(duration())					//EN Population count
+	}
+	* 
+	sex+										//EN Sex
+	*
+	place_of_birth+								//EN Place of birth
+};
+
+table Person tPopulation_Source //EN Population source table
+[in_tabulation_scope && WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals]
+{
+	population_source + * //EN Population Source
+	{
+		nz_delta(duration()),					//EN Population Count
+		duration()								//EN Person-years decimals=1
+	}
+	*sex +										//EN Sex
+	*report_calendar_year						//EN Year
+	*split(lifespan_age_start, AGE_GROUP18_5) +  //EN Age group
+};
+
+table Person tPopulation_Start //EN Population by year created and age created
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	place_of_birth+*								//EN Place of birth
+	gProvince+*										//EN Province
+	{
+		nz_delta(duration())						//EN Population count
+	}
+	* sex+											//EN Sex
+	* split( lifespan_age_start, AGE_GROUP18_5)+	//EN Age at startup
+	* split( calendar_year_start, YEARGROUP )		//EN Year at startup
+};
+
+// DH created tPop_Start to compare POHEM startpop to CANSIM pop in 2001.  It used to live in Tab.Pop.mpp which was not visible in the POHEM solution
+table Person tPop_Start //EN Population by sex, age and year
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && calendar_year <= pMaxYearNewArrivals ]
+{
+	{
+		nz_delta(duration()),						//EN Population count
+		duration()									//EN Person-years decimals=1
+	}
+	* sex+											//EN Sex
+	* report_calendar_year							//EN Year
+	* split( lifespan_age_start, AGE_GROUP18_5)+	//EN Age group
+};
+
+table Person tHUI_startage		//EN HUI by sex and age in start year only
+[in_tabulation_scope && calendar_year_start==pStartYear]
+{
+	sex+										//EN Sex
+	*
+	lifespan_age_start+							//EN Age at start
+	*
+	{
+		weighted_duration(gHUI_rep)/duration()	//EN Average HUI decimals=2
+	}
+};
+table Person tHUI_allyears		//EN HUI by sex and current age, all years
+[in_tabulation_scope]
+{
+	sex+										//EN Sex
+	*
+	lifespan_age+								//EN Age at start
+	*
+	{
+		weighted_duration(gHUI_rep)/duration()	//EN Average HUI decimals=2
+	}
+};
+table Person tHUI_age_5year //EN HUI by sex and 5 year age group by year
+[in_tabulation_scope] {
+
+  sex + //EN Sex
+
+  * split(lifespan_age, AGE_GROUP_20_TO_90_BY_5) + //EN Age group
+
+  * report_calendar_year + //EN Year
+
+  * { 
+    weighted_duration(gHUI_rep) / duration() //EN Average HUI decimals=2 
+  }
+};
+
+
+// BEGIN  Few big tables
+
+partition FROM_2002_TO_2022_BY_10  {2002, 2012, 2022};
+partition FROM_30_TO_90_BY_10_PLUS_21  {21, 30, 40, 50, 60, 70, 80, 90 }; //EN Age group
+
+/*NOTE(tCohort_LifeLong, EN)
+This table provides lifelong statistics for various cohorts like, for instance, actors who were created at age 40-49 in years 2012-2021 (those would be people who immigrate in Canada in 2012-2021 at age 40-49).
+
+Notes
+1. Calendar year at start = [min,2002[ corresponds to 2001 and hence provide life long statistics for those who were Canadian residents age 20+ in 2001.
+2. Initial age =[min,21[ corresponds to age 20.  If Calendar year at start is not [min,2002[  (e.g. [2012,2022[ ), the Initial age =[min,21[ corresponds to so-called new births (Canadian residents turning 20 after 2001).
+3. It is a good idea to check if Deterministic deaths (max year reached) is 0 or not.  If not zero, it means that the simulation of some persons were interupted because calendar year reached the value of the input parameter "Year simulation ends".  You may want to set it to a higher value.
+
+
+*/
+
+table Person tCohort_LifeLong [in_tabulation_scope &&  alive ] //EN Various cohorts lifelong statistics
+
+{
+	sex +													//EN Sex
+	*
+	split(calendar_year_start, FROM_2002_TO_2022_BY_10) +  //EN Calendar year at start
+	*
+	split(gBMI_start, BMI4CAT) +							//EN Initial BMI category
+	*
+	{
+		nz_delta(duration()),		                        //EN Nb persons 
+		duration(),								            //EN PY (person-years)
+		duration() / nz_delta(duration()),		            //EN Residual LE (life expectancy)                      decimals=2
+		weighted_duration(gHUI_rep),			        	//EN HAPY (health adjusted person-years)    
+		weighted_duration(gHUI_rep) / nz_delta(duration()), //EN Residual HALE (health adjusted life expectancy)    decimals=2
+		weighted_duration(gHUI_rep) / duration(),	        //EN Average HUI (HAPY / PY)                            decimals=4
+		duration(disability_group, 0) ,	                    //EN Disability PY: severe   
+		duration(disability_group, 1) ,	                    //EN Disability PY: moderate   
+		duration(disability_group, 2) ,	                    //EN Disability PY: none or mild   
+		entrances(gBP_PA                  , HIGH_BP_YES       ) , //EN Incidence: Hypertension   
+		entrances(gDiabetes_PA            , DIAB_YES          ) , //EN Incidence: Diabetes PA     
+		entrances(gDiabetes_DPoRT         , DIAB_YES          ) , //EN Incidence: Diabetes DPoRT  
+		entrances(gHeartDisease_PA        , HEART_DISEASE_YES ) , //EN Incidence: Heart Disease PA   
+		entrances(gCancer                 , CANCER_YES        ) , //EN Incidence: Cancer         
+		entrances(alive                      , FALSE), //EN Deaths (deterministic deaths included)
+		entrances(alive_deterministic_MaxYear, FALSE)  //EN Deterministic deaths (max year reached) 
+		
+	}
+	*
+	split(lifespan_age_start,FROM_30_TO_90_BY_10_PLUS_21) +	//EN Initial age
+
+};
+
+
+    	
+/*NOTE(tRisk_Factors_CrossSectional, EN)
+This table provides the distribution (and mean for age and BMI) of various risk factors.
+These are cross-sectional snapshots so that the age dimension reflect current age (in 2012 for instance).
+
+Alcohol categories: Light is less than 2 drinks per week, Moderate is 2-9 and 2-14 drinks per week for females and males respectively, Heavy is more than 9 and 14 drinks per week for females and males respectively.
+		
+*/
+
+table Person tRisk_Factors_CrossSectional [in_tabulation_scope && alive && report_calendar_year == calendar_year ] //EN Risk factors per year, sex, BMI and age group  (cross-sectional view)
+{
+	sex +												//EN Sex
+	*split(lifespan_age,AGE_GROUP_RF20_79) +			//EN Age
+	*split(gBMI_PHAC, BMI4CAT) +						//EN BMI category
+	*
+	{
+		duration(),										//EN Person-years (denominator of all others)
+
+		weighted_duration(lifespan_age) / duration(),          //EN Average integer age                decimals=2
+
+		// BEGIN inspired by tMeasuredSrAdultBMI
+		duration(bmi_PHAC, BMI_CAT_1) / duration()   ,	              //EN Self-reported BMI: Underweight <18.5        decimals=4
+		duration(bmi_PHAC, BMI_CAT_2) / duration()   ,	              //EN Self-reported BMI: Normal weight [18.5,25)  decimals=4
+		duration(bmi_PHAC, BMI_CAT_3) / duration()   ,	              //EN Self-reported BMI: Overweight 25 to <30       decimals=4
+		duration(bmi_PHAC, BMI_CAT_4) / duration()	 ,                //EN Self-reported BMI: Obese >=30               decimals=4 
+		weighted_duration(gBMI_PHAC)  / duration()   ,                //EN Self-reported BMI: Average                  decimals=2 
+
+
+		duration(bmi4cat_measured_PHAC, UNDERWEIGHT  ) / duration(),   //EN Measured BMI: Underweight <18.5        decimals=4
+		duration(bmi4cat_measured_PHAC, NORMAL_WEIGHT) / duration(),   //EN Measured BMI: Normal weight 18.5 to <25  decimals=4
+		duration(bmi4cat_measured_PHAC, OVERWEIGHT   ) / duration(),   //EN Measured BMI: Overweight 25 to <30       decimals=4
+		duration(bmi4cat_measured_PHAC, OBESE        ) / duration(),   //EN Measured BMI: Obese >=30               decimals=4 
+		weighted_duration(gBMImeasured_PHAC)           / duration(),   //EN Measured BMI: Average                  decimals=2 
+		// END inspired by tMeasuredSrAdultBMI
+
+		// BEGIN inspired by tCarry_forward_by_age_start
+		duration(gAlcohol5, ALCOHOL_NEVER)    / duration(),	    //EN Alcohol: Never                decimals=4
+		duration(gAlcohol5, ALCOHOL_FORMER)   / duration(),	    //EN Alcohol: Former               decimals=4
+		duration(gAlcohol5, ALCOHOL_LIGHT)    / duration(),	    //EN Alcohol: Light (see notes)    decimals=4
+		duration(gAlcohol5, ALCOHOL_MODERATE) / duration(),	    //EN Alcohol: Moderate (see notes) decimals=4
+		duration(gAlcohol5, ALCOHOL_HEAVY)    / duration(),	    //EN Alcohol: Heavy (see notes)    decimals=4
+		// END inspired by tCarry_forward_by_age_start
+
+		// BEGIN inspired by tVaria_Veteran_Lean  
+		duration(gEducation , EDUC1) / duration(),                       //EN Education: Less than secondary  decimals=4
+		duration(gEducation , EDUC2) / duration(),                       //EN Education: Secondary grad       decimals=4
+		duration(gEducation , EDUC3) / duration(),                       //EN Education: Other post-secondary decimals=4
+		duration(gEducation , EDUC4) / duration(),                       //EN Education: Post-secondary grad  decimals=4
+		duration(gIncomeQuartile , INCOME_Q1) / duration(),              //EN Income: Quartile 1 (poorest)       decimals=4
+		duration(gIncomeQuartile , INCOME_Q2) / duration(),              //EN Income: Quartile 2 (lower middle)  decimals=4
+		duration(gIncomeQuartile , INCOME_Q3) / duration(),              //EN Income: Quartile 3 (upper middle)  decimals=4
+		duration(gIncomeQuartile , INCOME_Q4) / duration(),              //EN Income: Quartile 4 (richest)       decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_NEVER )  / duration(), //EN Smoker POHEM: Never      decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_FORMER ) / duration(), //EN Smoker POHEM: Former     decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_CURRENT) / duration(), //EN Smoker POHEM: Current    decimals=4
+
+		// END inspired by tVaria_Veteran_Lean  
+
+		// BEGIN  inspired by tPA_by_age_start
+
+		duration(gWalk_errands, WALK_NO     ) / duration(), //EN Walking for errands (hours/week): None                   decimals=4
+		duration(gWalk_errands, WALK_0_5    ) / duration(), //EN Walking for errands (hours/week): 0 < WFE <= 5(0,5]      decimals=4
+		duration(gWalk_errands, WALK_6_10   ) / duration(),	//EN Walking for errands (hours/week): 5 < WFE <= 10 (5,10]   decimals=4
+		duration(gWalk_errands, WALK_11_plus) / duration(),	//EN Walking for errands (hours/week): WFE >10                decimals=4 
+		duration(gPA_usual_day, SIT         ) / duration(), //EN Usual day: Sit               decimals=4
+		duration(gPA_usual_day, STAND_WALK  ) / duration(),	//EN Usual day: Stand             decimals=4
+		duration(gPA_usual_day, LIFT        ) / duration(), //EN Usual day: Lift              decimals=4
+		duration(gPA_usual_day, HEAVY_WORK  ) / duration(),	//EN Usual day: Heavy work        decimals=4 
+		duration(gLTPA_cat, LTPA_NO         ) / duration(), //EN LTPA: No active leisure time decimals=4
+		duration(gLTPA_cat, LTPA_0_30       ) / duration(), //EN LTPA: 0-30 minutes/day       decimals=4
+		duration(gLTPA_cat, LTPA_30_60      ) / duration(), //EN LTPA: 30-60 minutes/day      decimals=4
+		duration(gLTPA_cat, LTPA_60_plus    ) / duration(), //EN LTPA: 60+ minutes/day        decimals=4
+		duration(gBike_errands, BIKE_NO     ) / duration(), //EN Biking for errands: None     decimals=4
+		duration(gBike_errands, BIKE_YES    ) / duration()  //EN Biking for errands: Some     decimals=4 
+	}
+	*report_calendar_year +	//EN Calendar year
+};
+
+/*NOTE(tHealth_Outcomes_CrossSectional, EN)
+This table provides the distribution (and mean for age, direct costs and HUI) of various health outcomes.
+These are cross-sectional snapshots so that the age dimension reflect current age (in 2012 for instance).
+
+For chronic conditions, the table provides prevalence, crude incidence and hazard rates.  The latter will be removed in future versions of POHEM as it can easily be computed from the other two: hazard = (crude rate)/(1 - prevalence rate).
+
+The so-called "other chronic conditions" are the chronic conditions other than the following five: OA, hypertension, diabetes, heart disease, cancer.
+
+*/
+table Person tHealth_Outcomes_CrossSectional [in_tabulation_scope && alive && report_calendar_year == calendar_year] //EN  Health outcomes and costs per year, sex, BMI and age group (cross-sectional view)
+{
+	sex +												//EN Sex
+	*split(lifespan_age,FROM_30_TO_90_BY_10) +			//EN Age
+	*split(gBMI_PHAC, BMI4CAT) +						//EN BMI category
+	*
+	{
+		duration(),										//EN Person-years (denominator of all others except hazard rates and death counts)
+
+		weighted_duration(lifespan_age) / duration(),   //EN Average integer age                decimals=2
+
+		// BEGIN  inspired by tCC_Person_by_age_start
+		duration(gBP_PA                  , HIGH_BP_YES       ) / duration(), //EN Prevalence rate: Hypertension     decimals=4
+		duration(gDiabetes_PA            , DIAB_YES          ) / duration(), //EN Prevalence rate: Diabetes PA      decimals=4
+		duration(gDiabetes_DPoRT         , DIAB_YES          ) / duration(), //EN Prevalence rate: Diabetes DPoRT   decimals=4
+		duration(gHeartDisease_PA        , HEART_DISEASE_YES ) / duration(), //EN Prevalence rate: Heart Disease PA decimals=4
+		duration(gCancer                 , CANCER_YES        ) / duration(), //EN Prevalence rate: Cancer           decimals=4
+		duration(dementia                , DEMENTIA_YES      ) / duration(), //EN Prevalence rate: Dementia         decimals=4
+		duration(has_copd                , TRUE              ) / duration(), //EN Prevalence rate: COPD             decimals=4  
+		entrances(gBP_PA                  , HIGH_BP_YES       ) / duration(), //EN Crude incidence rate: Hypertension    decimals=4
+		entrances(gDiabetes_PA            , DIAB_YES          ) / duration(), //EN Crude incidence rate: Diabetes PA     decimals=4
+		entrances(gDiabetes_DPoRT         , DIAB_YES          ) / duration(), //EN Crude incidence rate: Diabetes DPoRT  decimals=4
+		entrances(gHeartDisease_PA        , HEART_DISEASE_YES ) / duration(), //EN Crude incidence rate: Heart Disease PA   decimals=4
+		entrances(gCancer                 , CANCER_YES        ) / duration(), //EN Crude incidence rate: Cancer          decimals=4
+		entrances(dementia                , DEMENTIA_YES      ) / duration(), //EN Crude incidence rate: Dementia        decimals=4
+		entrances(has_copd                , TRUE              ) / duration(), //EN Crude incidence rate: COPD            decimals=4  
+		
+
+/* Hazard rate not shown as hazard rate  = (incidence rate)/(1-prev rate) */
+		entrances(gBP_PA    , HIGH_BP_YES   ) / duration(gBP_PA, HIGH_BP_NO        ),   //EN Hazard incidence rate: Hypertension decimals=4
+		entrances(gDiabetes_PA   , DIAB_YES ) / duration(gDiabetes_PA   , DIAB_NO  ),   //EN Hazard incidence rate: Diabetes PA decimals=4
+		entrances(gDiabetes_DPoRT, DIAB_YES ) / duration(gDiabetes_DPoRT, DIAB_NO  ),   //EN Hazard incidence rate: Diabetes DPoRT decimals=4
+        entrances(gHeartDisease_PA, HEART_DISEASE_YES) / duration(gHeartDisease_PA, HEART_DISEASE_NO), //EN Hazard incidence rate: Heart Disease PA   decimals=4
+		entrances(gCancer, CANCER_YES       ) / duration(gCancer, CANCER_NO        ),	//EN Hazard incidence rate: Cancer            decimals=4
+		entrances(dementia, DEMENTIA_YES    ) / duration(dementia, DEMENTIA_NO     ),	//EN Hazard incidence rate: Dementia          decimals=4
+		entrances(has_copd, TRUE            ) / duration(has_copd, TRUE            ),	//EN Hazard incidence rate: COPD              decimals=4  
+		// END  inspired by tCC_Person_by_age_start
+
+		duration(gCC_count_ex5, 0) / duration(), //EN Other chronic conditions : proportion with no OCC  decimals=4
+		duration(gCC_count_ex5, 1) / duration(), //EN Other chronic conditions : proportion with 1 OCC   decimals=4
+		duration(gCC_count_ex5, 2) / duration(), //EN Other chronic conditions : proportion with 2 OCC   decimals=4
+		(duration() - duration(gCC_count_ex5, 0) - duration(gCC_count_ex5, 1) - duration(gCC_count_ex5, 2)) / duration(), //EN Other chronic conditions : proportion with 3+ OCC  decimals=4
+
+		//BEGIN Inspired by tVaria_Veteran_Lean  
+		weighted_duration(gHUI_rep) / duration(),          //EN Average HUI                decimals=4
+		duration(disability_group, 0) / duration(),	       //EN Disability: severe         decimals=4
+		duration(disability_group, 1) / duration(),	       //EN Disability: moderate       decimals=4
+		duration(disability_group, 2) / duration(),	       //EN Disability: none or mild   decimals=4
+
+		//END Inspired by tVaria_Veteran_Lean      
+
+		entrances(alive, FALSE), //EN death counts decimals=4 
+		entrances(alive, FALSE) / duration(alive, TRUE) //EN Death hazard rate decimals=4 
+
+	}
+	*report_calendar_year +	//EN Calendar year
+	*dementia + //EN Dementia status
+};
+
+/*NOTE(tRisk_Factors_Longitudinal, EN)
+This table provides the distribution (and mean for age and BMI) of various risk factors.  
+These are cross-sectional snapshots of the cohort of people who were Canadian residents age 20+ in 2001. Except for calendar time, the dimensions of the table show characteristics of people in 2001. 
+
+Alcohol categories: Light is less than 2 drinks per week, Moderate is 2-9 and 2-14 drinks per week for females and males respectively, Heavy is more than 9 and 14 drinks per week for females and males respectively.
+
+*/
+
+table Person tRisk_Factors_Longitudinal //EN Risk factors per year, sex, BMI and age group  (longitudinal view)
+[in_tabulation_scope && alive && report_calendar_year == calendar_year && calendar_year_start == pStartYear] 
+{
+	sex +
+	*split(lifespan_age_start,AGE_GROUP_RF20_79) +	//EN Initial age in 2001
+	*split(gBMI_start, BMI4CAT) +  //EN Initial BMI category in 2001
+	*
+	{
+		duration(),										//EN Person-years (denominator of all others)
+
+		weighted_duration(lifespan_age) / duration(),          //EN Average integer age                decimals=2
+
+		// BEGIN inspired by tMeasuredSrAdultBMI
+		duration(bmi_PHAC, BMI_CAT_1) / duration()   ,	              //EN Self-reported BMI: Underweight <18.5        decimals=4
+		duration(bmi_PHAC, BMI_CAT_2) / duration()   ,	              //EN Self-reported BMI: Normal weight [18.5,25)  decimals=4
+		duration(bmi_PHAC, BMI_CAT_3) / duration()   ,	              //EN Self-reported BMI: Overweight 25 to <30       decimals=4
+		duration(bmi_PHAC, BMI_CAT_4) / duration()	 ,                //EN Self-reported BMI: Obese >=30               decimals=4 
+		weighted_duration(gBMI_PHAC)  / duration()   ,                //EN Self-reported BMI: Average                  decimals=2 
+		duration(bmi4cat_measured_PHAC, UNDERWEIGHT  ) / duration(),   //EN Measured BMI: Underweight <18.5        decimals=4
+		duration(bmi4cat_measured_PHAC, NORMAL_WEIGHT) / duration(),   //EN Measured BMI: Normal weight 18.5 to <25  decimals=4
+		duration(bmi4cat_measured_PHAC, OVERWEIGHT   ) / duration(),   //EN Measured BMI: Overweight 25 to <30       decimals=4
+		duration(bmi4cat_measured_PHAC, OBESE        ) / duration(),   //EN Measured BMI: Obese >=30               decimals=4 
+		weighted_duration(gBMImeasured_PHAC)           / duration(),   //EN Measured BMI: Average                  decimals=2 
+		// END inspired by tMeasuredSrAdultBMI
+
+		// BEGIN inspired by tCarry_forward_by_age_start
+		duration(gAlcohol5, ALCOHOL_NEVER)    / duration(),	    //EN Alcohol: Never                decimals=4
+		duration(gAlcohol5, ALCOHOL_FORMER)   / duration(),	    //EN Alcohol: Former               decimals=4
+		duration(gAlcohol5, ALCOHOL_LIGHT)    / duration(),	    //EN Alcohol: Light (see notes)    decimals=4
+		duration(gAlcohol5, ALCOHOL_MODERATE) / duration(),	    //EN Alcohol: Moderate (see notes) decimals=4
+		duration(gAlcohol5, ALCOHOL_HEAVY)    / duration(),	    //EN Alcohol: Heavy (see notes)    decimals=4
+		// END inspired by tCarry_forward_by_age_start
+
+		// BEGIN inspired by tVaria_Veteran_Lean  
+		duration(gEducation , EDUC1) / duration(),                       //EN Education: Less than secondary  decimals=4
+		duration(gEducation , EDUC2) / duration(),                       //EN Education: Secondary grad       decimals=4
+		duration(gEducation , EDUC3) / duration(),                       //EN Education: Other post-secondary decimals=4
+		duration(gEducation , EDUC4) / duration(),                       //EN Education: Post-secondary grad  decimals=4
+		duration(gIncomeQuartile , INCOME_Q1) / duration(),              //EN Income: Quartile 1 (poorest)       decimals=4
+		duration(gIncomeQuartile , INCOME_Q2) / duration(),              //EN Income: Quartile 2 (lower middle)  decimals=4
+		duration(gIncomeQuartile , INCOME_Q3) / duration(),              //EN Income: Quartile 3 (upper middle)  decimals=4
+		duration(gIncomeQuartile , INCOME_Q4) / duration(),              //EN Income: Quartile 4 (richest)       decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_NEVER )  / duration(), //EN Smoker POHEM: Never      decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_FORMER ) / duration(), //EN Smoker POHEM: Former     decimals=4
+		duration(smoking_status3 , SMOKING_STATE3_CURRENT) / duration(), //EN Smoker POHEM: Current    decimals=4
+
+
+		// END inspired by tVaria_Veteran_Lean  
+
+		// BEGIN  inspired by tPA_by_age_start
+
+		duration(gWalk_errands, WALK_NO     ) / duration(), //EN Walking for errands (hours/week): None                   decimals=4
+		duration(gWalk_errands, WALK_0_5    ) / duration(), //EN Walking for errands (hours/week): 0 < WFE <= 5(0,5]      decimals=4
+		duration(gWalk_errands, WALK_6_10   ) / duration(),	//EN Walking for errands (hours/week): 5 < WFE <= 10 (5,10]   decimals=4
+		duration(gWalk_errands, WALK_11_plus) / duration(),	//EN Walking for errands (hours/week): WFE >10                decimals=4 
+		duration(gPA_usual_day, SIT         ) / duration(), //EN Usual day: Sit               decimals=4
+		duration(gPA_usual_day, STAND_WALK  ) / duration(),	//EN Usual day: Stand             decimals=4
+		duration(gPA_usual_day, LIFT        ) / duration(), //EN Usual day: Lift              decimals=4
+		duration(gPA_usual_day, HEAVY_WORK  ) / duration(),	//EN Usual day: Heavy work        decimals=4 
+		duration(gLTPA_cat, LTPA_NO         ) / duration(), //EN LTPA: No active leisure time decimals=4
+		duration(gLTPA_cat, LTPA_0_30       ) / duration(), //EN LTPA: 0-30 minutes/day       decimals=4
+		duration(gLTPA_cat, LTPA_30_60      ) / duration(), //EN LTPA: 30-60 minutes/day      decimals=4
+		duration(gLTPA_cat, LTPA_60_plus    ) / duration(), //EN LTPA: 60+ minutes/day        decimals=4
+		duration(gBike_errands, BIKE_NO     ) / duration(), //EN Biking for errands: None     decimals=4
+		duration(gBike_errands, BIKE_YES    ) / duration()  //EN Biking for errands: Some     decimals=4 
+		
+	
+	}
+	*report_calendar_year +	//EN Calendar year
+};
+
+
+/*NOTE(tHealth_Outcomes_Longitudinal, EN)
+This table provides the distribution (and mean for age, direct costs and HUI) of various health outcomes.
+These are cross-sectional snapshots of the cohort of people who were Canadian residents age 20+ in 2001. Except for calendar time, the dimensions of the table show characteristics of people in 2001.
+
+For chronic conditions, the table provides prevalence, crude incidence and hazard rates.  The latter will be removed in future versions of POHEM as it can easily be computed from the other two: hazard = (crude rate)/(1 - prevalence rate).
+
+The so-called "other chronic conditions" are the chronic conditions other than the following five: OA, hypertension, diabetes, heart disease, cancer.
+*/
+
+table Person tHealth_Outcomes_Longitudinal //EN  Health outcomes and costs per year, sex, BMI and age group (longitudinal view)
+[in_tabulation_scope && alive && report_calendar_year == calendar_year && calendar_year_start == pStartYear] 
+{
+	sex + //EN Sex
+	*split(lifespan_age_start,FROM_30_TO_90_BY_10) +	//EN Initial age in 2001
+	*split(gBMI_start, BMI4CAT) +  //EN Initial BMI category in 2001
+	*
+	{
+		duration(),										//EN Person-years (denominator of all others except hazard rates and death counts)
+
+		weighted_duration(lifespan_age) / duration(),          //EN Average integer age                decimals=2
+
+		// BEGIN  inspired by tCC_Person_by_age_start
+		duration(gBP_PA                  , HIGH_BP_YES       ) / duration(), //EN Prevalence rate: Hypertension     decimals=4
+		duration(gDiabetes_PA            , DIAB_YES          ) / duration(), //EN Prevalence rate: Diabetes PA      decimals=4
+		duration(gDiabetes_DPoRT         , DIAB_YES          ) / duration(), //EN Prevalence rate: Diabetes DPoRT   decimals=4
+		duration(gHeartDisease_PA        , HEART_DISEASE_YES ) / duration(), //EN Prevalence rate: Heart Disease PA decimals=4
+		duration(gCancer                 , CANCER_YES        ) / duration(), //EN Prevalence rate: Cancer           decimals=4
+		duration(dementia                , DEMENTIA_YES      ) / duration(), //EN Prevalence rate: Dementia         decimals=4
+		duration(has_copd                , TRUE              ) / duration(), //EN Prevalence rate: COPD             decimals=4  
+		entrances(gBP_PA                  , HIGH_BP_YES       ) / duration(), //EN Crude incidence rate: Hypertension    decimals=4
+		entrances(gDiabetes_PA            , DIAB_YES          ) / duration(), //EN Crude incidence rate: Diabetes PA     decimals=4
+		entrances(gDiabetes_DPoRT         , DIAB_YES          ) / duration(), //EN Crude incidence rate: Diabetes DPoRT  decimals=4
+		entrances(gHeartDisease_PA        , HEART_DISEASE_YES ) / duration(), //EN Crude incidence rate: Heart Disease PA   decimals=4
+		entrances(gCancer                 , CANCER_YES        ) / duration(), //EN Crude incidence rate: Cancer          decimals=4
+		entrances(dementia                , DEMENTIA_YES      ) / duration(), //EN Crude incidence rate: Dementia        decimals=4
+		entrances(has_copd                , TRUE              ) / duration(), //EN Crude incidence rate: COPD            decimals=4  
+		
+
+/* Hazard rate not shown as hazard rate  = (incidence rate)/(1-prev rate) */
+		entrances(gBP_PA    , HIGH_BP_YES   ) / duration(gBP_PA, HIGH_BP_NO        ),   //EN Hazard incidence rate: Hypertension decimals=4
+		entrances(gDiabetes_PA   , DIAB_YES ) / duration(gDiabetes_PA   , DIAB_NO  ),   //EN Hazard incidence rate: Diabetes PA decimals=4
+		entrances(gDiabetes_DPoRT, DIAB_YES ) / duration(gDiabetes_DPoRT, DIAB_NO  ),   //EN Hazard incidence rate: Diabetes DPoRT decimals=4
+        entrances(gHeartDisease_PA, HEART_DISEASE_YES) / duration(gHeartDisease_PA, HEART_DISEASE_NO), //EN Hazard incidence rate: Heart Disease PA   decimals=4
+		entrances(gCancer, CANCER_YES       ) / duration(gCancer, CANCER_NO        ),	//EN Hazard incidence rate: Cancer            decimals=4
+		entrances(dementia, DEMENTIA_YES    ) / duration(dementia, DEMENTIA_NO     ),	//EN Hazard incidence rate: Dementia          decimals=4
+		entrances(has_copd, TRUE            ) / duration(has_copd, TRUE            ),	//EN Hazard incidence rate: COPD              decimals=4  
+		// END  inspired by tCC_Person_by_age_start
+
+		duration(gCC_count_ex5, 0) / duration(), //EN Other chronic conditions : proportion with no OCC  decimals=4
+		duration(gCC_count_ex5, 1) / duration(), //EN Other chronic conditions : proportion with 1 OCC   decimals=4
+		duration(gCC_count_ex5, 2) / duration(), //EN Other chronic conditions : proportion with 2 OCC   decimals=4
+		(duration() - duration(gCC_count_ex5, 0) - duration(gCC_count_ex5, 1) - duration(gCC_count_ex5, 2)) / duration(), //EN Other chronic conditions : proportion with 3+ OCC  decimals=4
+
+		//BEGIN Inspired by tVaria_Veteran_Lean  
+		weighted_duration(gHUI_rep) / duration(),          //EN Average HUI                decimals=4
+		duration(disability_group, 0) / duration(),	       //EN Disability: severe         decimals=4
+		duration(disability_group, 1) / duration(),	       //EN Disability: moderate       decimals=4
+		duration(disability_group, 2) / duration(),	       //EN Disability: none or mild   decimals=4
+
+		//END Inspired by tVaria_Veteran_Lean    
+
+		entrances(alive, FALSE), //EN death counts decimals=4 
+		entrances(alive, FALSE) / duration(alive, TRUE) //EN Death hazard rate decimals=4 
+
+	}
+	*report_calendar_year +	//EN Calendar year
+};
+
+// END Few big tables

@@ -1,0 +1,130 @@
+//FILE_LABEL (EN) DPP output Tables
+/* FILE_NOTE(EN) 
+	 DPP output Tables
+*/
+
+partition AGE_GROUP_DPP	{ 20, 30, 40, 50, 60, 70, 80 };
+partition DIABETES_PROB_CAT_FGL { 0.10, 0.11, 0.12, 0.13, 0.14, 
+	                              0.15, 0.16, 0.17, 0.18, 0.19, 
+								  0.20, 0.21, 0.22, 0.23, 0.24, 
+								  0.25, 0.26, 0.27, 0.28, 0.29, 
+								  0.30, 0.31, 0.32, 0.33, 0.34, 
+								  0.35, 0.36, 0.37, 0.38, 0.39, 0.40 };	
+partition DIABETES_PROB_CAT {.10,.20,.30,.40,.50,.60,.70,.80,.90};	
+partition YEARGROUP_DPP {2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030, 2031};
+partition YEARGROUP_DPP_2 {2014,2015,2016};
+
+
+table_group tgDPPTables { //EN DPP Tables
+	tDPP_DiabetesRiskDistribution,
+    tDPP_AgeSexRisk_AtEntry_Table,
+	tDPP_AverageBMI_Table,
+	tDPP_PACAT_Table,
+	tDPP_Diabetes_Table,
+	tDPP_AgeSexRisk_TargetPop_Table
+};
+
+// ---------------
+// QUESTION : Do any of these tables basically exist in our Standard tables, except for the filter on the target_for_DPP?
+// DO WE WANT TO ADD A FILTER TO ALL TABLES WHICH ALLOWS THE USER TO REPORT ONLY ON A TARGET POPULATION
+// IN NORMAL MODE, THE TARGET POPULATION WOULD BE WIDE OPEN (THE DPP PARAMETERS COULD NOT BE RESTRICTIVE - OR THERE NEEDS TO BE AN ADDITIONAL PARAMETER FOR DPP = ON/OFF
+// WHEN EVALUATING A SPECIFIC INTERVENTION, LIKE DPP, THE DPP PARAMETERS MUST BE SET TO RESTRICT THE TARGET POPULATION
+// IS THERE EVER NEED TO HAVE THE FULL POPULATION FOR SOME TABLES AND THE TARGET FOR OTHERS?
+// --------------------------
+
+// BF keepers ===============
+table Person tDPP_DiabetesRiskDistribution //EN Distribution of 10-year probability of developing diabetes to find proxy for FGL risk 
+// (in start year of DPP intervention for non-diabetics matching DPP age range, any BMI value)
+// Can't include the line above this in the label...makes the label too long...OpenM++ throws an error
+	[in_tabulation_scope &&  calendar_year== Year_for_DPP_program[LOWER_BOUND] 
+	&& 	( DppAgeRange[sex][LOWER_BOUND] <= lifespan_age && lifespan_age <= DppAgeRange[sex][UPPER_BOUND] )
+	&&	( gDiabetes_use == DIAB_NO ) ]
+{
+	{
+		nz_delta(duration())	//EN Persons
+	}
+	* split( Diabetes_Prob, DIABETES_PROB_CAT_FGL)+	//EN Diabetes Risk Groups (10-year probability)
+	* sex
+};
+
+
+table Person tDPP_AgeSexRisk_AtEntry_Table //EN Age-sex distribution of DPP target population (at start) and average risk of diabetes
+	[in_tabulation_scope &&  target_for_DPP== TRUE && calendar_year==Year_for_DPP_program[LOWER_BOUND] ]
+{
+	{
+		nz_delta(duration()),	//EN Number of persons
+		value_out(Diabetes_Prob)/nz_delta(duration())/10.0 //EN Average annual probability of developing diabetes decimals=3
+
+	 }
+	* split(lifespan_age,AGE_GROUP_DPP)+ //EN Age group
+	* sex+
+};
+
+table Person tDPP_AverageBMI_Table //EN Average value of BMI by year, sex and age group for population targetted by DPP
+		[in_tabulation_scope &&  target_for_DPP== TRUE ]
+{
+	sex+
+	*
+	{
+		weighted_duration(gBMI_PHAC)/duration(),				// Average BMI decimals=2
+		duration(bmi_PHAC, BMI_CAT_1)  / duration(),	    //EN underweight decimals=4
+		duration(bmi_PHAC, BMI_CAT_2)  / duration(),	    //EN normal weight decimals=4
+		duration(bmi_PHAC, BMI_CAT_3)  / duration(),	    //EN overweight decimals=4
+		duration(bmi_PHAC, BMI_CAT_4)  / duration()	//EN obese decimals=4
+	}
+	* split(lifespan_age,AGE_GROUP_DPP)+ //EN Age group
+	* report_calendar_year+
+};
+
+table Person tDPP_PACAT_Table //EN PA categories by year, sex and age group for population targetted by DPP
+		[in_tabulation_scope &&  target_for_DPP== TRUE ]
+{
+	sex+
+	*
+	{
+		duration( gLTPA_cat, LTPA_NO) / duration(),	        //EN No active leisure time decimals=4
+		duration( gLTPA_cat, LTPA_0_30)  / duration(),	    //EN 0-30 minutes/day of physical activity from leisure time decimals=4
+		duration( gLTPA_cat, LTPA_30_60) / duration(),	    //EN 30-60 minutes/day of physical activity from leisure time decimals=4
+		duration( gLTPA_cat, LTPA_60_plus)  / duration()    //EN 60+ minutes/day of physical activity from leisure time decimals=4
+	}
+	* split(lifespan_age,AGE_GROUP_DPP)+ //EN Age group
+	* report_calendar_year+
+};
+
+table Person tDPP_Diabetes_Table //EN Diabetes Incidence and Prevalence for population targetted by DPP
+		[in_tabulation_scope &&  target_for_DPP== TRUE ]
+{
+	sex+
+	* 
+	{
+		entrances(gDiabetes_use,DIAB_YES),				//EN Incidence (count) decimals=0
+		nz_delta(duration( gDiabetes_use, DIAB_YES)),	//EN Prevalence (count)  decimals=0
+		duration( gDiabetes_use, DIAB_YES),				//EN Prevalence (duration)  decimals=2 
+		nz_delta(duration()),						//EN Person count decimals=0
+		duration(),									//EN Person-years decimals=2
+		entrances(gDiabetes_use,DIAB_YES) /duration(), //EN Incidence Rate decimals=8
+		duration( gDiabetes_use, DIAB_YES)/duration()	//EN Prevalence Rate decimals=6
+	}
+	* split(lifespan_age,AGE_GROUP_DPP)+ //EN Age group
+	* report_calendar_year+
+};
+// end BF keepers
+
+
+table Person tDPP_AgeSexRisk_TargetPop_Table //EN Age-sex distribution of DPP target population, retention and average risk of diabetes
+	[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) ]
+{
+	{
+	    duration( adherent_bmi      ,TRUE) /duration( target_for_DPP,TRUE) , //EN DPP adherence rate: BMI decimals=3
+		duration( adherent_pa       ,TRUE) /duration( target_for_DPP,TRUE) , //EN DPP adherence rate: Physical activity decimals=3
+		duration( adherent_metformin,TRUE )/duration( target_for_DPP,TRUE) , //EN DPP adherence rate: Metformin decimals=3
+		entrances( target_for_DPP, TRUE ),	//EN Target population (first entered)
+		entrances( target_for_DPP, FALSE ),	//EN Should be zero (target_for_DPP from TRUE to FALSE) icitte_delete
+		nz_delta(duration()),				//EN Number of persons (whole population)
+		value_out(Diabetes_Prob)/nz_delta(duration())/10.0				//EN Average annual probability of developing diabetes (whole population) decimals=3
+	 }
+	* split(lifespan_age,AGE_GROUP_DPP)+ //EN Age group
+	* sex+
+	* report_calendar_year				//EN Year
+
+};

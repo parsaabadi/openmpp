@@ -1,0 +1,317 @@
+
+//FILE_LABEL (EN) BioBrowse
+/* FILE_NOTE(EN) 
+	This file contains a list of variables tracked for analysing individual life trajectories in POHEM
+	with the BioBrowser software.
+*/
+
+		
+  /* Some debugging tricks
+
+  								
+    if(CasesDebugLogEntry[LOWER_BOUND] <= case_id  && case_id <= CasesDebugLogEntry[UPPER_BOUND]  )
+	{
+		char line[199];
+		snprintf(line,199,"time=%0.7f,diabetes=%0.7f \n",time, check_db ); 
+		WriteDebugLogEntry(line);
+	}
+	if(CasesDebugLogEntry[LOWER_BOUND] <= case_id  && case_id <= CasesDebugLogEntry[UPPER_BOUND]  )
+	{
+		std::stringstream ss;
+		ss << "CRC screening modality used twice in a screening round. Problem detected while processing column " << m + 1 << " (1=A, 2=B, ...). \n" ;
+		ModelExit(ss.str().c_str());
+	}
+
+	mm::gprParam->
+
+	options event_trace   = on;  //Turn on/off in TraceOptions.mpp 
+	options case_checksum = on;  //Turn on/off in TraceOptions.mpp 
+  */
+
+
+range	DIGITS		{ 0, 9 };	//EN Digits
+classification DIGIT_ORDER {//EN Digit order
+	DIGIT_ORDER_1, //EN  First digit (10^4)
+	DIGIT_ORDER_2, //EN Second digit (10^3)
+	DIGIT_ORDER_3, //EN  Thrid digit (10^2)
+	DIGIT_ORDER_4, //EN Fourth digit (10^1)
+	DIGIT_ORDER_5  //EN  Fifth digit (10^0)
+};
+
+parameter_group ZZ_Debug_Parameters  //EN Debug Parameters
+{
+	EcrireDebugLogEntry,
+	//CasesDebugLogEntry,
+	FilterDigitTable,
+	CasesDebugLogEntry
+};
+
+
+parameters {
+	int	EcrireDebugLogEntry ; //EN EcrireDebugLogEntry
+	int	CasesDebugLogEntry[cLOWER_UPPER_BOUNDS]; //EN CasesDebugLogEntry
+	logical FilterDigitTable[DIGITS][DIGIT_ORDER]; //EN Filter for digit tables
+};
+
+hide(ZZ_Debug_Parameters);
+// ----------------- BEGIN SEARCH INTERESTING CASES -----------------------
+// ----------------- BEGIN SEARCH INTERESTING CASES -----------------------
+
+/* BEGIN  Search for interesting cases  
+
+// Do not forget to put this filter on tables -->  filter_digit_table 
+// Do not forget to unhide 
+
+actor Person            // Core Individual
+{
+	DIGITS case_id_digit1 = {9};
+	DIGITS case_id_digit2 = {9};
+	DIGITS case_id_digit3 = {9};
+	DIGITS case_id_digit4 = {9};
+	DIGITS case_id_digit5 = {9};
+	logical filter_digit_table =    FilterDigitTable[case_id_digit1][DIGIT_ORDER_1] 
+	                             && FilterDigitTable[case_id_digit2][DIGIT_ORDER_2]  
+								 && FilterDigitTable[case_id_digit3][DIGIT_ORDER_3] 
+								 && FilterDigitTable[case_id_digit4][DIGIT_ORDER_4] 
+								 && FilterDigitTable[case_id_digit5][DIGIT_ORDER_5]  ;
+
+	void InitializeDigits();
+	hook InitializeDigits,Start, 190; // 190 = execution number, the higher the value, the later the execution;
+};
+
+void hook_InitializeDigits(){};
+
+void Person::InitializeDigits()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	if(case_id<99999)
+	{
+		case_id_digit1 = case_id/10000;																				// 9 for case_id = 98765
+		case_id_digit2 = (case_id-case_id_digit1*10000)/1000;														// 8 for case_id = 98765
+		case_id_digit3 = (case_id-case_id_digit1*10000-1000*case_id_digit2)/100;									// 7 for case_id = 98765
+		case_id_digit4 = (case_id-case_id_digit1*10000-1000*case_id_digit2-100*case_id_digit3)/10;					// 6 for case_id = 98765
+		case_id_digit5 = (case_id-case_id_digit1*10000-1000*case_id_digit2-100*case_id_digit3-10*case_id_digit4)/1; // 5 for case_id = 98765
+	}
+
+
+	if (EcrireDebugLogEntry < 0 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND] && filter_digit_table)
+	{
+		char line[199];
+		snprintf(line, 199, "%i,%15.1f \n", (int)case_id, (double)case_seed);
+		WriteDebugLogEntry(line);
+		//std::stringstream ss;
+		//ss << case_id << " , " << case_seed ;
+		//WriteDebugLogEntry(ss.str().c_str());
+	}
+
+	hook_InitializeDigits();
+}
+
+
+
+
+table Person  tDB_SEP_d2   //EN Db prevalence by SEP 
+  [ WITHIN(REPORT_YEAR, year) && filter_digit_table ]
+{
+	case_id_digit2+
+	*
+	{
+	
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),	// Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+	  duration(), // total count of persons (duration)
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) )/duration() //EN Prevalence proportion
+	}
+	*	report_calendar_year 	// year
+};
+
+table Person  tDB_SEP_d3   //EN Db prevalence by SEP 
+  [ WITHIN(REPORT_YEAR, year) && filter_digit_table ]
+{
+	case_id_digit3+
+	*
+	{
+	
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),	// Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+	  duration(), // total count of persons (duration)
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) )/duration() //EN Prevalence proportion
+	}
+	*	report_calendar_year 	// year
+};
+
+table Person  tDB_SEP_d4   //EN Db prevalence by SEP 
+  [ WITHIN(REPORT_YEAR, year) && filter_digit_table ]
+{
+	case_id_digit4+
+	*
+	{
+	
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),	// Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+	  duration(), // total count of persons (duration)
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) )/duration() //EN Prevalence proportion
+	}
+	*	report_calendar_year 	// year
+};
+
+table Person  tDB_SEP_d5   //EN Db prevalence by SEP 
+  [ WITHIN(REPORT_YEAR, year) && filter_digit_table ]
+{
+	case_id_digit5+
+	*
+	{
+	
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),	// Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+	  duration(), // total count of persons (duration)
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) )/duration() //EN Prevalence proportion
+	}
+	*	report_calendar_year 	// year
+};
+  END  Search for interesting cases */
+
+// ----------------- END SEARCH INTERESTING CASES -----------------------
+// ----------------- END SEARCH INTERESTING CASES -----------------------
+
+
+
+  // ----------------- BEGIN TRACKING -----------------------
+  // ----------------- BEGIN TRACKING -----------------------
+//track Person [dominant]
+//{	
+
+/* BEGIN general stuff 
+sex,
+calendar_year,
+calendar_year_start,
+truncated_age,
+lifespan_age,
+lifespan_age_start,
+gImmigrantRecent,gImmigrantEver,proportion_in_canada,age_immigration,
+gProvince,
+cchs_record,
+population_source,
+ END general stuff */
+
+
+     
+/* BEGIN Health determinant 
+gBMI_growth_curve, gBMI_growth_curve_reported,	BMI_quantile_startpop,
+CHHS_bmi, bmi,
+gBMI_AdultModel,gBMI,gBMImeasuredOld,gBMI4CC,//gBMImeasured,
+
+
+	
+gSmoker,gSmokingCurrent,smoking_cancer_dynamic,gSmoking_NPHS,gSmoking_NPHS_ever_changed,
+gSmokePackyears,
+	total_packs_smoked, total_packyears_smoked,	
+
+gLTPA_cat, gBike_errands, gWalk_errands, gPA_usual_day,
+
+gEducation, education_ever_changed,gEducation_startpop,
+gIncomeQuartile,
+ END Health determinant */
+
+
+
+/* BEGIN Health outcomes 
+gHUI, 
+hui_model2_a , hui_model2_mu , hui_model2_quantile,
+hui_model3_a , hui_model3_mu , hui_model3_quantile,
+
+gHUI_rep,
+gHUI_model3_person_coerced, gHUI_model3_person, gHUI_model3, delta_HUI_Drugs_model3, delta_HUI_OA_OS_model3, delta_HUI_OA_surg_model3,
+gHUI_model2_person_coerced, gHUI_model2_person, gHUI_model2, delta_HUI_Drugs_model2, delta_HUI_OA_OS_model2, delta_HUI_OA_surg_model2,
+gHUI_model1_person_coerced, gHUI_model1_person, gHUI_model1, delta_HUI_Drugs_model1, delta_HUI_OA_OS_model1, delta_HUI_OA_surg_model1, 
+//delta_HUI_bmi, delta_HUI_age, delta_HUI_OA_model1, 
+
+CURE_BP_hazard,BP_hazard,
+gCC_count_ex5,gCC_count_ex4_cap3,
+gCancer,  gDiabetes_PA, gHeartDisease_PA, gBP_PA,
+alive_NPHS,
+
+gDiabetes_use,gDiabetes_rr_mortality,
+//gDiabetes_rr_mortality_mismatch , gDiabetes_rr_mortality_new , 
+gDiabetes_Recency,//gDiabetes_Recency_new,
+gDiabetes_Initial_Altered,
+//gDiabetes_rr_mortality_age_chunk,gDiabetes_rr_mortality_year_chunk,
+
+mort_hazard,
+ END Health outcomes */
+
+
+/* BEGIN Miscellaneous 
+gCostSpecialistGP, gCostHospital, gCostDrugs, gCostTotal,
+
+gAMI_Framingham_1yr_Predicted_Probability,
+//dCAD_10yearProb,
+gTC_HDL_ratio,
+//dCAD_10yearProb_wStatins,
+gStatinsRecommended,
+gRR_Statins_AMI_Incidence,
+
+JointTransExisted,
+
+cholx, hdlx, dbpx_chhs, sbpx_chhs,
+cholF, chol, hdl, bp_chhs,
+
+
+bp_actual,
+IndexAMI_event, cad_state,
+END Miscellaneous */
+
+
+/* BEGIN OA
+OA_prevalence_state,
+OA_OS_Visits, 
+IndexOA_event,
+OA_Number_Visits_to_OS,
+OA_Number_Revision_Surgeries,
+OA_Number_Primary_Surgeries,
+age_OA_OS_visit,
+age_OA_Primary,
+age_OA_Revision,
+gOAClock, 
+gIndexOAClock,
+OA_Event_State, OA_Event_State_Previous,
+PrevOA_event,
+age_IndexOA,
+age_OAevent,
+END OA */
+
+//	case_seed };  // END track{
+
+// ----------------- END TRACKING -----------------------
+// ----------------- END TRACKING -----------------------
+
+
+void PreSimulation()
+{
+	// WriteDebugLogEntry("case_id, population_source, year, age, sex, donor_id\n");
+	// WriteDebugLogEntry("StartPop_id, sex, age\n");
+	if (EcrireDebugLogEntry == 1)
+		WriteDebugLogEntry("message,case_id,time\n");
+
+//	if (EcrireDebugLogEntry == 2)
+//		WriteDebugLogEntry("cchs_record,disease_init,disease_altered,risk\n");
+
+	if (EcrireDebugLogEntry == 4)
+		WriteDebugLogEntry("case_id,case_seed,time,dementia,sex,AgeC_rcs,PackYearsC_rcs,DrinksLastWeekC_rcs,PhysicalActivityC_rcs,BMIC_rcs,SmokeCurrentC_cat,SmokeFormer0to5C_cat,SmokeFormer5PlusC_cat,FormerDrinkerC_cat,EthnNWC_cat,EduHSGradC_cat,EduSomePSC_cat,EduPSGradC_cat,DiabetesC_cat,HypertensionC_cat,HeartDiseaseC_cat,StrokeC_cat,AgeC_rcs_Spline,PackYearsC_rcs_Spline,DrinksLastWeekC_rcs_Spline,PhysicalActivityC_rcs_Spline,BMIC_rcs_Spline,hazard\n");
+
+	if (EcrireDebugLogEntry == 6)
+		WriteDebugLogEntry("case_id,case_seed,time,sex,AgeC_rcs,PackYearsC_rcs,DrinksLastWeekC_rcs,PhysicalActivityC_rcs,BMIC_rcs,ResidencyC_rcs,SmokeCurrentC_cat,SmokeFormer0to5C_cat,SmokeFormer5PlusC_cat,FormerDrinkerC_cat,EthnNWC_cat,EduLTHSC_cat,EduHSGradC_cat,EduSomePSC_cat,DiabetesC_cat,HypertensionC_cat,HeartDiseaseC_cat,StrokeC_cat,CancerC_cat,DementiaC_cat,AgeC_rcs_Spline,PackYearsC_rcs_Spline,DrinksLastWeekC_rcs_Spline,PhysicalActivityC_rcs_Spline,BMIC_rcs_Spline,ResidencyC_rcs_Spline,hazard\n");
+
+	if (EcrireDebugLogEntry == 8)
+		WriteDebugLogEntry("case_id,case_seed,year,sex,AgeC_rcs,PackYearsC_rcs,DrinksLastWeekC_rcs,PhysicalActivityC_rcs,BMIC_rcs,ResidencyC_rcs,SmokeCurrentC_cat,SmokeFormer0to5C_cat,SmokeFormer5PlusC_cat,FormerDrinkerC_cat,EduLTHSC_cat,EduHSGradC_cat,EduSomePSC_cat,DiabetesC_cat,HypertensionC_cat,HeartDiseaseC_cat,StrokeC_cat,CancerC_cat,DementiaC_cat\n");
+
+	if (EcrireDebugLogEntry == 93)
+		WriteDebugLogEntry("case_id,case_seed,time,lifespan_age_start,truncated_age,timing_first_update,number_drinks_past_week_extra1,number_drinks_past_week_extra2,number_drinks_past_week_extra2_start,alcohol_quantile,alcohol_quantile_startpopg, gAlcohol5_no_intervention,gAlcohol5 \n");
+	
+	if (EcrireDebugLogEntry == 94)
+		WriteDebugLogEntry( "case_id, case_seed, time, lifespan_age_start, truncated_age, gBike_errands_core, gWalk_errands_core, gPA_usual_day_core, gLTPA_cat_core \n" );
+	
+	if (EcrireDebugLogEntry == 95)
+		WriteDebugLogEntry( "case_id, case_seed, time, lifespan_age_start, truncated_age, p_next_bike, p_next_walk, p_next_usual_day, p_next_LTPA_cat \n" );
+
+	if (EcrireDebugLogEntry == 1234) {
+		WriteDebugLogEntry("case_id, time, sex, lifespan_age_start, truncated_age, number_drinks_past_week_extra2_start, number_drinks_past_week_extra1, number_drinks_past_week_extra2, number_drinks_past_week, gAlcohol5_start,  gAlcohol5 \n");
+	}
+}	

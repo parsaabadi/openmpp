@@ -1,0 +1,253 @@
+#include "pohem.h"
+//FILE_LABEL (EN) Model Body Mass Index (BMI) in youth
+/* FILE_NOTE(EN) 
+	This file simulates measured BMI in youth 
+	It implements growth curves estimated on CHMS or CCHS 2.2 .
+*/
+
+range AGE_YOUTH_YEAR   {6 , 19};
+range AGE_YOUTH_MONTH  {0 , 11}; 
+
+
+parameter_group pgYouthBMI {  //  BMI Youth model 
+	AgeYouthYearSimu,
+	AgeYouthMonthSimu,
+	WHO_cutoffs,
+	pgExpertYouthBMI
+};
+
+
+parameter_group pgExpertYouthBMI{  // Experts only
+	BmiSiloProbs,
+	BmiArmaplus11,
+	BmiYouthMultiplicativeFactor,
+	BCT_Mu,
+	BCT_Sigma,
+	BCT_Nu,
+	BCT_Tau,
+	YouthBmiBounds
+};
+
+parameters {
+	double	BmiArmaplus11  [SEX][UNIFORM_SILOS][ARMAPLUS_11_PARAMETERS]; //EN   ARMAplus(1,1) parameters used in BMI youth model 
+    double  BmiSiloProbs        [UNIFORM_SILOS] ;  //EN Probability of silos for the siloed uniform process used in BMI youth model 
+
+	double  BmiYouthMultiplicativeFactor[SEX][AGE_YOUTH_YEAR]; //EN Multiplicative adjustment to the BMI youth model  (multiplies Mu)
+	double	BCT_Mu   [SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH] ; //EN Mu parameter in growth curve model (location)
+	double	BCT_Sigma[SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH] ; //EN Sigma parameter in growth curve model (spread)
+	double	BCT_Nu   [SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH] ; //EN Nu parameter in growth curve model (skewness)
+	double	BCT_Tau  [SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH] ; //EN Tau parameter in growth curve model (kurtosis)
+	AGE_YOUTH_MONTH AgeYouthMonthSimu ;  //EN Month used to simulate BMI among youth (e.g. 9 years and 2 months old)
+	LIFE_SPAN       AgeYouthYearSimu  ;  //EN Year used to simulate BMI among youth (e.g. 9 years and 2 months old)
+
+	double WHO_cutoffs [SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH][cLOWER_UPPER_BOUNDS]; //EN WHO cut-offs
+	double YouthBmiBounds[cLOWER_UPPER_BOUNDS];  //EN Range of BMI for youth
+
+	model_generated double BCT_ProbRange[SEX][AGE_YOUTH_YEAR][AGE_YOUTH_MONTH] ;
+	model_generated double UnderlyingUniformWhereaboutsForBmi[DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+	
+	};
+
+
+
+   
+actor Person           
+{
+    double BMI_arma_11     [ARMAPLUS_11_ENTRIES];  //EN ARMAplus(1,1) stochastic process used to generate HUI quantile
+    double BMI_siloed_unif [SILOED_UNIF_PROCESS];
+
+    double BMI_quantile[AGE_YOUTH_YEAR];
+
+	double gBMI_growth_curve ={-9.9};
+	
+	
+  //BMI_INDEX_ALL_AGES bmi4cat_measured_youth = BMI_INDEX_ALL_AGES(split(gBMI_growth_curve , BMI4CAT));	//EN Probable Measured Body Mass Index category
+	BMI_INDEX_ALL_AGES bmi4cat_measured_youth = BMI_INDEX_ALL_AGES(   gBMI_growth_curve > WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,age_corresponding_to_bmi_growth_curve)][AgeYouthMonthSimu][UPPER_BOUND] ? 3
+                                                                    : gBMI_growth_curve > WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,age_corresponding_to_bmi_growth_curve)][AgeYouthMonthSimu][LOWER_BOUND] ? 2
+														        	: gBMI_growth_curve > 0.0 ? 1 : 0 
+						                                          );	// Body Mass Index State 4
+
+	LIFE_SPAN  age_corresponding_to_bmi_growth_curve = {0};
+	
+
+	double BMI_quantile_startpop={-9.9};
+	
+	double gBMI_growth_curve_reported  = MeasuredToSelfReportedBmi(gBMI_growth_curve,age_corresponding_to_bmi_growth_curve,sex,measured_reported_bmi_pivot);
+
+	// For table tMeasuredSrYouthBMI
+  	LIFE_SPAN bmi_history_age ;
+	LIFE_SPAN bmi_history_age_youth = min(mgYoungestAge - 1, int(bmi_history_age));
+	int       bmi_history_year;
+	REPORT_YEAR   bmi_history_report_calendar_year = COERCE( REPORT_YEAR, bmi_history_year);	//EN Year
+	double silly_accumulator_bmi           = {0.0};      //EN Measured BMI accumulator : BMI
+	int    silly_accumulator_obese         = {0};        //EN Measured BMI accumulator : Above 2 cutoffs
+	int    silly_accumulator_overweight    = {0};        //EN Measured BMI accumulator : Between 2 cutoffs  
+	int    silly_accumulator_normal        = {0};        //EN Measured BMI accumulator : Below 2 cutoffs
+	double silly_accumulator_sr_bmi        = {0.0}; //EN Self-Reported BMI accumulator : BMI
+	int    silly_accumulator_sr_obese      = {0};   //EN Self-Reported BMI accumulator : Above 2 cutoffs
+	int    silly_accumulator_sr_overweight = {0};   //EN Self-Reported BMI accumulator : Between 2 cutoffs  
+	int    silly_accumulator_sr_normal     = {0};   //EN Self-Reported BMI accumulator : Below 2 cutoffs
+	double silly_accumulator_age           = {0.0};   //EN Age accumulator 
+	
+
+   void ComputeBmiYouth();
+   void Get_BMI_quantile();
+   double ComputeBmiYouthForThisAge(LIFE_SPAN age_for_computation);
+  
+
+   hook ComputeBmiYouth , InitializeBmiStuff; 
+
+  event timePlayBmiHistoryEvent, PlayBmiHistoryEvent;
+
+};
+
+TIME Person::timePlayBmiHistoryEvent()
+{
+	return  lifespan_age_start == mgYoungestAge && bmi_history_age > MIN(AGE_YOUTH_YEAR) ?  WAIT(0) :  TIME_INFINITE   ;
+};
+
+void hook_PlayBmiHistoryEvent() {};
+
+void Person::PlayBmiHistoryEvent()
+{
+	bmi_history_age--  ;  
+	bmi_history_year-- ;
+
+	silly_accumulator_age += bmi_history_age + AgeYouthMonthSimu/12.0;
+
+	double bmi_now ;
+	//Measured BMI
+	bmi_now = ComputeBmiYouthForThisAge(bmi_history_age); 
+	silly_accumulator_bmi     += bmi_now;
+	if(bmi_now >  WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,bmi_history_age)][AgeYouthMonthSimu][UPPER_BOUND] )
+		silly_accumulator_obese++  ;      
+    else if(bmi_now >  WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,bmi_history_age)][AgeYouthMonthSimu][LOWER_BOUND] )
+		silly_accumulator_overweight++ ;
+	else
+		silly_accumulator_normal++;  
+
+	//Self-reported BMI
+	bmi_now  =  MeasuredToSelfReportedBmi(bmi_now,bmi_history_age, sex, measured_reported_bmi_pivot);
+	silly_accumulator_sr_bmi     += bmi_now;
+	if(bmi_now >  WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,bmi_history_age)][AgeYouthMonthSimu][UPPER_BOUND] )
+		silly_accumulator_sr_obese++  ;      
+    else if(bmi_now >  WHO_cutoffs[sex][RANGE_POS(AGE_YOUTH_YEAR,bmi_history_age)][AgeYouthMonthSimu][LOWER_BOUND] )
+		silly_accumulator_sr_overweight++ ;
+	else
+		silly_accumulator_sr_normal++;  
+
+	hook_PlayBmiHistoryEvent();
+};
+
+
+
+void hook_Get_BMI_quantile() {};
+
+void Person::Get_BMI_quantile()
+{
+   BMI_quantile[RANGE_POS(AGE_YOUTH_YEAR,mgYoungestAge)]=pnorm(BMI_arma_11[ARMAPLUS_11_Y_t],0.0,1.0);//icitte needed ??
+   for(int nAge=mgYoungestAge-1;nAge>= MIN(AGE_YOUTH_YEAR); nAge--)
+   {
+	   ARMAPLUS_11_move_backward(BMI_arma_11,RandNormal(117));
+       BMI_quantile[RANGE_POS(AGE_YOUTH_YEAR,nAge)]=pnorm(BMI_arma_11[ARMAPLUS_11_Y_t],0.0,1.0);
+   }
+
+   hook_Get_BMI_quantile();
+}
+
+double Person::ComputeBmiYouthForThisAge(LIFE_SPAN age_for_computation)
+{
+	double bmi_tempo = {-9};
+
+	if(lifespan_age_start == mgYoungestAge && MIN(AGE_YOUTH_YEAR)<= age_for_computation && age_for_computation < mgYoungestAge)
+	{
+		int  year_for_computation;
+		year_for_computation = calendar_year_start - ( lifespan_age_start - age_for_computation );
+
+		double quantile_tempo=BMI_quantile[RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)];
+		
+		bmi_tempo=qBCT(quantile_tempo,
+                    BmiYouthMultiplicativeFactor[sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)]*
+					BCT_Mu       [sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)][AgeYouthMonthSimu],
+					BCT_Sigma    [sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)][AgeYouthMonthSimu],
+					BCT_Nu       [sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)][AgeYouthMonthSimu],
+					BCT_Tau      [sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)][AgeYouthMonthSimu],
+					BCT_ProbRange[sex][RANGE_POS(AGE_YOUTH_YEAR,age_for_computation)][AgeYouthMonthSimu]);
+		bmi_tempo = min(max(bmi_tempo, YouthBmiBounds[LOWER_BOUND]), YouthBmiBounds[UPPER_BOUND]);
+		bmi_tempo=CalendarTimeAdjustmentBMI(bmi_tempo,2004,year_for_computation); //icitte could allow CompoundBMIChange to play 
+		bmi_tempo = min(max(bmi_tempo, YouthBmiBounds[LOWER_BOUND]), YouthBmiBounds[UPPER_BOUND]);
+	}
+
+	return bmi_tempo;
+}
+
+void hook_ComputeBmiYouth() {};
+
+void Person::ComputeBmiYouth() 
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	LIFE_SPAN age_for_computation=AgeYouthYearSimu;
+
+	if(lifespan_age_start == mgYoungestAge && MIN(AGE_YOUTH_YEAR)<= age_for_computation && age_for_computation < mgYoungestAge)
+	{
+		age_corresponding_to_bmi_growth_curve = AgeYouthYearSimu;
+		
+		// Get quantiles
+		BMI_quantile_startpop = runif(RandUniform(118),UnderlyingUniformWhereaboutsForBmi[cchs_record][LOWER_BOUND],UnderlyingUniformWhereaboutsForBmi[cchs_record][UPPER_BOUND]);
+		UNIFORM_SILOS which_silo = (UNIFORM_SILOS) InitializeSiloedUniform(BMI_siloed_unif, BmiSiloProbs, BMI_quantile_startpop);  //BMI_siloed_unif entries also get filled properly
+		ARMAPLUS_11_initialize(BMI_arma_11, BmiArmaplus11[sex][which_silo], qnorm(BMI_quantile_startpop,0.0,1.0),RandNormal(119), RandNormal(146));
+		Get_BMI_quantile(); //this makes the ARMA(1,1) move backward
+		
+		gBMI_growth_curve = ComputeBmiYouthForThisAge(age_for_computation);
+		//Note: youth BMI is not subject to any intervention
+
+	}
+
+	hook_ComputeBmiYouth();
+}
+
+
+void PreSimulation()
+{
+	//BEGIN get BCT_ProbRange
+	 for ( int nSex = 0; nSex < SIZE( SEX ); nSex++ )
+	   for (int nAgeYear=0; nAgeYear < SIZE( AGE_YOUTH_YEAR ) ; nAgeYear++)
+		   for (int nAgeMonth=0; nAgeMonth < SIZE( AGE_YOUTH_MONTH ) ; nAgeMonth++)
+		   {
+			   if(BCT_Nu[nSex][nAgeYear][nAgeMonth]==0.0)
+				   BCT_ProbRange[nSex][nAgeYear][nAgeMonth]=1.0;
+			   else
+			   {
+				   BCT_ProbRange[nSex][nAgeYear][nAgeMonth]=
+				     pt(1.0/std::abs(BCT_Nu[nSex][nAgeYear][nAgeMonth]*BCT_Sigma[nSex][nAgeYear][nAgeMonth]),
+					          BCT_Tau[nSex][nAgeYear][nAgeMonth]);
+				   
+			   }
+		   }
+	//END get BCT_ProbRange
+		
+
+// ==========================================================
+// BEGIN get  UnderlyingUniformWhereaboutsForBmi
+// ==========================================================
+
+		    
+ 
+   int    covariates[SIZE(COVARIATE_X)] = {cDb_Sex,cDb_Province,cDb_AgeGrp,cDb_Sex};
+   double in_scope  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = { -1.0, 9e9,
+                                                                       -1.0, 9e9,  
+                                                                       -1.0, 9e9, 
+                                                                       -1.0, 9e9  } ;
+   
+   in_scope [COVARIATE_X3][LOWER_BOUND] = mgAgeCodeYoungest ;
+   in_scope [COVARIATE_X3][UPPER_BOUND] = mgAgeCodeYoungest ;
+   
+
+   int n_records_tot = StoreData(mgStartPopCopy  ,covariates,cDb_BMI,NULL,NULL,in_scope );
+  
+   qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by sex, province, age and BMI
+   
+   GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForBmi, n_records_tot);
+	                                                               
+}

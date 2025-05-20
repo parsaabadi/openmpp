@@ -1,0 +1,1003 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Risk Factor Interventions
+/* FILE_NOTE(EN) 
+	This file implements interventions on risk factors that are applied one-time when Person is created,
+	and/or every year on birthday after risk factor transition has been applied.
+*/
+
+range BP_TREATMENT_YEAR {1991, 2008}; //EN Years, for which BP treatment rates are defined
+
+classification BP_TREATMENT_EDUCATION //EN Educaton levels for high blood pressure treatment
+{
+	BPTE_SS_OR_LESS,
+	BPTE_UNIVERSITY
+};
+aggregation BP_TREATMENT_EDUCATION, EDUCATION
+{
+	BPTE_SS_OR_LESS, EDUC1,
+	BPTE_SS_OR_LESS, EDUC2,
+	BPTE_UNIVERSITY, EDUC3,
+	BPTE_UNIVERSITY, EDUC4
+};
+classification BP_TREATMENT_CATEGORY  //EN Risk categories for high blood pressure treatment
+//AO: Because we are not differentiating treatment rates between age groups in high-risk individuals,
+//    we can use just one dimension combining high-risk groups and age groups (instead of two dimensions)
+//	  for the parameters pBaselineBpTreatmentRate, pAdditionalBpTreatmentRate and pEffectiveBpTreatmentRate.
+{
+	BPTC_DIABETES,			//EN Diabetes melitus
+	BPTC_PRIOR_MI_CVD,		//EN Prior MI or CVD
+	BPTC_NO_RISK_FACTORS_UNDER60,	//EN No additional risk factors, under 60 years old
+	BPTC_NO_RISK_FACTORS_60PLUS,	//EN No additional risk factors, 60 years old and older
+	BPTC_NULL				//EN Not treated for high BP (null category)
+};
+classification CAD_RISK_FACTOR{	//EN Cardiac Risk factors
+	cBMI,			//EN Body Mass Index
+	// cCHOL,		//EN Total Cholesterol
+	// cHDL,		//EN HDL
+	// cSBP,		//EN Systolic blood pressure
+	// cDBP,		//EN Diastolic blood pressure
+	cSMOKING		//EN Smoking
+	// cDIABETES	//EN Diabetes
+};
+classification RF_SWITCH {	//EN Risk Factor Switches
+	RF_EVOLUTION_MODEL,		//EN Baseline Evolution
+	RF_RELATIVE_CHANGE,		//EN Relative Change
+	RF_CHANGE_TO_VALUE,		//EN Apply Change to Value
+	RF_REINTERVENTION		//EN Allow re-intervention
+};
+classification AMI_HIGH_RISK_STATES { //EN Risks used in Statin assessment criteria
+	cHIGH_AGE,			//EN Age
+	cHIGH_NUMBER_RX,	//EN Minimum Risk Factor count
+	cHIGH_BMI,			//EN Body Mass Index
+	//cHIGH_CHOL,			//EN Total Cholesterol
+	cLOW_HDL,			//EN HDL
+	cHIGH_SBP,			//EN Systolic blood pressure
+	cHIGH_DBP,			//EN Diastolic blood pressure
+	cHIGH_SMOKING,		//EN Smoking
+	cHIGH_DIABETES		//EN Diabetes
+};
+classification UPTAKE_RATE {
+	cBASE_RATE,
+	cUPTAKE_RATE,
+	cMAX_RATE
+};
+classification RF_INTERVENTION_PARAMETER { //EN RF Intervention Parameters
+	cAMOUNT_OF_CHANGE,		//EN Amount of change 
+	cHIGH_RISK_LOWER_CUTOFF,	//EN Risk group lower cut-off
+	cHIGH_RISK_UPPER_CUTOFF,	//EN Risk group upper cut-off
+	cRESULT_LOWER_LIMIT,		//EN Floor
+	cLOWER_BUFFER,				//EN Floor buffer size
+	cRESULT_UPPER_LIMIT,		//EN Ceiling
+	cUPPER_BUFFER				//EN Ceiling buffer size
+};
+classification RF_INTERVENTION_TIME_PARAMETER { //EN Time Parameters for RF Interventions 
+	cINTERVENTION_START_YEAR,	//EN Intervention start year 
+	cINTERVENTION_END_YEAR,		//EN Intervention end year
+	cMAX_INTERVENTION_YEARS		//EN Max interventions per person
+};
+classification AMI_RISK_LEVEL {			// AMI risk levels
+	AMI_VERY_LOW_RISK,					// Very Low
+	AMI_LOW_RISK,						// Low
+	AMI_MOD_RISK,						// Moderate
+	AMI_HIGH_RISK,						// High
+	AMI_VERY_HIGH_RISK					// Very High
+};
+classification TREATMENT_INTENTION { // Treatment intent
+	PRIMARY_TREATMENT,
+	SECONDARY_TREATMENT
+};
+parameter_group pgIntervention_Parameters{ //EN Intervention parameters
+	pgRiskFactorInterventions,
+	pgDPP,
+	//pgMEND,
+	pgAMIinterventions
+	
+};
+
+parameter_group pgRiskFactorInterventions{ //EN Risk Factor Controls
+	
+	pRF_INTERVENTIONS,
+	pRF_INTERVENTION_TIME_PERIOD,
+	pRF_INTERVENTION_AGE_GROUPS,
+	//pgBpTreatment,
+	pgExpertRiskFactorInterventions
+};
+
+parameter_group pgExpertRiskFactorInterventions{ //EN Experts only
+	pRISK_FACTOR_CONTROL_PANEL,
+	pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE,
+	pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_START_YEAR_TO_CHANGE_HUI
+
+};
+
+/*
+parameter_group pgBpTreatment { //EN High BP Treatmant Parameters
+pBaselineBpTreatmentRate,
+pAdditionalBpTreatmentRate,
+pEffectiveBpTreatmentRate
+};
+*/
+
+parameter_group pgAMIinterventions { //EN More...
+pgAMI_STATINS,
+pRR_BETABLOCKERS_ON_AMI_INCIDENCE,
+pgAMIinterventions_INCOME
+};
+
+parameter_group pgAMI_STATINS { //EN Statins
+pRR_STATINS_ON_AMI_INCIDENCE,
+pAMI_HIGH_RISK,
+pSTATIN_EFFECTIVE_COVERAGE,
+pAMI_TARGET_LIPID_LEVELS,
+pSTATIN_REASSESSMENT_TIMES
+};
+
+parameter_group pgAMIinterventions_INCOME { //EN Income
+pRR_INCOME_QUARTILE_ON_AMI,
+pAMI_INCOME_QUARTILE_INTERVENTION_CONTROL
+};
+
+parameters {
+
+	/* NOTE ( pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_START_YEAR_TO_CHANGE_HUI , EN )
+
+		This parameter allows the user to decide if they want to allow a hypothetical intervention 
+		that changes the baseline distribution of BMI in the starting population to also impact HUI 
+		(set to TRUE), as per the parameters that relate BMI category to HUI. For all other changes
+		in BMI category in the simulation, this change in HUI is applied. By applying it here, it 
+		is consistent with the established relationship, however, it will create a distribution of 
+		HUI different from that reported and input to the simulation. Again, this is in line with the 
+		intervention and must be understood in the context the intervention scenario that changes BMI.  
+		
+		Once caveat: persons on CCHS read into the simulation with high HUI (example 1.0) may exceed 
+		the maximum value of HUI (1.0) when the change in BMI occurs in the start year (indeed at 
+		other times too). The software does not allow HUI to go out of bounds, so it is possible that
+		even though the intervention may improve BMI status that would usually result in improved HUI,
+		this may not be realized if their BMI is already at the maximum.
+		
+		The user can set this parameter to false so that HUI will not be changed in the start year 
+		when BMI is changed as a result of a hypothetical intervention. 
+
+		Default: TRUE
+	*/
+	logical pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_START_YEAR_TO_CHANGE_HUI;	//EN Allow change in BMI in start year to change HUI in start year.
+
+	/* NOTE ( pRISK_FACTOR_CONTROL_PANEL, EN )
+	Four "switches" that allow control over 
+	>(1) which models of evolution of risk factors are used (see detailed notes below), 
+	>(2) how the reductions in risk factors for intervention scenarios are applied (relatively or absolutely), and
+	>(3) whether the reduction is applied to the value of the risk factor or to the proportion in a category.
+	>(4) whether interventions can be applied again after they have once been successful (the person have fallen 
+		 out of the target risk group as a result of original intervention)
+
+	>See parameter pRF_INTERVENTIONS for value of % reduction specified.
+	> ---------------------------------
+	>Base Case Evolution Model
+	> DEFAULT: set all to TRUE for Base scenario
+	> ---------------------------------
+	>BMI 
+	> TRUE  : NPHS regressions used (with age restrictions-see pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE)
+	> FALSE : Transition Matrix used (see TransHRisk)
+	> ---------------------------------
+	>Smoking 
+	> TRUE  : NPHS nth order Hierarchical Markov chain used 
+	(with age restrictions-see pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE )
+	> FALSE : No evolution.
+	> ---------------------------------
+	>Cholesterol and Blood pressure (SPB either/or DBP)
+	> TRUE  : Risk factor reduction applied to result from Transition Matrix (see TransHRisk) over lifetime
+	> FALSE : Risk factor reduction applied to input to Transition Matrix (see TransHRisk) in Start Year only
+	> HDL: n/a (imputed from total cholesterol)
+	> ---------------------------------
+	>Diabetes (Note: DPORT always used to project incidence)
+	> TRUE  :  DPoRT result used as input to Transition Matrix
+	> FALSE : Transition Matrix result used for next Transition (testing)
+	*/
+
+	//EN Risk factor control panel
+	logical pRISK_FACTOR_CONTROL_PANEL[CAD_RISK_FACTOR][RF_SWITCH];
+
+	/* NOTE ( pRF_INTERVENTIONS, EN )
+	>Risk factor intervention parameter is used to reduce or increase prevalence 
+	of risk factors for targeted high risk categories (by sex and age group).
+	The amount can represent a RELATIVE change (interpreted as a percent) 
+	or an ABSOLUTE change (interpreted as a value).
+	See pRISK_FACTOR_CONTROL_PANEL to specify if it is to be interpretted as RELATIVE or ABSOLUTE.
+	>
+	>DEFAULT: Set Amount of Change to 0 (Base case scenario).
+	>
+	> AS A PERCENT CHANGE:
+	> Example : -0.1 means 10% reduction in risk factor ("beneficial" intervention)
+	> Example : 0.1 means 10% increase in risk factor ("harmful" intervention)
+	> Range   : -1.0 to 1.0
+	>
+	> AS A ABSOLUTE CHANGE:
+	> Example : 2 means reduce the risk factor value by 2 units 
+	> Range   : user discretion
+	> Default : 0.0 (no intervention)
+	>
+	> HIGH RISK CUTOFF (UPPER, LOWER)		
+	> Example: apply the BMI reduction % to all persons with BMI falling between the two specified values
+	> Range   : varies by risk factor
+	> Default : none.
+	> 
+	> FLOOR, CEILING and BUFFERS
+	> As of May 2011, these are the new controls to restrict RF values resulting from interventions. The 
+	total of 4 controls: 2 for specifying the actual limits, above which or below which the RF value is not 
+	allowed to fall, and 2 - for the size of the buffer intervals adjacent to floor and ceiling respectively.
+	The buffers serve to prevent having too many people ending up "at the border" as a result of interventions.
+	Whenever a risk factor crosses the midpoint of the buffer interval (up for upper buffer and down for lower 
+	buffer) as a result of an intervention, the person is assigned a value drawn uniformly from the buffer 
+	interval instead of the value that would be computed without restrictions.
+	>
+	>
+	>Note: HDL is imputed from total cholesterol so an intervention on total cholesterol 
+	is also an intervention on HDL (the HDL parameter is a placeholder, but no explicit intervention is
+	currently modeled).
+	>
+	>Note: blood pressure category is combined systolic and diastolic measures, so the intervention should be 
+	on both simultaneously (for example, a 10% reduction for both; 
+	or an absolute reduction of systolic by 4 mmHg and diastolic by 2 mmHg)
+	>
+	> STATIN INTERVENTIONS are specified through other parameters:
+	> See parameters : 	pRR_STATINS_ON_AMI_INCIDENCE, pAMI_HIGH_RISK, pAMI_TARGET_LIPID_LEVELS
+	*/
+
+	//EN Risk factor interventions
+	double pRF_INTERVENTIONS[CAD_RISK_FACTOR][RF_INTERVENTION_PARAMETER];
+
+	/* NOTE ( pRF_INTERVENTION_TIME_PERIOD, EN )
+	Parameter that defines when and for how long RF interventions are applied. Interventions, as defined by 
+	pRF_INTERVENTIONS are applied annually within the interval [start year, end year). The third parameter 
+	restricts the total number of annnual interventions for one person. This parameter is only meaningful if 
+	it is set to less than the difference between end year and start year.
+	Nb: Interventions are NOT applied in the end year.
+	*/	
+
+	//EN Time period for risk factor interventions
+	double pRF_INTERVENTION_TIME_PERIOD[CAD_RISK_FACTOR][RF_INTERVENTION_TIME_PARAMETER];
+
+	/* NOTE ( pRF_INTERVENTION_AGE_GROUPS, EN )
+	As of May 2011, the pRF_INTERVENTIONS parameter is no longer tabulated by age and sex. Instead, this
+	separate table of logical switches is used to indicate, to which age/sex groups RF interventions (as
+	specified by pRISK_FACTOR_CONTROL_PANEL, pRF_INTERVENTIONS and pRF_INTERVENTION_TIME_PERIOD) are allpied.
+
+	Caveat: compound change in BMI and baseline evolution switch shall not be affected by this parameter
+	*/
+
+	//EN Target age/sex groups for risk factor interventions
+	logical pRF_INTERVENTION_AGE_GROUPS[SEX][AGE_GROUP_RFI][CAD_RISK_FACTOR];
+
+	/* NOTE ( pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE, EN )
+	Only meaningful when pRISK_FACTOR_CONTROL_PANEL[x][RF_EVOLUTION_MODEL]
+	is TRUE for risk factor x. 
+	Used to interupt the modeled evolution of RISK FACTORS for 
+	a period determined by an age range
+	>NB: Only used for smoking and BMI currently
+	>NB: Always set second parameter to 999 (cannot restart yet).
+	*/
+
+	//EN Risk factor evolution off age ranges
+	int pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE[CAD_RISK_FACTOR][cLOWER_UPPER_BOUNDS];
+
+	
+	//EN Proportion of people with high blood pressure treated in 1990 (baseline)
+	//double pBaselineBpTreatmentRate[BP_TREATMENT_CATEGORY][SEX][BP_TREATMENT_EDUCATION];
+
+
+	
+	//EN Proportion of people with high blood pressure treated in addition to baseline level (1991-2008)
+	//double pAdditionalBpTreatmentRate[BP_TREATMENT_CATEGORY][SEX][BP_TREATMENT_EDUCATION][BP_TREATMENT_YEAR];
+	
+	
+	//EN Proportions of people treated for high blood pressure, for whom treatment is effective
+	//double pEffectiveBpTreatmentRate[BP_TREATMENT_CATEGORY][SEX][BP_TREATMENT_EDUCATION][BP_TREATMENT_YEAR];
+
+	/* NOTE ( pSTATIN_REASSESSMENT_TIMES, EN )
+	>Parameter 1: Recommended period to wait before reasssessing lipid levels according to
+	guidelines. 
+	>Default is 5 years (Source: CMAJ 2003 Guidelines)
+	>Parameter 2: Time to re-assess cases that were non-adherent to recommended statin use
+	>Default is 1 year (next physician visit) (Source: Lit review).
+	>Parameter 3: Number of times after which a non-adherent is a never-adherent 
+	>Default is 1 follow-up visit. (Source: Lit review).
+	*/	
+	//EN Statin re-assessment timing
+	double		pSTATIN_REASSESSMENT_TIMES[STATIN_REASSESSMENT];
+
+	/* NOTE ( pRR_INCOME_QUARTILE_ON_AMI, EN )
+	This is populated by first running POHEM to generate the 1-year predicted risk of AMI
+	using the Framingham function, and reporting the cumulative probability by age group, sex
+	and income quartile. From this the relative risk of each quartile to richest can be calculated.
+	
+	Example: 
+	To use in intervention to reduce everyones risk to their age-sex richest counterparts, 
+	the inverse of the relative risk in this parameter is applied (do not manually invert)
+	ie. POHEM applies a 1/RR to the risk function for AMI incidence.
+	
+	*/
+	//EN Relative risk of AMI by Income Quartile
+	double pRR_INCOME_QUARTILE_ON_AMI[SEX][AGE_GROUP3080][INCOME_QUARTILE];
+
+	/* NOTE ( pAMI_INCOME_QUARTILE_INTERVENTION_CONTROL, EN )
+	Controls whether this intervention is activated (true) or not (false = default)
+	*/
+	//EN Control of Income quartile intervention
+	logical pAMI_INCOME_QUARTILE_INTERVENTION_CONTROL;
+
+	/* NOTE ( pAMI_TARGET_LIPID_LEVELS, EN )
+	>Specify the target lipid levels as the ratio of total chol to HDL as specified by Guidelines
+	(or as desired) to determine who would be eligible for statin use, by 10-year predicted risk category.
+	>Data source: Working Group recommendations on dislipidemia (Fodor CMAJ 2000, Fodor CMAJ 2003, or other).
+	> Note: >Guidelines allow for lifestyle changes before statins recommended:
+	> for Moderate and Low risk are given 3 and 6 months respectively, however, this is not explicitly modeled
+	*/
+	//EN Guideline target lipid levels by level of risk of AMI
+	double pAMI_TARGET_LIPID_LEVELS[AMI_RISK_LEVEL];
+
+	/* NOTE ( pSTATIN_EFFECTIVE_COVERAGE, EN )
+	>This represents the effective coverage of (adherence to ) statins in the initial years of the simulation.
+	The three components allow you to specify the usage in the initial year of the simulation (see pStartYear)
+	the yearly rate of increase, and the ceiling value assumed. This can be speficied separately for those
+	being treated before having heart disease (primary prevention) and those after (secondary prevention). 
+	Furthermore the coverage can be varied by level of risk, if that level of information is known.
+	> Valid data values from 0.0 to 1.0 e.g., for 100% enter 1.0; for 50% enter 0.5; etc
+	*/
+	//EN Statin effective coverage
+	double pSTATIN_EFFECTIVE_COVERAGE[AMI_RISK_LEVEL][TREATMENT_INTENTION][UPTAKE_RATE];
+
+	/* NOTE ( pRR_STATINS_ON_AMI_INCIDENCE, EN )
+	Relative risk (beneficial) of statin to reduce incidence of heart attacks (AMI).
+	>Default: 0.74
+	>Range: >0
+	>Tip: Set to 1 to create a scenario "what-if statins had not been introduced, what would the number of
+	heart attacks been.
+	>Related Parameter: pSTATIN_EFFECTIVE_COVERAGE
+	*/
+	//EN Relative risk of statins on incidence of AMI
+	double pRR_STATINS_ON_AMI_INCIDENCE;
+
+	/* NOTE ( pRR_BETABLOCKERS_ON_AMI_INCIDENCE, EN )
+	Reduce AMI incidence when beta blockers (or "substitute" for other drug):
+	>	RR = 0.xx when beta blockers given to those at high risk of AMI and hypertensive
+	>	RR = 1.0 for base case scenario, and those not hypertensive (even if at high risk of AMI)
+	> value must be between 0.0 and 1.0
+	*/
+
+	//EN Relative risk of beta blockers on incidence of AMI
+	double pRR_BETABLOCKERS_ON_AMI_INCIDENCE;
+
+
+	/* NOTE ( pAMI_HIGH_RISK, EN )
+	Guidelines for assessment of lipid level depend on level of risk of AMI, determined according to 
+	age, number of CAD risks, levels of BMI, SBP, DBP, Smoking, diabetes and history of AMI. 
+	Chol and HDL can be set here, but in practice, one assumes they wouldn't be known 
+	prior to lipid testing (Default: set Chol to 999 and HDL to 0).
+	*/
+	//EN High risk of AMI as per guidelines for lipid level assessment criteria 
+	double pAMI_HIGH_RISK[SEX][AMI_HIGH_RISK_STATES];
+};
+
+actor Person	// Core Individual
+{
+	//void	InterveneOnCholesterol();
+	void	ApplyStatinTherapy();
+	void	InterveneOnIncome();
+	void	InterveneOnBMI();
+	void	InterveneOnSmoking();
+	//void	ApplyRegularBPTreatment();
+
+//	void	InterventionsAtStart();
+//	hook	InterventionsAtStart, ImputeInitialStatesNotOnStartPop;
+
+	void	RiskFactorInterventions();
+	hook	RiskFactorInterventions, BirthdayEvent, 30;	// 30 = execution number, the higher the value, the later the execution		
+	hook	RiskFactorInterventions, Start, 20;	// 20 = execution number, the higher the value, the later the execution		
+
+	event	timeAssessLipidLevelsEvent,  AssessLipidLevelsEvent; 
+
+	double	gAMI_Framingham_1yr_Predicted_Probability = {0.0};
+	logical	lAssess_Dyslipidemia_Guidelines = {FALSE};
+	logical	gStatinsRecommended = {FALSE};
+	logical	gStatinAdherence = {FALSE};
+	logical	gAssessLipidLevels  = {TRUE};
+	double	gStatinGuidelineReassesWaitTime = {TIME_INFINITE};
+	int		gNumberTimesNonAdherent={0};
+	logical	gBetaBlockersPrescribed = {FALSE};
+	AMI_RISK_LEVEL	gAMI_risk_level = {AMI_VERY_LOW_RISK};	// Based on 10-year predicted risk of AMI
+	AMI_RISK_LEVEL	gAMI_risk_level_previous = {AMI_VERY_LOW_RISK};	// Based on 10-year predicted risk of AMI
+
+	BP_TREATMENT_CATEGORY bptcRiskGroup = {BPTC_NULL};
+	int nTreatmentYear = RANGE_POS(BP_TREATMENT_YEAR, calendar_year);
+	BP_TREATMENT_EDUCATION bpteEducation = aggregate(gEducation, BP_TREATMENT_EDUCATION);
+
+	
+	int		nInterventionsApplied[CAD_RISK_FACTOR];
+	logical lInterventionSucceeded[CAD_RISK_FACTOR];
+
+	//logical MEND_target= gBMI_growth_curve> MEND_cutoff[sex]; // This creates a logical for MEND_target
+};
+
+/*  *NOTE*(Person.InterventionsAtStart,EN)
+	
+	INTERVENTIONS performed at Start, ie just after person is created. 
+	Changing risk factors at start of person's life allows them to impact 
+	the starting values for other risk factors (e.g., cholesterol) initialized 
+	in HealthRisks. This does not necessarily assume a one-time change: the 
+	same interventions can be applied in future years depending on the values
+	of pRF_INTERVENTION_TIME_PERIOD parameter.
+
+	Note: Future births and new immigrants start their life in future years, 
+		  not necessarily at simulation start year.
+	
+	INTERVENTION : SMOKING
+	INTERVENTION : BMI
+
+*/
+/*
+* void hook_InterventionsAtStart(){};
+* 
+void Person::InterventionsAtStart()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	// Initialize nInterventionsApplied and lInterventionSucceeded here to make sure
+	// they are set to all zeros before we start counting interventions.
+	for ( int nRF=0; nRF<SIZE(CAD_RISK_FACTOR); nRF++ )
+	{
+		nInterventionsApplied[nRF] = 0;
+		lInterventionSucceeded[nRF] = FALSE;
+	};
+
+	InterveneOnSmoking();
+	InterveneOnBMI();
+
+	hook_InterventionsAtStart();
+};
+*/
+/* NOTE(Person.RiskFactorInterventions,EN)
+	These INTERVENTIONS are performed after RiskFactorTransitions i.e, after Start and each birthday, 
+	but before evaluating risk of developing disease. They  are potentially applied more 
+	than once (depending on parameter choices).
+
+	INTERVENTION : HYPERTENSION
+	INTERVENTION : CHOLESTEROL
+	INTERVENTION : STATIN USE
+	INTERVENTION : TRANS FAT  ** NOT DONE - NO SUPPORTING DATA ** 
+	INTERVENTION : SES
+
+	AO, May2011: The generalized RF Intervention controls are fully implemented only for BMI and Smoking.
+				 The following parameters/controls are ignored by all other interventions:
+				 - intervention start/end year and max years per person (pRF_INTERVENTION_TIME_PERIOD)
+				 - targer age/sex groups (pRF_INTERVENTION_AGE_GROUPS)
+				 - floor/ceiling restrictions on the value resulting from interventions (pRF_INTERVENTIONS)
+				 - apply change to value (pRISK_FACTOR_CONTROL_PANEL)
+				 - risk group upper cut-off (pRF_INTERVENTIONS)
+
+				 Nb: The code below needs revision in order to comply with the new RF Intervention controls
+*/
+
+void Person::RiskFactorInterventions()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	if ( truncated_age == lifespan_age_start ) 
+	{
+		// Initialize nInterventionsApplied and lInterventionSucceeded here to make sure
+		// they are set to all zeros before we start counting interventions.
+		for ( int nRF=0; nRF<SIZE(CAD_RISK_FACTOR); nRF++ )
+		{
+			nInterventionsApplied [nRF] = 0;
+			lInterventionSucceeded[nRF] = FALSE;
+		}
+	}
+
+	InterveneOnSmoking();
+	InterveneOnBMI();
+	UpdateBMI_InterventionFactor();
+
+
+	//------------------------------------------------------------------
+	// INTERVENTIONS ON CARDIAC RISK FACTORS 
+	// - Blood pressure / hypertension
+	// - Cholesterol
+	// - Statin therapy
+	// -- see PersonCore.mpp for smoking and BMI
+	//------------------------------------------------------------------
+	// NOTE The sign of the percent change determines if we 
+	// REDUCE (-ve) or INCREASE (+ve) proportion in the risk factor
+	// The equations below use the sign automatically to adjust % down or up.
+
+	//InterveneOnCholesterol();
+	ApplyStatinTherapy();
+	InterveneOnIncome();
+	//ApplyRegularBPTreatment();
+
+	hook_RiskFactorInterventions();
+};
+
+void hook_InterveneOnSmoking() {};
+
+void Person::InterveneOnSmoking()
+{
+	//------------------------------------------------------------------
+	// INTERVENTION CODE : SMOKING
+	//------------------------------------------------------------------
+	// Note: Following RF intervention restrictions cannot be applied to smoking interventions:
+	//		 - risk group upper and lower cut-off points (see pRF_INTERVENTIONS)
+	//		 - floor/ceiling with buffers (see pRF_INTERVENTIONS)
+	//		 - disallowing re-interventions once successful (see pRISK_FACTOR_CONTROL_PANEL)
+	// Also it is always assumed the change is applied to categories (not value), and that the 
+	// chnage is relative (regardless if corresponding values in pRISK_FACTOR_CONTROL_PANEL
+
+	double	dAmountOfChange = {0.0};
+	int		nAgeGroupRFI = SPLIT( truncated_age, AGE_GROUP_RFI);
+
+	// The sign of the input parameter determines if 
+	// we REDUCE (-ve) or INCREASE (+ve) proportion of smokers
+	dAmountOfChange = pRF_INTERVENTIONS[cSMOKING][cAMOUNT_OF_CHANGE];
+
+	// Check for: 
+	//  - time period
+	//	- target age/sex group
+	//	- whether the maximum number of interventions per person has been reached
+	if ( (calendar_year >= pRF_INTERVENTION_TIME_PERIOD[cSMOKING][cINTERVENTION_START_YEAR]) && 
+		 (calendar_year < pRF_INTERVENTION_TIME_PERIOD[cSMOKING][cINTERVENTION_END_YEAR]) &&
+		 (pRF_INTERVENTION_AGE_GROUPS[sex][nAgeGroupRFI][cSMOKING] == TRUE) &&
+		 (nInterventionsApplied[cSMOKING] < pRF_INTERVENTION_TIME_PERIOD[cSMOKING][cMAX_INTERVENTION_YEARS]) ) 
+	{
+
+		// REDUCE number of smokers by x% (always relative reduction)
+		if ( dAmountOfChange < 0.0 )
+		{	
+			dAmountOfChange = -1.0*dAmountOfChange;
+			if ( gSmoker == cREGULAR_SMOKER ) 
+			{
+				if ( RandUniform(4) < dAmountOfChange )
+				{
+					gSmokingRegular = cNOT_REGULAR_SMOKER;
+				}
+			}
+		}
+		// INCREASE number of smokers by x% (always relative reduction)
+		else
+		{
+			if ( gSmoker == cNOT_REGULAR_SMOKER ) 
+			{
+				if ( RandUniform(65) < dAmountOfChange )
+				{
+					gSmokingRegular = cREGULAR_SMOKER;
+				}
+			}
+		}
+		nInterventionsApplied[cSMOKING] ++;
+	}
+
+	hook_InterveneOnSmoking();
+};
+
+void hook_InterveneOnBMI() {};
+
+void Person::InterveneOnBMI()
+{
+	//------------------------------------------------------------------
+	// INTERVENTION CODE : BMI
+	//------------------------------------------------------------------
+	// Nb: bmi state variable gets automatically updated when gBMI changes value
+
+	double	dAmountOfChange = {0.0};
+	int		nAgeGroupRFI = SPLIT( truncated_age, AGE_GROUP_RFI);
+	double	dLowerTrigger = {0.0};
+	double	dUpperTrigger = {0.0};
+	double  bmi_altered  = gBMI;
+
+	// The sign of the input parameter determines if 
+	// we REDUCE (-ve) or INCREASE (+ve) proportion of overweight and obese
+	dAmountOfChange = pRF_INTERVENTIONS[cBMI][cAMOUNT_OF_CHANGE];
+
+	// Check for: 
+	//  - time period
+	//	- target age/sex group
+	//	- risk group cut-offs (upper, lower)
+	//	- whether the maximum number of interventions per person has been reached
+	//  - whether the person once already benefited from intervention and re-interventions are not allowed
+	//	  (see pRISK_FACTOR_CONTROL_PANEL)
+	if ( (calendar_year >= pRF_INTERVENTION_TIME_PERIOD[cBMI][cINTERVENTION_START_YEAR]) && 
+		 (calendar_year < pRF_INTERVENTION_TIME_PERIOD[cBMI][cINTERVENTION_END_YEAR]) &&
+		 (pRF_INTERVENTION_AGE_GROUPS[sex][nAgeGroupRFI][cBMI] == TRUE) &&
+		 (bmi_altered >= pRF_INTERVENTIONS[cBMI][cHIGH_RISK_LOWER_CUTOFF]) &&
+		 (bmi_altered <= pRF_INTERVENTIONS[cBMI][cHIGH_RISK_UPPER_CUTOFF]) &&
+		 (nInterventionsApplied[cBMI] < pRF_INTERVENTION_TIME_PERIOD[cBMI][cMAX_INTERVENTION_YEARS]) &&
+		 (pRISK_FACTOR_CONTROL_PANEL[cBMI][RF_REINTERVENTION] || !lInterventionSucceeded[cBMI]) ) 
+	{
+		// apply as a RELATIVE change 
+		if ( pRISK_FACTOR_CONTROL_PANEL[cBMI][RF_RELATIVE_CHANGE] )
+		{	
+			// apply change to value
+			if ( pRISK_FACTOR_CONTROL_PANEL[cBMI][RF_CHANGE_TO_VALUE] )
+			{	
+				bmi_altered *= (1.0 + dAmountOfChange);
+			}
+
+			// apply change to categories targeted
+			else 
+			{	
+				// REDUCE % IN HIGH BMI CATEGORIES (ABOVE CUT-OFF) ** desirable outcome analysis **
+				if ( dAmountOfChange < 0.0 )
+				{	
+					dAmountOfChange = -1.0*dAmountOfChange;
+					if ( RandUniform(35) < dAmountOfChange ) 
+					{
+						if (bmi == BMI_CAT_4) {	// obese 
+							bmi_altered = 29.0	;		// becomes overweight (high end)
+						}
+						else if (bmi == BMI_CAT_3)
+						{	// overweight 
+							bmi_altered = 24.0	;				// becomes normal (high end)
+						}
+						else if (bmi == BMI_CAT_2)
+						{	// normal 
+						bmi_altered = 18.4	;					// becomes underweight (high end)
+						}
+					}
+				}
+				// INCREASE % IN HIGH BMI CATEGORIES (ABOVE CUT-OFF) ** undesirable outcome  analysis **
+				else 
+				{
+					if ( RandUniform(66) < dAmountOfChange ) 
+					{
+						if (bmi == BMI_CAT_3)
+						{	// overweight  
+							bmi_altered = 31.0	;		// becomes obese (low end)
+						}
+						else if (bmi == BMI_CAT_3)
+						{	// normal  
+							bmi_altered = 26.0	;				// becomes overweight (low end)
+						}
+						else if (bmi == BMI_CAT_2) 
+						{	// underweight  
+							bmi_altered = 19.0	;					// becomes normal (low end)
+						}
+					}
+				}
+			}
+		}
+		else 
+		{	// apply as an ABSOLUTE reduction/increase depending on sign
+			bmi_altered += dAmountOfChange;
+		}
+
+		if ( dAmountOfChange != 0 )
+		{
+			// correct the resulting BMI value to conform with floor/ceiling restrictions
+			dLowerTrigger = pRF_INTERVENTIONS[cBMI][cRESULT_LOWER_LIMIT] + pRF_INTERVENTIONS[cBMI][cLOWER_BUFFER]/2;
+			dUpperTrigger = pRF_INTERVENTIONS[cBMI][cRESULT_UPPER_LIMIT] - pRF_INTERVENTIONS[cBMI][cUPPER_BUFFER]/2;
+
+			if ( bmi_altered < dLowerTrigger )
+			{
+				bmi_altered =	pRF_INTERVENTIONS[cBMI][cRESULT_LOWER_LIMIT] + 
+						(RandUniform(75) * pRF_INTERVENTIONS[cBMI][cLOWER_BUFFER]);
+			}
+			else if ( bmi_altered > dUpperTrigger ) 
+			{
+				bmi_altered =	pRF_INTERVENTIONS[cBMI][cRESULT_UPPER_LIMIT] - 
+						(RandUniform(76) * pRF_INTERVENTIONS[cBMI][cUPPER_BUFFER]);
+			}
+
+			// check if an intervention succeeded (a person is no longer in a risk group
+			if ( (bmi_altered < pRF_INTERVENTIONS[cBMI][cHIGH_RISK_LOWER_CUTOFF]) ||
+				 (bmi_altered > pRF_INTERVENTIONS[cBMI][cHIGH_RISK_UPPER_CUTOFF]) )
+			{
+				lInterventionSucceeded[cBMI] = TRUE;
+			}
+		}
+
+		// Count how many times intervention has been applied so far 
+		nInterventionsApplied[cBMI]++;
+	}
+
+	gBMI = COERCE(BMI_RANGE, bmi_altered);
+
+//	gBMImeasuredOld TO REVISE - NOT SATISFYING
+//	gBMImeasuredOld = gBMI * pMeanDiffBMIm_sr[sex][bmi-1][age_BMI_group3075]; //delete  it is now a derived state
+
+	// Nb: bmi state variable gets automatically updated when gBMI changes value
+
+	hook_InterveneOnBMI();
+};
+
+//void hook_InterveneOnCholesterol() {};
+
+void hook_ApplyStatinTherapy() {};
+
+void Person::ApplyStatinTherapy()
+{
+	double	dCAD_10yearProb = {0.0};
+	double	dCAD_10yearProb_wStatins = {0.0}; // initiliaze at low risk
+	double	dFramResult = {0.0};
+	double	dStatinBaseRate = {0.0};
+	double	dStatinUptakeRate ={0.0};
+	double	dStatinMaxRate = {1.0};
+	double	dStatinNumberYears = {0.0};
+	double	dStatinEffectiveCoverageRate = {0.0};
+	int		nNumberofCADriskfactors = {0};	
+
+	//------------------------------------------------------------------
+	// INTERVENTION CODE : STATIN USE  -- first version not used			
+	//------------------------------------------------------------------
+	//Statin intervention to high risk people ** NO LONGER USED **
+	/* We have decided to try the 10-year predicted risk method
+	if ( gSmoker == cREGULAR_SMOKER ) 
+	{	
+		nRiskCounter += 1; 
+	}
+	if ( chol == CHOL_MEDHI || chol == CHOL_MED || chol == CHOL_HIGH ) 
+	{
+		nRiskCounter += 1; 
+	}
+	if (bp_chhs == BP_MEDHI || bp_chhs == BP_HIGH ) 
+	{
+		nRiskCounter += 1; 
+	}
+	if ( diab == DIAB_YES || nRiskCounter >=2 ) 
+	{
+		// Give statins which impact incidence as RR
+		gRR_Statins_AMI_Incidence = pRR_STATINS_ON_AMI_INCIDENCE;
+	}
+	else 
+	{
+		gRR_Statins_AMI_Incidence = 1.0; // no impact
+	}
+	*/
+
+	// ------------------------------------------------------------------
+	//	INTERVENTION CODE : STATIN USE  -- first version not used			
+	// ------------------------------------------------------------------
+	/*	Give statins to high risk groups; 
+		- evaluate every year
+		- once on statins, stay on statins regardless of updated risk
+		- Step 0: Assess who would be evaluated for their risk of statins
+		- step 1: calculate 10-year predicted risk for everyone 
+				(even if have diabetes, for reporting)
+		- step 2: diabetics are at very high risk 
+					(as are those with CVD - CVD not modelled YET)
+		- step 3: calculate the ratio of total chol (TC) to HDL for statin eligibility
+		- step 4: conditionally "give" statins to lower risk of of developing AMI by setting the relative risk 
+					as reported in the literature 
+		
+		See related parameter pAMI_TARGET_LIPID_LEVELS which defines the target 
+		lipid levels. This parameter can be used to specify the 2000 or 2003 guidelines, 
+		but run in different scenarios.
+
+		For simplicity, statin use is immediate (no delay).
+	*/
+
+	/*------------------------------------------------------------------
+	 STEP 0: Assess who should be evaluated for statins based on their risk profile
+		***  However, in POHEM, we will evaluate the risk for all cases, and 
+			 report by those who would have been assessed and those who would 
+			 not have been assessed according to the guidelines
+			 Note - risk of second AMI is based on survival data which implicitly
+			 incorporates all treatments, including statins, into the survival
+			 function. So one assumes that statins have been prescribed
+			 where appropriate and the compliance is captured in the survival
+			 data
+	------------------------------------------------------------------*/
+	/*------------------------------------------------------------------
+	 STEP 1: Assign risk category of developing AMI based on the 10-year predicted risk of AMI. 
+			 Categories according to those used in Statin Guidelines 
+			 Note:	When age is too young, 0 is added to risk total, 
+			 when age exceeds 99 the risk at 99 is added to total.
+	------------------------------------------------------------------*/
+	// gAMI_risk_level = AMI_LOW_RISK; // initialized to very low, and will be set to low or above here
+	dCAD_10yearProb = 0.0;
+	dFramResult=0.0;
+	/*
+	for ( int nAge=truncated_age; nAge<truncated_age+10; nAge++) 
+	{
+		if ( nAge >= MIN( CAD_AGE_RANGE ) && nAge < SIZE( LIFE ) ) 
+		{ 
+			dFramResult = Framingham1998(Framingham_Beta_Chol[sex][cholF-1],
+										Framingham_Beta_HDL[sex][hdl-1], 
+										Framingham_Beta_BP[sex][bp_actual-1], 
+										Framingham_Beta_Diabetes[sex][gDiabetes_use], 
+										Framingham_Beta_Smoker[sex][gSmoker], 
+										Framingham_AMI_Alpha[gRegion][sex][truncated_age]  );
+		}
+		dCAD_10yearProb += dFramResult;	
+	};
+	*/
+	gAMI_risk_level_previous = gAMI_risk_level;
+	gAMI_risk_level = (	AMI_RISK_LEVEL ) SPLIT( dCAD_10yearProb, AMI_10YR_RISK_GROUPS );
+
+	/*------------------------------------------------------------------
+ 	  step 2: update risk level if they have diabetes or histor of heart disease
+	------------------------------------------------------------------*/
+	if ( gDiabetes_use == DIAB_YES ) 	// prevalence or incidence cases
+	{
+		gAMI_risk_level = AMI_VERY_HIGH_RISK;
+	};
+	/*------------------------------------------------------------------*/
+	// Whenever a person moves to a higher risk of AMI, assume lipids will be retested 
+	// and statins (re)prescribed even if non-compliant earlier, 
+	// this also resets any wait time to next evaluation (from non-adherence or next scheduled test)
+	if ( gAMI_risk_level > gAMI_risk_level_previous ) 
+	{
+		gNumberTimesNonAdherent = 0;	// reset
+		gAssessLipidLevels = TRUE;		// reset
+	}
+	// assessment criteria ( only those with identifiable risks)
+	if ( gAssessLipidLevels )
+	{
+		nNumberofCADriskfactors = 0;	
+		/* if ( truncated_age >= MIN( CAD_AGE_RANGE ) ) // Adults
+		{	
+			if ( gBMI >= pAMI_HIGH_RISK[sex][cHIGH_BMI] ) 
+			{
+				nNumberofCADriskfactors++;
+			};
+			if ( gSmoker == cREGULAR_SMOKER ) 
+			{
+				nNumberofCADriskfactors++;
+			};
+			if ( cholx > pAMI_HIGH_RISK[sex][cHIGH_CHOL] ) 
+			{
+				nNumberofCADriskfactors++;
+			};
+			if ( hdlx < pAMI_HIGH_RISK[sex][cLOW_HDL]  ) 
+			{
+				nNumberofCADriskfactors++;
+			};
+			if ( sbpx_chhs > pAMI_HIGH_RISK[sex][cHIGH_SBP]  )
+			{
+				nNumberofCADriskfactors++;
+			};
+			if ( dbpx_chhs > pAMI_HIGH_RISK[sex][cHIGH_DBP]  )
+			{
+				nNumberofCADriskfactors++;
+			};
+		} */
+		if (( truncated_age >= pAMI_HIGH_RISK[sex][cHIGH_AGE] ) ||
+			( nNumberofCADriskfactors >= pAMI_HIGH_RISK[sex][cHIGH_NUMBER_RX]  ) ||
+			( gDiabetes_use == DIAB_YES )
+			)
+			// or clinical evidence of CAD
+			// or peripheral vascular disease or carotid atherosclerosis
+			// or patients with xanthomata or other stigmata of dyslipidemia
+			// or history of dyslipidemia or CAD
+		{
+			lAssess_Dyslipidemia_Guidelines = TRUE;
+		};
+
+		if ( lAssess_Dyslipidemia_Guidelines ) 
+		{
+			/*------------------------------------------------------------------
+		 	  step 4: test if statins are to be prescribe based on risk level 
+					and the ration of total chol to hdl
+					2000 and 2003 Guidelines can both be specified through the same parameters
+					but in separate scenarios.
+			------------------------------------------------------------------*/
+			// if statins were prescribed then assume annual follow-up - so could re-evaluate every year to help boost adherence
+			// if statins not prescribed then don`t check for another five years
+
+			if (!gStatinsRecommended || !gStatinAdherence) // includes never prescribed
+			{
+				//gRR_Statins_AMI_Incidence = 1.0; // RESET 
+				// Statins recommended if above target lipid levels
+				if ( gTC_HDL_ratio >= pAMI_TARGET_LIPID_LEVELS[gAMI_risk_level] )
+				{
+					// statins should be recommended according to guidelines
+					gStatinsRecommended = TRUE;	
+					
+					// Apply Adherence to statins (this one parameter represents 
+					// both physician adherence to guidelines and patient adherence to prescription)
+//							if ( RandUniform(5) < pAMI_TARGET_LIPID_LEVELS[gAMI_risk_level][PROPN_STATINS] )
+
+					//dStatinBaseRate = pSTATIN_EFFECTIVE_COVERAGE[gAMI_risk_level][IndexAMI_event][cBASE_RATE];
+					//dStatinUptakeRate = pSTATIN_EFFECTIVE_COVERAGE[gAMI_risk_level][IndexAMI_event][cUPTAKE_RATE];
+					//dStatinMaxRate = pSTATIN_EFFECTIVE_COVERAGE[gAMI_risk_level][IndexAMI_event][cMAX_RATE];
+					dStatinNumberYears = (calendar_year - calendar_year_start);
+					dStatinEffectiveCoverageRate = dStatinBaseRate + ( dStatinUptakeRate * dStatinNumberYears );
+					dStatinEffectiveCoverageRate = min( dStatinMaxRate , dStatinEffectiveCoverageRate); 
+					if ( RandUniform(5) < dStatinEffectiveCoverageRate  )
+					{
+						gStatinAdherence = TRUE;
+						//gRR_Statins_AMI_Incidence = pRR_STATINS_ON_AMI_INCIDENCE;
+					}
+					else  // non-adherence , physician follow-up to improve is possible
+					{
+						gAssessLipidLevels = FALSE;
+						if ( gNumberTimesNonAdherent < pSTATIN_REASSESSMENT_TIMES[cSTATIN_NONADHERENCE_FOLLOWUPS] ) 
+						{
+							gStatinGuidelineReassesWaitTime = pSTATIN_REASSESSMENT_TIMES[cSTATIN_NONADHERENCE];
+						}
+						else 
+						{
+							gStatinGuidelineReassesWaitTime = TIME_INFINITE;
+						}
+						gNumberTimesNonAdherent++;
+					} // end else non-adh.
+				} // end ratio
+				else  // Lipid levels were below targets - reassess in x years
+				{
+					gAssessLipidLevels = FALSE;
+					gStatinGuidelineReassesWaitTime = pSTATIN_REASSESSMENT_TIMES[cSTATIN_LIPIDLEVELS_OK];
+				}	
+			}; // end if not on statins
+
+			// could evaluate for high risk groups the use of Beta Blockers
+			/*
+			if (!gBetaBlockersPrescribed) 
+			{
+				if ((gAMI_risk_level == AMI_VERY_HIGH_RISK)&& 
+					(( sbpx_chhs > pRF_INTERVENTIONS[cSBP][cHIGH_RISK_LOWER_CUTOFF] ) ||
+					 ( dbpx_chhs > pRF_INTERVENTIONS[cDBP][cHIGH_RISK_LOWER_CUTOFF] )))
+				{
+					gBetaBlockersPrescribed = TRUE;
+					gRR_BetaBlockers_AMI_Incidence = pRR_BETABLOCKERS_ON_AMI_INCIDENCE;
+				}
+				else 
+				{
+					gRR_BetaBlockers_AMI_Incidence = 1.0;
+				}
+			} 
+			*/
+			// end of bb
+
+			/*------------------------------------------------------------------
+			 step x. possibly was used for reporting. May also be interested in the 
+				 distribution of AMI risk level by 10-year predicted risk after statin 
+				 intervention, however we won't know how it effects chol and hdl
+			------------------------------------------------------------------*/
+			//dCAD_10yearProb_wStatins = dCAD_10yearProb * gRR_Statins_AMI_Incidence; 
+		} // end if lAssess_Dyslipidemia_Guidelines
+	}; // end assess lipids
+
+	hook_ApplyStatinTherapy();
+};
+
+void hook_InterveneOnIncome() {};
+
+void Person::InterveneOnIncome()
+{
+
+	int     nAgeGroup3080 = SPLIT( truncated_age, AGE_GROUP3080);
+	double	dFramResult = {0.0};
+
+	//------------------------------------------------------------------
+	// INTERVENTION CODE : SES
+	//------------------------------------------------------------------
+	// Keep 1 year probability for reporting by SES			-- See Table xxxx
+
+	/* dFramResult = Framingham1998(Framingham_Beta_Chol[sex][cholF-1],
+							Framingham_Beta_HDL[sex][hdl-1], 
+							Framingham_Beta_BP[sex][bp_actual-1], 
+							Framingham_Beta_Diabetes[sex][gDiabetes_use], 
+							Framingham_Beta_Smoker[sex][gSmoker], 
+							Framingham_AMI_Alpha[gRegion][sex][truncated_age] );
+	gAMI_Framingham_1yr_Predicted_Probability = dFramResult/(1+dFramResult);	*/
+	// p/(1+p) is appropriate since the risk function was modeled as a logistic regression
+	//------------------------------------------------------------------
+	/* if (pAMI_INCOME_QUARTILE_INTERVENTION_CONTROL)	// TRUE means do intervention on income
+	{
+		gRR_IncomeQuartile_AMI = (1.0/pRR_INCOME_QUARTILE_ON_AMI[sex][nAgeGroup3080][gIncomeQuartile]);
+	}; */
+
+	hook_InterveneOnIncome();
+};
+
+TIME Person::timeAssessLipidLevelsEvent()
+{
+	return WAIT( gStatinGuidelineReassesWaitTime ); 
+};
+
+void hook_AssessLipidLevelsEvent() {};
+
+void Person::AssessLipidLevelsEvent()
+{
+	gAssessLipidLevels = TRUE; // AT NEXT BIRTHDAY
+
+	hook_AssessLipidLevelsEvent();
+}
+

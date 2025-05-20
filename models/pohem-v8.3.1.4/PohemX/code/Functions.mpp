@@ -1,0 +1,1397 @@
+//FILE_LABEL (EN) Functions
+/* FILE_NOTE(EN) 
+	This file contains generalized functions used by other routines.
+*/
+
+
+
+/* NOTE ( RR_SAMPLES )
+The number of different sets of relative risk estimates that will be used to span
+the space of all possible risk factor combinations bases on their individual 
+distributions.  This is used under the "Monte" and "LatinHyperCube" methods of 
+selecting the relative risks.  Initially, we will continue to employ the subsample
+method of assignment (which is limited to a maximum of 40) but at some time may
+wish to switch to a cloning assignment.
+>
+Formerly known as MAX_SUBSAMPLES.  When using past scenarios with this version 
+of POHEM.EXE the dat files will need to be changed to use RR_SAMPLES.
+*/
+
+#include "pohem.h"
+#include "StatDistributionsFromDcdflib.H"
+#include "StatDistributionsFromR.H"
+
+range RR_SAMPLES {0,39};
+
+classification STATISTICAL_PACKAGE {
+	STATISTICAL_PACKAGE_DUMMY,  //EN Dummy
+	STATISTICAL_PACKAGE_R_OPEN_SOURCE, //EN R open source code
+	STATISTICAL_PACKAGE_DCDFLIB //EN DCDFLIB
+};
+classification cLOWER_UPPER_BOUNDS {	// Lower and Upper Bounds
+	LOWER_BOUND,					// Lower bound
+	UPPER_BOUND						// Upper bound
+};
+
+range SCATTER_PLOT_ELEMENTS{	//EN Data point index
+	0, 9
+};
+classification COORDINATES_X_Y{  //EN Size or probability
+	COORDINATES_X, //EN X  (e.g. age)
+	COORDINATES_Y  //EN Y (e.g. log cumulative hazard)
+};
+
+range CUBIC_SPLINE_KNOTS_INDEX  {1, 20}; //EN List of knots
+classification CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT{ //EN Cubic spline knots location and coefficient
+
+	CUBIC_SPLINE_KNOTS_LOCATION,    //EN Knot location
+	CUBIC_SPLINE_KNOTS_COEFFICIENT  //EN Knot coefficient
+};
+classification CUBIC_SPLINE_COMPANION{ //EN Cubic spline companion
+		CUBIC_SPLINE_COMPANION_MIN, //EN Lower bound for entity used to compute spline
+		CUBIC_SPLINE_COMPANION_MAX, //EN Upper bound for entity used to compute spline
+		CUBIC_SPLINE_COMPANION_RANGE_POWER, //EN Power of knot range for scaling
+		CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM, //EN Center linear term 
+		CUBIC_SPLINE_COMPANION_LINEAR_COEFFICIENT, //EN Coefficient for linear term
+		CUBIC_SPLINE_COMPANION_CENTER_CUBIC_TERM   //EN Center cubic spline term 
+};
+
+classification ARMAPLUS_11_PARAMETERS{  //EN ARMAplus(1,1) parameters
+	ARMAPLUS_11_PARAM_PHI,   //EN phi
+	ARMAPLUS_11_PARAM_THETA, //EN theta
+	ARMAPLUS_11_PARAM_KAPPA  //EN kappa
+};
+
+classification ARMAPLUS_11_ENTRIES{  //EN array entries for ARMAplus(1,1) process 
+//ARMA(1,1) part
+	ARMAPLUS_11_PHI,   //EN phi
+	ARMAPLUS_11_THETA, //EN theta
+	ARMAPLUS_11_VAR_A, //EN variance of a_t (derived from phi and theta)
+	ARMAPLUS_11_A_t,   //EN a_t
+//Plus part
+	ARMAPLUS_11_KAPPA, //EN kappa
+	ARMAPLUS_11_X,     //EN X ~ N(0,1) static
+//Final product ARMAplus(1,1) process
+	ARMAPLUS_11_Y_t    //EN Y_t
+};
+
+classification UNIFORM_SILOS{ //EN Silos for SILOED_UNIF process 
+	UNIFORM_SILOS_BOTTOM,  //EN Corridor of small uniform variates
+	UNIFORM_SILOS_MIDDLE,  //EN Corridor of intermediate uniform variates 
+	UNIFORM_SILOS_TOP      //EN Corridor of uniform variates corridor
+};
+
+classification SILOED_UNIF_PROCESS{  //EN array entries for SILOED_UNIF process 
+	SILOED_UNIF_LOWER_BOUND,   //EN Lower bound where uniform is constrained.
+	SILOED_UNIF_UPPER_BOUND,   //EN Upper bound where uniform is constrained.
+	SILOED_UNIF_U01_t          //EN U(0,1) within bound
+//	SILOED_UNIF_WHICH_SILO
+};
+
+
+
+hide (StatisticalPackage);
+hide (DisallowStatisticalPackageR);
+
+
+
+parameters {
+	/* NOTE ( StatisticalPackage )
+	The package to be used for statistical function such as cdf of gamma distribution, as requested by user.  
+	*/
+	STATISTICAL_PACKAGE StatisticalPackage;
+
+	/* NOTE ( DisallowStatisticalPackageR )
+	If this parameter is true and R package is requested by user, use DCDFLIB instead of R.
+	*/
+	logical DisallowStatisticalPackageR;
+
+	/* NOTE ( StatisticalPackageEdited )
+	Actual package to be used for statistical function such as cdf of gamma distribution.  
+	*/
+	model_generated STATISTICAL_PACKAGE StatisticalPackageEdited;
+
+	/* NONOTE ( ZSCORE )
+	Used in conjunction with the Latin Hyper Cube code.  
+	It represents the equal distribution of the devations across a set number of
+	subsamples.
+	*/
+	//double ZSCORE[RR_SAMPLES];
+
+	/* NONOTE ( RandomShuffleSeed )
+	Random seed for the random shuffle procedure (separate from case seed)
+	*/
+	//int RandomShuffleSeed;	
+
+	model_generated double mgMathConstant_PiOverSqrt3 ; //EN Standard deviation of logistic distribution = pi/sqrt(3) 
+	model_generated double mgMathConstant_Pi ;
+	model_generated double mgLOG_DBL_MAX;
+};
+
+
+
+// This function compares two records with respect to X_GROUP and Y
+// It is used by qsort in the PreSimulation
+int compare_two_RXYCC_vectors(const void *p, const void *q)
+{
+    double *record1 = (double *)p;
+    double *record2 = (double *)q;
+	double diff=0.0;
+
+	if(diff==0.0)
+		diff=record1[RXYCC_X_GROUP ] - record2[RXYCC_X_GROUP ];
+
+	if(diff==0.0)
+		diff=record1[RXYCC_Y       ] - record2[RXYCC_Y       ];
+
+	return diff < 0.0 ? -1 : (diff > 0.0 ? 1 : 0) ;
+};
+
+int StoreData( double pool[SIZE( DB_RECORDS_CDF )][SIZE(RECORD_X_Y_CDFINF_CDFSUP)], int *X, int Y, double *X_alternative_vec, double *Y_alternative_vec, double in_scope_bounds  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] )
+{
+	//  BEGIN check that X's are non-negative integers and get maximum for each covariates
+   double maximum[SIZE(COVARIATE_X)];
+   logical warning_should_be_issued = FALSE;
+
+   for(int this_x = 0; this_x<SIZE(COVARIATE_X);this_x++)
+   {
+	   maximum[this_x] = -14.0;
+	   for(int record_looper = 0;record_looper < SIZE(DB_RECORDS); record_looper++)
+	   {
+		   if(mgCumStartPopWeight[record_looper]>0.0)
+		   {
+			   double this_x_value =  X[this_x] < 0 ? X_alternative_vec[record_looper] : pStartPop[record_looper][ X[this_x] ];
+			   maximum[this_x] = max(maximum[this_x],this_x_value);
+			   if(  this_x_value < 0.0 || this_x_value != int(this_x_value +0.5)  )
+			   {
+				   warning_should_be_issued = TRUE;
+				   char line[199];
+				   snprintf(line,199,"NN integer check %i,%i,%0.9f,%i,%i \n",record_looper,this_x,this_x_value, this_x_value < 0.0 ? 1 : 0 ,this_x_value != int(this_x_value +0.5) ? 1 : 0);               
+				   WriteDebugLogEntry(line);
+			   }
+		   }
+
+	   }
+   }
+
+   if(warning_should_be_issued)
+	   ModelExit("\n Non-negative integer expected in function StoreData.\n");
+   //  END   check that X's are non-negative integers and get maximum for each covariates
+
+   
+   for (int record_looper = 0; record_looper < SIZE( DB_RECORDS_CDF ); record_looper++ ) //probably not really required because of  n_records_tot in qsort call
+   {
+	   pool[record_looper][RXYCC_RECORD]=99.9;
+	   pool[record_looper][RXYCC_X_GROUP  ]=99.9;
+	   pool[record_looper][RXYCC_Y   ]=99.9;
+	   pool[record_looper][RXYCC_CDFINF]=99.9;
+	  // pool[record_looper][RXYCC_CDFSUP]=99.9;
+   }		   
+	   
+   //BEGIN store proper information in pool
+
+   int n_records_tot = 0;
+   logical went_out_of_bounds = FALSE;
+   
+   for (int record_looper = 0; record_looper < SIZE( DB_RECORDS ) && !went_out_of_bounds ; record_looper++ ) 
+   {
+		double dRecordWeight = mgCumStartPopWeight[record_looper];
+		if ( dRecordWeight > 0.0 ) 
+		{	
+			logical is_in_scope =TRUE;
+			for(int this_x = 0; this_x<SIZE(COVARIATE_X);this_x++)
+			{
+				double this_x_value =  X[this_x] < 0 ? X_alternative_vec[record_looper] : pStartPop[record_looper][ X[this_x] ];
+				is_in_scope = is_in_scope && in_scope_bounds[this_x][LOWER_BOUND] <= this_x_value  && this_x_value <= in_scope_bounds[this_x][UPPER_BOUND];
+			}
+
+			if (is_in_scope ) 
+			{	
+				if(n_records_tot < SIZE( DB_RECORDS_CDF ) )
+				{
+					pool[n_records_tot][RXYCC_RECORD  ]=(double)record_looper;
+					pool[n_records_tot][RXYCC_Y       ]= Y < 0 ? Y_alternative_vec[record_looper] : pStartPop[record_looper][Y];
+					pool[n_records_tot][RXYCC_CDFINF  ]=dRecordWeight ; 
+					//pool[n_records_tot][RXYCC_CDFSUP  ]=dRecordWeight ; 
+
+ 					// BEGIN  create X_group out of X1, X2, X3, X4
+  							 /* BEGIN What is 472?
+  							    472 = 4*100 + 7*10 + 2 = 4*ten*dix + 7*ten + 2 =   ten*(dix*4 + 7)+2
+								  472 is the end result of this sequence/algorithm
+								     tot = 4
+									 tot = dix*tot + 7
+									 tot = ten*tot + 2
+ 		  					   In the above 
+								     ten = 1 + maximum possible value for third  digit = 10
+									 dix = 1 + maximum possible value for second digit = 10
+  		 					   The only way to have tot = 472 is to have first digit = 4 and second digit =2 and third digit = 2
+								  If maximum possible value for digits is not 10, the above sequence/algorithm can be used to summaries (3) digits into a single number.
+								  Provided that proper values of ten and dix are used (i.e.  ten = 1 + ... and  dix = 1 + ...), there is a one-to-one correspondance between digits and summary/tot .
+
+								  Below, we create X_group (tot) out of covariates ( "digits") 
+								 END What is 472? */
+
+					double this_x_value ;
+
+					this_x_value =  X[ 0            ] < 0 ? X_alternative_vec[record_looper] : pStartPop[record_looper][ X[ 0            ] ]; // akin to expression in loop below but with this_x = 0 aka COVARIATE_X1
+				//	this_x_value =  X[ COVARIATE_X1 ] < 0 ? X_alternative_vec[record_looper] : pStartPop[record_looper][ X[ COVARIATE_X1 ] ]; // akin to expression in loop below but with this_x = 0 aka COVARIATE_X1
+      
+  					pool[n_records_tot][RXYCC_X_GROUP  ] = this_x_value ;
+					for(int this_x = 1; this_x<SIZE(COVARIATE_X);this_x++)
+					{
+						this_x_value =  X[this_x] < 0 ? X_alternative_vec[record_looper] : pStartPop[record_looper][ X[this_x] ];
+						pool[n_records_tot][RXYCC_X_GROUP  ] = pool[n_records_tot][RXYCC_X_GROUP  ] * (1.0+ maximum[this_x] )  + this_x_value ;  
+					}
+  					 // END    create X_group out of X1, X2, X3, X4
+
+					n_records_tot++;
+				}
+				else //attempt to write in pool when it is already full
+					went_out_of_bounds = TRUE;
+			}
+		}
+
+	} 
+    //END store proper information in pool
+
+	if(went_out_of_bounds)
+		ModelExit("Went out of bounds in StoreData");   
+
+   return n_records_tot;
+}
+
+
+ void GetUnderlyingUniformWhereabouts(double pool              [SIZE( DB_RECORDS_CDF )][SIZE(RECORD_X_Y_CDFINF_CDFSUP)],
+	                                    double underlying_uniform[SIZE( DB_RECORDS )][SIZE(cLOWER_UPPER_BOUNDS)],int nrow_used_pool)
+ {
+   double current_group,  current_Y     ;  //these will be used in the next 4 segments/passes  (BEGIN ... END)
+
+   /*    Prior to PASS 1 RXYCC_CDFINF only contains weight of the record
+                 RXYCC_Y   RXYCC_CDFINF   RXYCC_CDFSUP 
+
+				 1.5			157.6		0.0
+				 1.5			258.4		0.0
+				 2.7			115.7		0.0
+				 4.1			589.5		0.0
+				 4.1			258.6		0.0
+
+         After PASS 1 
+                RXYCC_Y   RXYCC_CDFINF   RXYCC_CDFSUP 
+
+				 1.5			157.6		0.0
+				 1.5			416.0		0.0
+				 2.7			531.7		0.0
+				 4.1		   1121.2		0.0
+				 4.1		   1379.8		0.0
+
+         After PASS 2 
+               RXYCC_Y   RXYCC_CDFINF   RXYCC_CDFSUP 
+
+				 1.5		  0.1142		0.1142
+				 1.5		  0.3015		0.3015
+				 2.7		  0.3853		0.3853
+				 4.1		  0.8126		0.8126
+				 4.1		  1.0000		1.0000
+
+         After PASS 3 and 4 
+               RXYCC_Y   RXYCC_CDFINF   RXYCC_CDFSUP 
+
+				 1.5		  0.0000		0.3015
+				 1.5		  0.0000		0.3015
+				 2.7		  0.3015		0.3853
+				 4.1		  0.3853		1.0000
+				 4.1		  0.3853		1.0000
+
+   */
+
+   //BEGIN PASS 1 --> let [RXYCC_CDFINF  ] contain CDF numerator with respect to Y (e.g. BMI) within group  ... with caveat that two records with same Y will not contain the same numerator
+
+   double cumulative_w     = {0.0};
+     
+   current_group  = -9.9;
+   
+   for(int nRecord = 0; nRecord < nrow_used_pool ; nRecord++ ) 
+   {
+	   if( current_group  != pool[nRecord][RXYCC_X_GROUP] )
+	   {  //new group
+		   current_group  = pool[nRecord][RXYCC_X_GROUP] ;
+		   cumulative_w   = 0.0;
+	   }
+	   cumulative_w += pool[nRecord][RXYCC_CDFINF  ];
+	   pool[nRecord][RXYCC_CDFINF  ] = cumulative_w;
+   }
+   //  END PASS 1 --> let [RXYCC_CDFINF  ] contain CDF numerator with respect to Y (e.g. BMI) within group  ... with caveat that two records with same Y will not contain the same numerator
+
+   //BEGIN PASS 2 --> let [RXYCC_CDFINF  ]  and [RXYCC_CDFSUP  ] contain CDF with respect to Y (e.g. BMI) within group  ...  with caveat that two records with same Y will not contain the same cdf
+
+   double denominator      = {0.0};
+
+   current_group  = -9.9;
+   
+   for(int nRecord = nrow_used_pool - 1; nRecord >=0  ; nRecord-- ) 
+   {
+	   if( current_group  != pool[nRecord][RXYCC_X_GROUP] )
+	   {  //new group
+		   current_group  = pool[nRecord][RXYCC_X_GROUP] ;
+		   denominator    = pool[nRecord][RXYCC_CDFINF ];
+	   }
+	   pool[nRecord][RXYCC_CDFINF  ] /= denominator;
+	   pool[nRecord][RXYCC_CDFSUP  ] = pool[nRecord][RXYCC_CDFINF  ]  ;
+   }
+   //END PASS 2 --> let [RXYCC_CDFINF  ]  and [RXYCC_CDFSUP  ] contain CDF with respect to Y (e.g. BMI) within group  ...  with caveat that two records with same Y will not contain the same cdf
+
+
+   double cdf_inf, cdf_sup;
+
+    //BEGIN PASS 3 --> let [RXYCC_CDFINF  ]  = Prob(BMI < BMI of this record)   
+
+   current_group  = -9.9;
+   
+   for(int nRecord = 0; nRecord < nrow_used_pool ; nRecord++ ) 
+   {
+	   if( current_group  != pool[nRecord][RXYCC_X_GROUP] )
+	   {  //EN new X_group
+		   current_group  = pool[nRecord][RXYCC_X_GROUP] ;
+		   cdf_inf = 0.0;
+		   current_Y      = pool[nRecord][RXYCC_Y  ] ;
+	   }
+	   else if(current_Y  != pool[nRecord][RXYCC_Y  ] )
+	   {  //EN encounter new BMI within current X_group
+		   cdf_inf     = pool[nRecord-1][RXYCC_CDFSUP  ] ; //yes this is RXYCC_CDFSUP, not RXYCC_CDFINF
+		   current_Y   = pool[nRecord  ][RXYCC_Y  ] ;
+	   }
+	   pool[nRecord][RXYCC_CDFINF  ] = cdf_inf;
+   }
+    //END PASS 3 --> let [RXYCC_CDFINF  ]  = Prob(BMI < BMI of this record)  
+
+
+   //BEGIN PASS 4 --> let [RXYCC_CDFSUP  ]  = Prob(BMI <= BMI of this record)   
+
+   current_group  = -9.9;
+   
+   for(int nRecord = nrow_used_pool-1; nRecord >=0  ; nRecord-- ) 
+   {
+	   if( current_group  != pool[nRecord][RXYCC_X_GROUP] )
+	   {  //EN new X_group
+		   current_group  = pool[nRecord][RXYCC_X_GROUP] ;
+		   cdf_sup = 1.0;
+		   current_Y      = pool[nRecord][RXYCC_Y  ] ;
+	   }
+	   else if(current_Y    != pool[nRecord][RXYCC_Y  ] )
+	   {  //EN encounter new BMI within current X_group
+		   cdf_sup     = pool[nRecord  ][RXYCC_CDFSUP  ] ;
+		   current_Y   = pool[nRecord  ][RXYCC_Y  ] ;
+	   }
+	   pool[nRecord][RXYCC_CDFSUP ] = cdf_sup;
+   }
+    //END PASS 4 --> let [RXYCC_CDFSUP  ]  = Prob(BMI <= BMI of this record)  
+
+
+    for(int nRecord = 0; nRecord < SIZE(DB_RECORDS) ; nRecord++ ) //EN initialisation not really required because underlying_uniform will only be used for records in the youngest age group
+	{
+		underlying_uniform[nRecord][LOWER_BOUND] = -1.0;
+		underlying_uniform[nRecord][UPPER_BOUND] = -1.0;
+	}
+    for(int nRecord = 0; nRecord < nrow_used_pool ; nRecord++ ) 
+	{
+		int record_in_pStartPop = int(pool[nRecord][RXYCC_RECORD  ]);
+		underlying_uniform[record_in_pStartPop][LOWER_BOUND] = pool[nRecord][RXYCC_CDFINF  ];
+		underlying_uniform[record_in_pStartPop][UPPER_BOUND] = pool[nRecord][RXYCC_CDFSUP  ];
+	}
+
+// ==========================================================
+// END get  underlying_uniform
+// ==========================================================
+
+}
+
+
+
+double Calculate_Sigma( double dUpper, double dLower, double dConfidenceInterval )
+{
+// INPUTS: lower and upper bounds of confidence interval of RR
+// ASSUME: RR is distributed lognormally
+// CALCULATE: A lognormal standard error by averaging the upper and lower
+// PURPOSE: Determine RR during simulation as RR * exp( lognormal_se * randdeviate() );
+
+	double dSigma;
+
+	dSigma = ( ( log( dUpper ) - log( dLower ) ) / dConfidenceInterval  ) / 2;
+
+	return dSigma;
+}
+
+double Lognormal_RR( double dMean, double dStdDev, double dDeviate )
+{
+/* The RR is assumed to be lognormal. When calculating the mean for the lognormal
+from a normal there is an adjustment factor of sigma^2 / 2
+The reference for this is the Handbook of the Normal Distribution Patel and Read page 24.
+*/
+	double dRR;
+
+	dRR = dMean / exp( pow( dStdDev, 2) / 2 ) * exp( dStdDev * dDeviate );
+
+	return dRR;
+};
+
+static int compare(int *e1, int *e2)
+{
+	return( (*e1 < *e2 ) ? -1 : (*e1 > *e2 ) ? 1 : 0 );
+}
+
+// Randomly shuffles indices in the array
+void RandomShuffle(int N, int mRandArray[][2])
+{
+/* using a model generated parameter so that calling routine has access to 
+   the result of the random shuffle (must be better way, passing pointer to array)
+*/
+	for ( int j =0; j<N; j++ )
+	{
+		mRandArray[j][0] = rand();
+		mRandArray[j][1] = j;
+	}
+
+	qsort( (void *)mRandArray, (size_t)N, 2*(sizeof(int)),
+		(int (*)(const void *, const void *))compare);
+}
+
+
+double qcauchy(double p, double mu, double sigma)
+// compute quantile of the Cauchy(mu,sigma) distribution.  
+{
+	return mu+sigma*tan((p-0.5)*mgMathConstant_Pi);// mgMathConstant_Pi used in lieu of M_PI = 3.14159... from math.h
+}
+
+double pcauchy(double x, double mu, double sigma)
+// compute cdf of the Cauchy(mu,sigma) distribution.  
+{
+	return 0.5+atan((x-mu)/sigma)/mgMathConstant_Pi;// mgMathConstant_Pi used in lieu of M_PI = 3.14159... from math.h
+}
+
+
+double qlogis(double p, double mu, double sigma)
+// compute quantile of the Logistic(mu,sigma) distribution.  
+{
+	return mu + sigma*log(p/(1-p));
+}
+
+double plogis(double x, double mu, double sigma)
+// compute cdf of the logistic(mu,sigma) distribution.  
+{
+	return 1.0/(1.0 + exp(-(x - mu) / sigma)) ;
+}
+
+double dlogis(double x, double mu, double sigma)
+// compute density of the logistic(mu,sigma) distribution.  
+{
+	double cdf = plogis(x, mu, sigma);
+	return cdf*(1-cdf)/sigma;
+}
+
+double dloglogis(double x, double mu, double sigma)
+// compute density of the log-logistic(mu,sigma) distribution.  
+// X ~ log-logistic(mu,sigma) if log(X) ~ logistic(mu,sigma)
+{
+	return dlogis(log(x),mu,sigma) / x;
+}
+
+
+/* BEGIN overhead wrapper to use functions in StatDistributionsFromDcdflib.mpp or StatDistributionsFromR.mpp */
+
+double qbeta(double p, double a, double b)
+// compute quantile of the beta(a,b) distribution.  
+{
+  switch(StatisticalPackageEdited)
+  {
+  case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return qbeta(p, a, b, 1, 0);	//Simply call qbeta borrowed from R
+  case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cdfbet borrowed in dcdflib (see dcdflib.mpp)
+    double x; // value sought i.e. x such that Prob( Beta(a,b) < x ) = p
+    double y; // y = 1 - (value sought)
+    double q; // q=1-p 
+    double bound;  // extra information if error
+    int status; // error flag
+    int which; 
+
+    which=2; // Calculate X and Y from P, Q, A and B
+    q=1.0-p;
+
+    cdfbet ( &which, &p, &q, &x, &y,  &a, &b, &status, &bound );
+    return x;
+  case STATISTICAL_PACKAGE_DUMMY: 
+  default:                          return p; //quantile of U(0,1)
+  }
+}
+
+double pbeta(double x, double a, double b)
+// compute cdf of the beta(a,b) distribution.  
+// Could also have called cdfbet
+{
+ switch(StatisticalPackageEdited)
+  {
+  case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return pbeta(x, a, b, 1, 0); //Simply call pbeta borrowed from R
+  case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cumbet borrowed in dcdflib (see dcdflib.mpp)
+    double p; // cdf value sought i.e. p = Prob( Beta(a,b) < x )
+    double q; // 1-(cdf value sought)
+    double y;  // y = 1 - x
+
+    y=1-x;
+ 
+    cumbet ( &x, &y, &a, &b, &p, &q );  // beta_inc ( &a, &b, &x, &y, &p, &q, &ierror );
+    return p;
+ case STATISTICAL_PACKAGE_DUMMY:
+ default:                         return x; //cdf of U(0,1)
+ }
+  
+}
+
+
+double pnorm(double x, double mu, double sigma)
+// compute cdf of the N(mu,sigma^2) distribution.  
+{
+ switch(StatisticalPackageEdited)
+ {
+   case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return pnorm5( x,   mu,   sigma, 1,0);  //Simply call pnorm5 borrowed from R
+   case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cdfnor borrowed in dcdflib (see dcdflib.mpp)
+     double p; // cdf value sought i.e. p = Prob( N(mu,sigma^2) < x )
+     double q; // 1-(cdf value sought)
+     double bound;  // extra information if error
+     int status; // error flag
+     int which; 
+
+     which=1; //   1: Calculate P and Q from X, mu and sigma;
+
+     cdfnor ( &which, &p, &q, &x, &mu, &sigma, &status, &bound );
+     return p;
+  case STATISTICAL_PACKAGE_DUMMY: 
+  default:                         return 1.0/(1.0+exp(-(x-mu)/sigma)); //cdf of logistic distribution
+  }
+}
+
+double qnorm(double p, double mu, double sigma)
+// compute quantile of the N(mu,sigma^2) distribution.  
+{
+  switch(StatisticalPackageEdited)
+  {
+  case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return qnorm5( p,   mu,   sigma, 1,0); //Simply call qnorm5 borrowed from R
+  case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cdfnor borrowed in dcdflib (see dcdflib.mpp)
+     double x; // value sought i.e. x such that Prob( N(mu,sigma^2) < x ) = p 
+     double q; // q=1-p 
+     double bound;  // extra information if error
+     int status; // error flag
+     int which; 
+
+     which=2; //    2: Calculate X from P, Q, mu and sigma;
+     q=1.0-p;
+
+     cdfnor ( &which, &p, &q, &x, &mu, &sigma, &status, &bound );
+     return x;
+  case STATISTICAL_PACKAGE_DUMMY: 
+  default:                  	  return mu+sigma*log(p/(1-p)); //quantile of logistic distribution
+  }  
+}
+
+double pgamma(double x, double alpha, double scale)
+{  //compute cdf of the gamma distribution.  
+   //Note that Gamma(alpha,scale) means density f(x) proportional to x**(alpha-1)*exp(-x/scale)
+switch(StatisticalPackageEdited)
+  {
+  case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return pgamma( x , alpha , scale , 1,0);	//Simply call pgamma borrowed from R
+  case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cdfgam borrowed in dcdflib (see dcdflib.mpp)
+     double p; // cdf value sought i.e. p = Prob( Gamma(alpha,scale) < x )
+     double q; // 1-(cdf value sought)
+     double bound;  // extra information if error
+     int status; // error flag
+     int which; 
+
+     which=1; //    1: Calculate P and Q from X, alpha and SCALE;
+     scale=1.0/scale;// adjustment because for dcdflib Gamma(alpha,scale) means f(x) proportional to x**(alpha-1)*exp(-x*scale)
+
+     cdfgam ( &which, &p, &q, &x, &alpha, &scale, &status, &bound );
+     return p;
+  case STATISTICAL_PACKAGE_DUMMY:
+  default:                         return 1.0-exp(-x); //cdf of exponential(mean=1)
+  } 
+}	
+
+double qgamma(double p, double alpha, double scale)
+{  //compute quantile of the gamma distribution.  
+   //Note that Gamma(alpha,scale) means density f(x) proportional to x**(alpha-1)*exp(-x/scale)
+switch(StatisticalPackageEdited)
+  {
+  case STATISTICAL_PACKAGE_R_OPEN_SOURCE: return qgamma( p , alpha , scale , 1,0);	//Simply call qgamma borrowed from R
+  case STATISTICAL_PACKAGE_DCDFLIB: //Simply call cdfgam borrowed in dcdflib (see dcdflib.mpp)
+     double x; // value sought i.e. x such that Prob( Gamma(alpha,scale) < x ) = p 
+     double q; // q=1-p 
+     double bound;  // extra information if error
+     int status; // error flag
+     int which; 
+
+     which=2; //    2: Calculate X from P, Q, alpha and SCALE;
+     q=1.0-p;
+     scale=1.0/scale;// adjustment because for dcdflib Gamma(alpha,scale) means f(x) proportional to x**(alpha-1)*exp(-x*scale)
+
+     cdfgam ( &which, &p, &q, &x, &alpha, &scale, &status, &bound );
+     return x;
+  case STATISTICAL_PACKAGE_DUMMY:
+  default:                        return -log(1.0-p); //quantile of exponential(mean=1)
+  }
+}	
+
+/* END overhead wrapper to use functions in StatDistributionsFromDcdflib.mpp or StatDistributionsFromR.mpp */
+
+
+double qbeta_a_mu(double quantile, double a, double mu)
+// compute quantile of the beta(a,mu) distribution.  
+{
+    return qbeta(quantile, a, a*(1-mu)/mu );
+}
+
+double pbeta_a_mu(double x, double a, double mu)
+// compute cdf of the beta(a,mu) distribution.  
+{
+   return pbeta(x, a,  a*(1-mu)/mu);
+}
+
+double pF(double x, double df1, double df2)
+// compute cdf of the Fisher(df1,df2) distribution.
+// We use the fact that if X ~ Beta(df2/2,df1/2) then Y=(X^-1 -1)df2/df1 ~ Fisher(df1,df2)
+{
+	return 1.0 - pbeta(1.0/(1.0+df1*x/df2) , df2/2.0, df1/2.0);
+  //return   pbeta(1.0-1.0/(1.0+df1*x/df2) , df1/2.0, df2/2.0); //alternative from 1-Beta(a,b) ~ Beta(b,a)
+  //return   pbeta(   df1*x/(df2+df1*x)    , df1/2.0, df2/2.0); //alternative
+}
+
+double qF(double quantile, double df1, double df2)
+// compute quantile of the Fisher(df1,df2) distribution.
+// We use the fact that if X ~ Beta(df2/2,df1/2) then Y=(X^-1 -1)df2/df1 ~ Fisher(df1,df2)
+{
+	return quantile==0.0 ? 0.0 : df2/df1*(1.0/qbeta(1-quantile,df2/2.0, df1/2.0)  -1.0);
+}
+
+double pt_from_F(double x, double df)
+// compute cdf of the student distribution with df degrees of freedom
+// We use the fact that if X ~ t(df) then X^2 ~ Fisher(1,df) with distribution of X symetric about 0
+{
+	if(x<0.0) return 1.0-pt_from_F(-x,df); // recursive call .  Use the fact that cdf_t(x,df)+cdf_t(-x,df) = 1.0
+    //For x>=0.0, return expression below
+	return (1.0 + pF(x*x ,1.0, df))/2.0; // Prob(T<x)=Prob(T<0)+Prob(0<T<x)=0.5+0.5P(|T|<x)
+}
+/*
+double pt(double x, double df)
+{  // compute cdf of the student distribution with df degrees of freedom 
+	return  pt_from_F( x,  df);
+}
+*/
+
+double pt(double x, double df)
+{  // compute cdf of the student distribution with df degrees of freedom 
+	return  pt_from_dcdflib( x,  df);
+}
+
+double pt_from_dcdflib(double x, double df)
+{  // compute cdf of the student distribution with df degrees of freedom 
+     double x_copy = x; 
+     double df_copy= df; 
+     double cdf;  // CDF value sought
+	 double ccdf; // Complementary CDF (do not care)
+
+	 //cumt ( double *t, double *df, double *cum, double *ccum )
+     cumt ( &x_copy, &df_copy, &cdf, &ccdf );
+     return cdf;
+}
+ 
+
+double qt(double quantile, double df)
+// compute quantile of the student distribution with df degrees of freedom
+// We use the fact that if X ~ t(df) then X^2 ~ Fisher(1,df) with distribution of X symetric about 0
+{
+    if(quantile<0.5) return -qt(1.0-quantile,df);  // recursive call .  Use the fact that qt(p,df)+pt(1-p,df) = 0.0
+	//For quantile >= 0.5 return expression below (we know that x>=0)
+	return sqrt(qF(2.0*quantile-1.0,1.0,df)); // solve (1.0 + pF(x*x ,1.0, df))/2.0 = quantile wrt x
+}
+
+
+double pBCT(double x, double mu, double sigma, double nu, double tau, double prange)
+// x>0, mu>0, sigma>0,tau>0, nu unrestricted
+// compute cdf of gamlss' BCT (Box-Cox student) distribution
+// We use the fact that if X ~ BCT(mu,sigma,nu,tau) then ((X/mu)^nu -1)/(nu*sigma) ~ t(df=tau)  for nu!=0
+// For nu==0 we have log(X/mu)/sigma ~ t(df=tau))
+// Note that for nu>0, we should actually say t(df=tau) restricted to (-1/(nu*sigma) , infinity     )
+//               nu<0, we should actually say t(df=tau) restricted to (-infinity     ,-1/(nu*sigma) )
+{
+	if(nu==0.0) 
+		return pt(log(x/mu)/sigma,tau);
+
+	if(prange<0.0) 
+		prange=pt(1.0/std::abs(nu*sigma),tau);
+
+	return pt((pow(x/mu,nu)-1)/(nu*sigma),tau)/ prange ;
+}
+
+double qBCT(double quantile, double mu, double sigma, double nu, double tau, double prange)
+// 0<quantile<1, mu>0, sigma>0,tau>0, nu unrestricted
+// compute quantile of gamlss' BCT (Box-Cox student) distribution  (see pBCT for more details)
+{
+	if(nu==0.0) 
+		return mu*exp(sigma*qt(quantile,tau));
+
+	if(prange<0.0) 
+		prange=pt(1.0/std::abs(nu*sigma),tau);
+
+	return mu*pow(1.0+sigma*nu*qt(quantile*prange,tau),1.0/nu) ;
+}
+
+
+
+double rpois(double lambda)
+{
+   double jumps=0.0;
+
+   for(double sum = -log(RandUniform(84)) ; sum<lambda ; jumps++)
+	   sum = sum - log(RandUniform(85));
+
+   return jumps;
+}
+
+
+int pps_sampling(double u, double p[], int number_of_categories)
+//
+// sample one number (X) with probability proportional to size(p)
+//    i.e. P(X=i)=p[i], i=0,...,number_of_categories-1
+// Akin to Lookup_ in MODGEN, p does not have to add up to 1
+{
+	double sum_p;
+	int i;
+
+	sum_p=0.0;
+	for(i=0;i<number_of_categories;i++)
+		sum_p += p[i];
+
+	u=u*sum_p;
+	sum_p=p[0];
+    for(i=1; u>sum_p && i<number_of_categories;i++)
+		sum_p += p[i];
+
+	return (i-1);
+}
+
+
+void my_lookup(double u, double p[], int number_of_dimensions, int number_of_categories[])
+//
+// sample one entry of a matrix with probability proportional to p
+// Akin to Lookup_ in MODGEN, p does not have to add up to 1
+// length(number_of_categories) = number_of_dimensions + 1 
+// if p is 22 x 5 x 8 then number_of_dimensions = 3 and number_of_categories = {22, 5, 8, whatever}
+// At the end of execution, number_of_categories contains the selected entry (e.g. number_of_categories = {13, 0, 2, whatever})
+{
+	double sum_p;
+	int i;
+//	int rev_dim_prod[9];  // if number_of_categories = (22,5,8) then rev_dim_prod=(880,40,8,1)  cumulative prod from the left
+
+//	for(i=0;i<9;i++)
+//       rev_dim_prod[i]=1;
+
+    number_of_categories[number_of_dimensions]=1;
+	for(i=number_of_dimensions-1;i>=0;i--)
+        number_of_categories[i] *= number_of_categories[i+1];
+		//rev_dim_prod[i] = rev_dim_prod[i+1] * number_of_categories[i];
+
+	sum_p=0.0;
+	for(i=0;i<number_of_categories[0];i++)
+		sum_p += p[i];
+
+	u=u*sum_p;
+	sum_p=p[0];
+    for(i=1; u>sum_p && i<number_of_categories[0];i++)
+		sum_p += p[i];
+
+	i--;
+
+	for(int k=0 ; k<number_of_dimensions; k++)
+	{
+        number_of_categories[k]= i / number_of_categories[k+1];
+		i -= number_of_categories[k]*number_of_categories[k+1];
+	}
+
+};
+
+
+
+double qnorm_old(double p)
+//
+// Inverse Cumulative Distribution Function
+//
+{
+	double c[3] = { 2.515517, 0.802853, 0.010328};
+	double d[3] = { 1.432788, 0.189269, 0.001308};
+	double t, tsq, tcub, z, p_small;
+	double num, denom;
+
+	p_small = p;
+	if (p > 0.5) p_small = 1-p;
+	
+	t = sqrt(log(1/(p_small*p_small)));
+	tsq = t*t;
+	tcub = tsq*t;
+	num = (c[0] + c[1]*t + c[2]*tsq);
+	denom = 1+(d[0]*t + d[1]*tsq + d[2]*tcub);
+
+	z = (num/denom) - t;
+	if (p > 0.5) z = - z;
+
+	return z;
+}
+
+double Gauss(double dRandUniform, double low, double high)
+//
+// Generates from truncated Normal(0,1) distribution. 
+// Truncated means that only the distribution between percentile low and high is retained 
+//
+{
+	return qnorm_old(dRandUniform * (high-low) + low);
+}
+
+
+void BVN_indep_given_sum(double sigma2_X, double sigma2_Y, double sum, double std_norm, double * X, double *Y)
+{
+	//  This generates (X,Y) given (X+Y)=sum 
+	//  where a priori X and Y are independent and normally distributed
+	//  with mean 0 and variances sigma2_X and sigma2_Y respectively
+	//  It turns out that X|(X+Y)=sum  is normally distributed with mean and variance implemented below
+	//  Note that std_norm is a N(0,1) variate previously generated
+  double varX_over_varSum ;
+  
+  varX_over_varSum = sigma2_X/(sigma2_X + sigma2_Y);
+
+  //*X= sum*varX_over_varSum +RandNormal(8)*sqrt(sigma2_Y*varX_over_varSum); //works well but lack reproducibility if new ARMA(1,1) is introduced
+  *X= sum*varX_over_varSum +std_norm*sqrt(sigma2_Y*varX_over_varSum);
+  *Y= sum - *X;
+}
+
+void BVN_given_sum(double sigma2_X, double sigma2_Y, double rho, double sum, double std_norm, double * X, double *Y)
+{
+	//  This generates (X,Y) given (X+Y)=sum 
+	//  where a priori (X,Y) follows the bivariate normal distribution  
+	//  with mean 0, correlation rho and variances sigma_X**2 and sigma_Y**2 respectively
+	//  We use the fact that X+Y=[Y-rho*sigma_Y*X/sigma_X] +[(1+rho*sigma_Y/sigma_X)*X] = term1 + term2
+	//    Note that sigma_X=sqrt(sigma2_X) and sigma_Y=sqrt(sigma2_Y)
+	//    Note that std_norm is a N(0,1) variate previously generated
+	//  The two terms in [] are independent so
+	//    1) use BVN_indep_given_sum two generate the two terms in bracketts
+	//    2) generate X, Y
+  double term1, term2, var_term1, var_term2, one_plus_rho_ratio ;
+  
+  one_plus_rho_ratio=1+rho*sqrt(sigma2_Y/sigma2_X);
+  var_term1 = sigma2_Y*(1-rho*rho);
+  var_term2 = pow(one_plus_rho_ratio,2)  * sigma2_X;
+  BVN_indep_given_sum(var_term1, var_term2, sum, std_norm,  &term1,  &term2);
+
+  *X= term2/one_plus_rho_ratio;
+  *Y= sum - *X;
+}
+
+
+// BEGIN ARMAPLUS_11 functions: ARMAPLUS_11_initialize, ARMAPLUS_11_move_forward, ARMAPLUS_11_move_backward
+/*
+ARMA 1,1
+Y(t) = phi * Y(t-1)+ a(t) - theta * a(t-1) with
+  *   the a(.) being iid N(0, Var[a(t)])
+  *   std::abs(phi) < 1 and std::abs(theta) < 1
+[ ARMA_11_VAR_A ] provides Var[a(t)]) required so that V[Y(t)] = 1.  This is a function of phi and theta
+
+
+ARMAplus 1,1
+Z(t) = Kappa * X + sqrt(1-Kappa **2) * Y(t)  where X and Y(t) are independent stochastic processes with
+  *  X is N(0,1) and does not depend on t
+  *  Y(t) is an ARMA(1,1) stochastic process such that Y(t) ~ N(0,1)
+  *  std::abs(kappa) < 1.  Using kappa = 0.4 or kappa = -0.4 leads to processes that are stochastically equivalent
+
+*/
+
+void ARMAPLUS_11_initialize(double armaplus_11[], const double armaplus_11_parameters[], const double sum, const double std_norm_for_arma11, const double std_norm_for_plus)
+{
+	double phi   = armaplus_11_parameters[ARMAPLUS_11_PARAM_PHI  ] ;
+	double theta = armaplus_11_parameters[ARMAPLUS_11_PARAM_THETA];
+	double kappa = armaplus_11_parameters[ARMAPLUS_11_PARAM_KAPPA];
+
+	armaplus_11[ARMAPLUS_11_PHI] = phi;
+	armaplus_11[ARMAPLUS_11_THETA] = theta;
+	armaplus_11[ARMAPLUS_11_VAR_A] = (1 - phi * phi) / (1 + theta * theta - 2 * phi * theta);
+	armaplus_11[ARMAPLUS_11_KAPPA] = kappa;
+	armaplus_11[ARMAPLUS_11_Y_t] = sum;
+
+  // initialize X, a_t,  Y_t,  given Z_t=sum
+  // 1) Y_t=sum  (trivial).   Done above
+  // 2) Kappa * X and sqrt(1-Kappa **2) * Y(t)  are independent so use BVN_indep_given_sum
+  // 3) a_t and  [phi * Y_tm1 - theta * a_tm1 ] are independent so use BVN_indep_given_sum
+
+	double term1, term2, somme, var_term1, var_term2;
+
+	// 2) term1 = Kappa * X, term2= sqrt(1-Kappa **2) * Y(t) , somme = sum
+	somme = sum;
+	var_term1 = pow(kappa,2);
+	var_term2 = 1.0 - var_term1;
+	BVN_indep_given_sum(var_term1, var_term2, somme, std_norm_for_plus, &term1, &term2);
+	armaplus_11[ARMAPLUS_11_X] = term1 / (kappa != 0.0 ? kappa : 1.0);       //if kappa == 0      then ARMAPLUS_11_Y_X does not matter
+	double initial_arma11 = term2 / (std::abs(kappa) != 1.0 ? sqrt(1-kappa*kappa) : 1.0);  //if std::abs(kappa) == 1 then initial_arma11  does not matter
+
+	// 3) term1=a_t , term2=phi * Y_tm1 - theta * a_tm1, somme=initial_arma11
+	somme=initial_arma11;
+	var_term1 = armaplus_11[ARMAPLUS_11_VAR_A];
+	var_term2 = phi*phi +(theta*theta-2*phi*theta)* armaplus_11[ARMAPLUS_11_VAR_A];// should be the same as 1-armaplus_11[ARMAPLUS_11_VAR_A]
+	//BVN_given_sum    (var_term1, var_term2, 0.0, somme, std_norm_for_arma11,&term1, &term2);
+	BVN_indep_given_sum(var_term1, var_term2,      somme, std_norm_for_arma11,&term1, &term2);
+	armaplus_11[ARMAPLUS_11_A_t]=term1;
+}
+
+
+void ARMAPLUS_11_move_forward(double  armaplus_11[],double std_norm_for_arma11, double std_norm_for_plus)
+{
+	double previous_Y, previous_a, new_arma11;
+
+	previous_a= armaplus_11[ARMAPLUS_11_A_t];
+    previous_Y= armaplus_11[ARMAPLUS_11_Y_t];
+	armaplus_11[ARMAPLUS_11_A_t] = sqrt(armaplus_11[ARMAPLUS_11_VAR_A]) * std_norm_for_arma11;
+	new_arma11 = armaplus_11[ARMAPLUS_11_PHI] * previous_Y + armaplus_11[ARMAPLUS_11_A_t] - armaplus_11[ARMAPLUS_11_THETA] * previous_a ;
+	armaplus_11[ARMAPLUS_11_Y_t] = armaplus_11[ARMAPLUS_11_KAPPA] * armaplus_11[ARMAPLUS_11_X] + sqrt(1 - pow(armaplus_11[ARMAPLUS_11_KAPPA], 2)) * new_arma11;
+}
+
+void ARMAPLUS_11_move_backward(double armaplus_11[],double std_norm)
+{
+ // Knowing Y_t and a_t, get Y_tm1 and a_tm1 with BVN_given_sum.  
+ // term1=phi * Y_tm1,  term2=- theta * a_tm1,  somme= Y_t - a_t
+	if (armaplus_11[ARMAPLUS_11_KAPPA] != 0.0)
+		ModelExit("ARMAPLUS_11_move_backward currently not implemented for Kappa !=0");
+
+	double term1, term2, somme, var_term1, var_term2, rho, phi, theta;
+
+	phi= armaplus_11[ARMAPLUS_11_PHI];
+    theta= armaplus_11[ARMAPLUS_11_THETA];
+	somme= armaplus_11[ARMAPLUS_11_Y_t]- armaplus_11[ARMAPLUS_11_A_t];
+	var_term1=phi*phi;
+	var_term2=theta*theta* armaplus_11[ARMAPLUS_11_VAR_A];
+	rho=sqrt(armaplus_11[ARMAPLUS_11_VAR_A])*((-theta <0.0) ? -1.0 : 1.0 )  * (phi<0.0 ? -1.0 : 1.0);
+    BVN_given_sum(var_term1, var_term2,  rho, somme, std_norm, &term1, &term2);
+	armaplus_11[ARMAPLUS_11_Y_t]=term1/phi;
+	armaplus_11[ARMAPLUS_11_A_t]=-term2/theta;
+}
+
+// END ARMAPLUS_11 functions: ARMAPLUS_11_initialize, ARMAPLUS_11_move_forward, ARMAPLUS_11_move_backward
+
+
+double UpdateSiloedUniform(double siloed_uniform[], double std_norm)
+{
+	siloed_uniform[SILOED_UNIF_U01_t] = pnorm(std_norm,0.0, 1.0); // U(0,1) within bounds
+	return runif(siloed_uniform[SILOED_UNIF_U01_t] , siloed_uniform[SILOED_UNIF_LOWER_BOUND], siloed_uniform[SILOED_UNIF_UPPER_BOUND]);  // U(0.1,0.4) if bounds are 0.1, 0.4.
+}
+
+int InitializeSiloedUniform(double siloed_uniform[], const double silo_probs[], const double initial_unif)
+{
+	if(SIZE(UNIFORM_SILOS) != 3)
+		ModelExit("Developer, you need to change cumprob[4] in function InitializeSiloedUniform.");
+
+	// BEGIN get cumprob ... should be done in PreSimulation but put it here for now
+	//double cumprob[4]; // 4 = 1 + SIZE(UNIFORM_SILOS)
+	double cumprob[1 + SIZE(UNIFORM_SILOS)]; // 4 = 1 + SIZE(UNIFORM_SILOS)
+
+	cumprob[0] = 0.0;
+	for (int k = 0; k < SIZE(UNIFORM_SILOS); k++)
+		cumprob[k+1] = cumprob[k ] + silo_probs[k];
+	if (std::abs(cumprob[SIZE(UNIFORM_SILOS)] - 1.0) > 1e-11)
+		ModelExit("Probability of silos should add up to 1.");
+	// END get cumprob ... should be done in PreSimulation but put it here for now
+
+	int which_silo = 0;
+	for (int k = 0; k < SIZE(UNIFORM_SILOS); k++)
+		which_silo += (initial_unif > cumprob[k + 1] ? 1 : 0);
+
+	siloed_uniform[SILOED_UNIF_LOWER_BOUND] = cumprob[which_silo  ];
+	siloed_uniform[SILOED_UNIF_UPPER_BOUND] = cumprob[which_silo+1];
+	siloed_uniform[SILOED_UNIF_U01_t] = (initial_unif - cumprob[which_silo] )/ (cumprob[which_silo + 1] - cumprob[which_silo]);  // U(0,1) within silo . [SILOED_UNIF_U01_t] not really used but helps with thinking.
+
+	return which_silo;
+}
+
+
+//==================================================================================
+TIME PiecewiseInverseWeibull( double dRandUniform,
+							 double uCut,	double tCut,
+							 double lambda1, double beta1,
+							 double lambda2, double beta2, 
+							 double R)
+{
+	// Usage:
+
+	// Only one of uCut or tCut is necessary; if both supplied tCut is ignored
+	// to use only tCut, pass uCut as -1
+	// otherwise uCut is between [0,1]
+
+	// The survival paramaters (alpha & beta) are derived from survival data
+	// which could be in years or months.
+	// The survival time generated by this routine is in the same units as those
+	// implicit in the survival parameters.  
+	// The calling routine must convert the survival time 
+	// to a waiting time measured in years.
+
+	// R is an adjustment factor
+	// - used to approximate relative survival from parameters based on crude survival
+	// - used to apply a relative risk to the survival
+	// - set to 1, it has no effect
+
+	// Random number now passed as parameter to avoid spurious noise
+	// in random sequence : dRandUniform replaces u
+
+	TIME	survtime = TIME_INFINITE;
+	double	lambda, beta, uFixed;
+
+	if ( uCut < 0 ) 
+	{	// u cut-off not supplied so use tCut to determine it
+		uFixed = pow( exp( -pow(lambda1 * tCut, beta1) ), R);
+	}
+	else
+	{
+		uFixed = pow(uCut, R);
+	};
+
+
+	if ( dRandUniform > uFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	if ( lambda != 0.0 && R != 0.0 && beta != 0.0 && dRandUniform !=0.0 ) {	//Bill improved conditions April 3, 2007
+		survtime = TIME( pow( -log(dRandUniform)/R, 1/beta ) / lambda );
+
+	};
+   return survtime;
+};
+
+//==================================================================================
+/* Version Oct 2, 2007 ** does not look very good - return to July 3 version 
+also note that the July 20, 2007 version was like Oct 2, 2007 but with a bug in 
+the specification of past max = 20 years (it was specified as 20 days)
+*/
+/*
+TIME PiecewiseInverseWeibullPrevalence( double uPast,
+							double uCut,	double tCut,
+							double lambda1, double beta1,
+							double lambda2, double beta2, 
+							double R)
+{
+	TIME	survtime_u = TIME_INFINITE;	// total time to next event (from incidence moment)
+	TIME	survtime_v = TIME_INFINITE;	// past time (from incidence moment to prevalence moment)
+	TIME	survtime = TIME_INFINITE;	// remaining time to next event (from prevalence moment)
+
+	double	u;	// corresponds to total time to next event (from incidence moment)
+	double	v;	// corresponds to past time already in the state (from incidence moment to prevalence moment)
+	double	w, vPastMax;
+	double	lambda, beta, uFixed, tFixed;
+	double	tPastMax;	// limits how far in the past a prevalent case can be
+
+	tPastMax = 20.0*365.0; // 20*365 is 20 years in units of days and is arbitrary
+
+	// in case uCut was not supplied use tCut to determine it (in uFixed variable)
+	if ( uCut < 0 ) 
+	{	
+		uFixed = pow( exp( -pow(lambda1 * tCut, beta1) ), R);
+	}
+	else
+	{
+		uFixed = pow(uCut, R);
+	};
+
+//==================
+// generate the time already past
+//==================
+	//in case tCut was not supplied, calculate it (in tFixed variable)
+	if ( lambda1 != 0.0 && R != 0.0 && beta1 != 0.0 && uFixed !=0.0 ) 
+	{
+		tFixed = pow( -log(uFixed)/R, 1/beta1 ) / lambda1; //in case tCut was not supplied
+	}
+	else {
+		tFixed = 0.0;
+	}
+	if ( tPastMax  < tFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	// proportion of observed prevalent case that had their previous event t=20 years earlier
+	vPastMax = pow( exp( -pow(lambda * tPastMax, beta) ), R);	
+//	w = uPast;
+	w = RandUniform(18);
+	// v is time past; rescaled Random number from [0,1] to [v,1] to force time to be less than or equal to 20 years
+	v = vPastMax + (1-vPastMax)*w;	
+	
+
+	// caculate the past time in event corresponding to v
+	if ( v > uFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	if ( lambda != 0.0 && R != 0.0 && beta != 0.0 && v !=0.0 ) {	//Bill improved conditions April 3, 2007
+		survtime_v = TIME( pow( -log(v)/R, 1/beta ) / lambda );
+	};
+
+//==================
+// generate the total time to next event conditional on surviving past (v)
+//==================
+	u = v*RandUniform(22);			// u is total event time, given survived to v		
+
+	// caculate the total time to event corresponding to u
+	if ( u > uFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	if ( lambda != 0.0 && R != 0.0 && beta != 0.0 && u !=0.0 ) {	//Bill improved conditions April 3, 2007
+		survtime_u = TIME( pow( -log(u)/R, 1/beta ) / lambda );
+	};
+
+
+//==================
+// return the remaining time to next event conditional on surviving past (v)
+//==================
+	survtime = survtime_u - survtime_v;
+	return survtime;
+};
+*/
+
+TIME timeOA (double lambda, double sigma, double mu, double sex, double age)
+{
+	TIME	survtime = TIME_INFINITE;
+	double	u;
+	double R;
+	u = RandUniform(20);
+    R=exp(sex+age);
+	survtime = TIME( exp(mu)*pow( -log(u)/(lambda*R), sigma ));
+	/* Correspond à S(t)=u=[exp(-lambda*((t/exp(mu))^(1/sigma))]^R 
+	 où R=exp(a1x1 + a2x2 + ...): risque relatif
+	    (t/exp(mu))^(1/sigma)= transformation apportée au temps dans résultats LIFEREG de SAS */ 	    
+	return survtime;
+};
+//==================================================================================
+/* Version July 3, 2007 (looks good)
+Example of how the time of the originating event of the prevalence cases is estimated.
+For a hypothetical survival curve we may have that 
+10% of cases "fail" after 1 year,
+20% after 2 years, 
+40% after 3 years, and 
+80% after 4 years. 
+100% after 5 years.
+
+So for our prevalent case alive in the "current" time (now), 
+we estimate the time of the originiting event in the past by first noting that there is
+a  90% chance that the prevalent case had its previous event 1 year ago,
+an 80% chance that the prevalent case had its previous event 2 years ago,
+a  60% chance that the prevalent case had its previous event 3 years ago,
+a  20% chance that the prevalent case had its previous event 4 years ago,
+a  0%  chance that the prevalent case had its previous event 5 years ago,
+
+Then the cumulative percent change is 90% + 80% + 60% + 20% +0% = 250%
+and the relative probability of the prevalent case having had its initial event within
+1 year is 90/250
+2 years is 80/250
+3 years is 60/250
+4 years is 20/250
+5 years is 0/250
+
+This is the approach that is generalized in the following prevalence procedure.
+We allow for 40 increments of time measured in 6 month periods, or a total of 20 years
+We do not explicitly take into account competing risks. The 20 year limit is meant to be 
+a reasonable "average".
+*/
+TIME PiecewiseInverseWeibullPrevalence(double uPast, double uFuture, 
+							double uCut,	double tCut,
+							double lambda1, double beta1,
+							double lambda2, double beta2, 
+							double R)
+{
+	TIME	survtimeu = TIME_INFINITE;	// total time between events
+	TIME	survtimev = TIME_INFINITE;	// time in past for prevalence
+	TIME	event_time_remaining = TIME_INFINITE;	// remaining time to next event
+	double	t, tFixed, u,v, lambda, beta, uFixed;
+	double	p, uStep[SIZE(OAP_YEARS_PAST)], uCum[SIZE(OAP_YEARS_PAST)];			// value of u at discrete time steps (years), and cumulated
+	double	uCumTotal=0.0;
+//	double	vLower =0.0;
+//	double	vUpper = 1.0;
+	logical vFound = FALSE;
+	int tIndex; 
+
+	// if u cut-off not supplied, calculate it from tCut
+	if ( uCut < 0 ) 
+	{	// u cut-off not supplied so use tCut to determine it
+		uFixed = pow( exp( -pow(lambda1 * tCut, beta1) ), R);
+	}
+	else
+	{
+		uFixed = pow(uCut, R);
+	};
+	//in case tCut was not supplied, calculate it (in tFixed variable)
+	if ( lambda1 != 0.0 && R != 0.0 && beta1 != 0.0 && uFixed !=0.0 ) 
+	{
+		tFixed = pow( -log(uFixed)/R, 1/beta1 ) / lambda1; //in case tCut was not supplied
+	}
+	else {
+		tFixed = 0.0;
+	}
+	
+	// Step 1: estimate time in past when prevalent event occurred (discrete time units of half years)
+	// but note that the lambda's and beta's for OA were calculated for day units
+	// a) First estimate the proportion of cases that we could expect to be alive who had their previous event
+	// 1 year, 2 years, ... x years in the past. 
+	// x = OAP_YEARS_PAST / 2. (currently represents 20 years and was arbitrarily chosen
+	// tIndex is in units of half year; 
+	// t is in units of days consistent with the estimation of lambda and beta
+	for ( tIndex = 0; tIndex < SIZE(OAP_YEARS_PAST); tIndex++ ) {
+		t = (tIndex+1)*(365.24/2.0);		// convert 6 months to days
+		if ( t < tFixed ) {
+			lambda = lambda1;
+			beta = beta1;
+		}
+		else {
+			lambda = lambda2;
+			beta = beta2;
+		};
+		// proportion of observed prevalent cases that had their previous event 6 months, 1 year, 1.5 years... earlier
+		uStep[tIndex]= pow( exp( -pow(lambda1 * t, beta1) ), R);	
+		// cumulative proportion
+		uCumTotal += uStep[tIndex];
+		uCum[tIndex]= uCumTotal;	
+	}
+	tIndex= 0; 
+	while ( tIndex < SIZE(OAP_YEARS_PAST) && !vFound ) {
+		p = uCum[tIndex]/uCumTotal;	// probability that the observed prevalent case 
+									// had their previous event tIndex half-years earlier
+		if ( uPast < p ) {			// if random less than probability means that this represents the past time
+			v = uStep[tIndex];		// v is proportion corresponding to this amount of past time
+			vFound = TRUE;			// v has been assigned (leave loop)
+		}
+		tIndex++;
+	};
+// good idea, didn't help
+//	vLower = uStep[tIndex];				// this is the proportion corresponding this amount of past time
+//	if (tIndex > 0) {
+//		vUpper = uStep[tIndex-1];
+//	};
+//	v = RandUniform(24)*(vUpper-vLower)+vLower; //v represents a portion of the past year (between vLower and vUpper) at which time the event occured
+
+	//Step 2: get time to next event conditional on past (v) (between 0 and v)
+	u = v * uFuture;			// represents proportion of cases having event after past (v cases)
+	if ( u > uFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	if ( lambda != 0.0 && R != 0.0 && beta != 0.0 && u !=0.0 ) {	//Bill improved conditions April 3, 2007
+		survtimeu = TIME( pow( -log(u)/R, 1/beta ) / lambda );
+	};
+   if ( v > uFixed ) {
+		lambda = lambda1;
+		beta = beta1;
+	}
+	else {
+		lambda = lambda2;
+		beta = beta2;
+	};
+	if ( lambda != 0.0 && R != 0.0 && beta != 0.0 && v !=0.0 ) {	//Bill improved conditions April 3, 2007
+		survtimev = TIME( pow( -log(v)/R, 1/beta ) / lambda );
+	};
+
+	//Step 3: The time remaining is the difference between the total time survtimeu (conditioned on surviving to t(v))
+	// less the past time represented survtimev; 
+	// we also subtract from this a portion of a year (0 to 1) because technically we are measuring the 
+	// prevalence in the year before pStartYear
+	// this value may be negative (which needs to be handled in the calling routine)
+	event_time_remaining = max(0.00001, survtimeu - survtimev - OA_Prevalence_SurvivalTimeOffset);
+
+	return event_time_remaining;
+};
+
+bool Inv_parameterized_power_transform(double z,double mu, double sigma, double lambda, double *inverse)
+{
+	double tempo;
+
+	tempo = mu+sigma*z;
+	if (tempo>0) {*inverse = pow(tempo,1/lambda);}
+		
+	return (tempo>0);
+} 
+
+/*
+double runif(double a,double b)
+// generates random number from uniform distribution on [a,b].
+{
+	return a+(b-a)*RandUniform(31) ;
+}
+*/
+
+double runif(double u,double a,double b)
+// generates random number from uniform distribution on [a,b] ...  assuming u is U(0,1)
+{
+	return a+(b-a)*u ;
+}
+
+double CubicSpline(double age_or_time, double *knots_location, double *cubic_spline_coef, double *cubic_spline_companion)
+{
+	int number_of_splines = 0;
+	for (number_of_splines = 0; number_of_splines < SIZE(CUBIC_SPLINE_KNOTS_INDEX) && knots_location[number_of_splines+1] >= knots_location[number_of_splines]; number_of_splines++);
+
+	number_of_splines = number_of_splines - 1;
+
+	return CubicSpline(age_or_time, knots_location, cubic_spline_coef, cubic_spline_companion,  number_of_splines);
+};
+double CubicSpline(double age_or_time, double *knots_location, double *cubic_spline_coef, double *cubic_spline_companion, int number_of_splines)
+{
+	double *two_trailing_knots = knots_location + number_of_splines;
+
+	double capped_age_or_time = max(min(age_or_time, cubic_spline_companion[CUBIC_SPLINE_COMPANION_MAX]), cubic_spline_companion[CUBIC_SPLINE_COMPANION_MIN]);
+	double scale = pow( two_trailing_knots[1] - knots_location[0], cubic_spline_companion[CUBIC_SPLINE_COMPANION_RANGE_POWER] ) ;
+	double answer = (capped_age_or_time - cubic_spline_companion[CUBIC_SPLINE_COMPANION_CENTER_LINEAR_TERM]) * cubic_spline_companion[CUBIC_SPLINE_COMPANION_LINEAR_COEFFICIENT];
+
+	capped_age_or_time = capped_age_or_time - cubic_spline_companion[CUBIC_SPLINE_COMPANION_CENTER_CUBIC_TERM];
+	for (int knot = 0; knot < number_of_splines; knot++)
+	{
+		double spline_value = 0;
+
+		spline_value += capped_age_or_time > two_trailing_knots[1] ? pow((capped_age_or_time - two_trailing_knots[1])/scale, 3) * (two_trailing_knots[0] - knots_location[knot]) : 0.0;
+		spline_value -= capped_age_or_time > two_trailing_knots[0] ? pow((capped_age_or_time - two_trailing_knots[0])/scale, 3) * (two_trailing_knots[1] - knots_location[knot]) : 0.0;
+		spline_value /= (two_trailing_knots[1] - two_trailing_knots[0]);
+		spline_value += capped_age_or_time > knots_location[knot]  ? pow((capped_age_or_time - knots_location[knot] )/scale, 3) : 0.0;  // here we have the cubic part prior to application of coefficient 
+		spline_value *= cubic_spline_coef[knot]; //cubic part done
+
+		answer += spline_value;
+	}
+	return answer;
+}
+
+
+void PreSimulation()
+{
+    StatisticalPackageEdited = StatisticalPackage;
+	if(DisallowStatisticalPackageR && StatisticalPackage==STATISTICAL_PACKAGE_R_OPEN_SOURCE)
+		StatisticalPackageEdited = STATISTICAL_PACKAGE_DCDFLIB;
+
+	mgMathConstant_PiOverSqrt3 = 1.8137993642342178 ; //EN Standard deviation of logistic distribution = pi/sqrt(3) 
+	mgMathConstant_Pi          = 3.1415926535897931 ;
+	mgLOG_DBL_MAX              = log(DBL_MAX);
+}
+
+
+

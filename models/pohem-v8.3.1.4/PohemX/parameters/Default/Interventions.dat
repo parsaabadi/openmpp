@@ -1,0 +1,156 @@
+parameters {
+	 
+	logical	pRF_INTERVENTION_ALLOW_CHANGE_IN_BMI_START_YEAR_TO_CHANGE_HUI = TRUE; //EN Allow change in BMI in start year to change HUI in start year.
+
+	 //EN Risk factor control panel
+	logical	pRISK_FACTOR_CONTROL_PANEL[CAD_RISK_FACTOR][RF_SWITCH] = {
+		(2) {
+			(4) TRUE, 
+		},
+	};
+/* NOTE ( pRF_INTERVENTIONS, EN )
+Amount of Change initialized to 0 means no What-if intervention, i.e., Base case scenario
+Cut-offs initially set at most usual values of high risk, floor set to zero, and ceiling - to infinity
+*/
+
+
+	 //EN Risk factor interventions
+	double	pRF_INTERVENTIONS[CAD_RISK_FACTOR][RF_INTERVENTION_PARAMETER] = {
+		0.0, 25.0, 9999, (2) 0, 9999, 0, 
+		//0.0, 240, 9999, (2) 0, 9999, 0, 
+		//0.0, 45, 9999, (2) 0, 9999, 0, 
+		//0.0, 140, 9999, (2) 0, 9999, 0, 
+		//0.0, 90, 9999, (2) 0, 9999, 0, 
+		0.0, 1, 9999, (2) 0, 9999, 0, 
+		//0.0, 999.9, 9999, (2) 0, 9999, 0, 
+	};
+/* NOTE ( pRF_INTERVENTION_TIME_PERIOD, EN )
+	No restriction on start/end year of intervention or on the number of interventions for a
+	single person: start yer=0, end year=9999, max years=9999
+*/
+
+
+	 //EN Time period for risk factor interventions
+	double	pRF_INTERVENTION_TIME_PERIOD[CAD_RISK_FACTOR][RF_INTERVENTION_TIME_PARAMETER] = {
+		(2) {
+			0, (2) 9999, 
+		},
+	};
+/* NOTE ( pRF_INTERVENTION_AGE_GROUPS, EN )
+	By default, all age/sex groups are selected for all risk factors to apply interventions
+*/
+
+
+	 //EN Target age/sex groups for risk factor interventions
+	logical	pRF_INTERVENTION_AGE_GROUPS[SEX][AGE_GROUP_RFI][CAD_RISK_FACTOR] = {
+		// FEMALE - MALE
+		(2) {
+			(5) {
+				(2) TRUE, 
+			},
+		},
+	};
+/* NOTE ( pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE, EN )
+	>Default: [999, 999] which indicates that it never interferes with the 
+	modeled projection of the RISK FACTOR
+*/
+
+
+	 //EN Risk factor evolution off age ranges
+	int	pRISK_FACTOR_EVOLUTION_OFF_AGE_RANGE[CAD_RISK_FACTOR][cLOWER_UPPER_BOUNDS] = {
+		(2) {
+			(2) 999, 
+		},
+	};
+
+	 //EN Statin re-assessment timing
+	double	pSTATIN_REASSESSMENT_TIMES[STATIN_REASSESSMENT] = {
+		5.0, 1.0, 1, 
+	};
+/* NOTE ( pRR_INCOME_QUARTILE_ON_AMI, EN )
+These were estimated as the ratio of the 1-year predicted probability of AMI to income quartile 4 (richest).
+The 1-year predicted probabilities of AMI were generated from POHEM (run on Jan 24, 2008) 
+in Table tAMI_1yearRisk_SES. The ratios were computed in Excel and copied here.
+*/
+
+
+	 //EN Relative risk of AMI by Income Quartile
+	double	pRR_INCOME_QUARTILE_ON_AMI[SEX][AGE_GROUP3080][INCOME_QUARTILE] = {
+		// FEMALE
+		1.07, 1.05, 1.02, 1.00, 
+		1.12, 1.07, 1.06, 1.00, 
+		1.12, (2) 1.03, 1.00, 
+		1.26, 1.15, 1.11, 1.00, 
+		1.28, 1.20, 1.09, 1.00, 
+		1.14, 1.09, 1.03, 1.00, 
+		1.05, 1.03, 1.01, 1.00, 
+		// MALE
+		0.95, 1.04, 0.98, 1.00, 
+		1.11, 1.09, 1.08, 1.00, 
+		1.07, 1.02, (2) 1.00, 
+		1.14, (2) 1.04, 1.00, 
+		1.17, 1.10, 1.05, 1.00, 
+		1.09, 1.05, 1.03, 1.00, 
+		1.00, 0.98, 0.96, 1.00, 
+	};
+	logical	pAMI_INCOME_QUARTILE_INTERVENTION_CONTROL = FALSE; //EN Control of Income quartile intervention
+	double	pRR_BETABLOCKERS_ON_AMI_INCIDENCE = 1.0; //EN Relative risk of beta blockers on incidence of AMI
+/* NOTE ( pAMI_HIGH_RISK, EN )
+>2003 Guidelines for Statin use.
+*/
+
+
+	 //EN High risk of AMI as per guidelines for lipid level assessment criteria
+	double	pAMI_HIGH_RISK[SEX][AMI_HIGH_RISK_STATES] = {
+		50.0, 1, 30.0, 999, 140, 90, (2) 1, 
+		40.0, 1, 30.0, 999, 140, 90, (2) 1, 
+	};
+/* NOTE ( pAMI_TARGET_LIPID_LEVELS, EN )
+>2003 Guidlines.
+>Very Low risk do not have their lipids tested so are not ever eligible for
+statins : set to 99.0.
+*/
+
+
+	 //EN Guideline target lipid levels by level of risk of AMI
+	double	pAMI_TARGET_LIPID_LEVELS[AMI_RISK_LEVEL] = {
+		99.0, 6.0, 5.0, (2) 4.0, 
+	};
+/* NOTE ( pSTATIN_EFFECTIVE_COVERAGE, EN )
+>Base case values based on NPHS data using internal Master File, and inspired
+by Neutal et al. See Statin analysis by Omariba August 2008. This is a crude
+interpretation for expediency and we want to update to breakdown by age group.
+Also, using the same values across risk categories may be unrealistic, but we
+have not attempted to calculate usage by risk level from NPHS data (limited
+variables). We have broken it down by those with and without heart disease.
+>Primary Prevention = No heart disease in Neutal paper
+>Secondary Prevention = Heart disease in Neutal paper
+>There is no breakdown by risk level in Neutal; therefore we use the same
+values for all risk levels.
+>We know that having Heart Disease corresponds to High or Very High risk, so we
+use 0.0 for Very Low, Low and Moderate in the corresponding Secondary Treatment
+cells.
+*/
+
+
+	 //EN Statin effective coverage
+	double	pSTATIN_EFFECTIVE_COVERAGE[AMI_RISK_LEVEL][TREATMENT_INTENTION][UPTAKE_RATE] = {
+		// AMI_VERY_LOW_RISK - AMI_MOD_RISK
+		(3) {
+			0.04, 0.0067, 0.06, 
+			(3) 0.0, 
+		},
+		// AMI_HIGH_RISK - AMI_VERY_HIGH_RISK
+		(2) {
+			0.04, 0.0067, 0.06, 
+			0.33, 0.02, 0.4, 
+		},
+	};
+/* NOTE ( pRR_STATINS_ON_AMI_INCIDENCE, EN )
+>Base case value is 0.74 and is applied under base case assumptions of Statin
+use (aka effective coverage, aka adherence.
+*/
+
+	double	pRR_STATINS_ON_AMI_INCIDENCE = 0.74; //EN Relative risk of statins on incidence of AMI
+};
+

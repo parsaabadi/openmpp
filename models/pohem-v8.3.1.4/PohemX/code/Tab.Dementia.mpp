@@ -1,0 +1,612 @@
+
+//FILE_LABEL (EN) Tables for dementia incidence and prevalence
+/* FILE_NOTE(EN)
+	 POHEM Dementia tables
+*/
+
+partition AGE_GROUP_20_TO_90_BY_5{ 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90 }; //EN Age group
+
+
+table_group tgDementiaCostsTableVariants { //EN Dementia costs table variants 
+    tDementia_Costs_BMI		,		
+ 	tDementia_Costs_PackYears		,		 
+	tDementia_Costs_DrinksLastWeek	,		
+	tDementia_Costs_PhysicalActivity	,		
+	tDementia_Costs_SmokingStatus		,	
+	tDementia_Costs_AlcoholStatus		,	
+	tDementia_Costs_Ethnicity			,	
+ 	tDementia_Costs_Education			,	
+ 	tDementia_Costs_ImmigrantStatus	,		
+	tDementia_Costs_Income			,	
+	tDementia_Costs_Diabetes			,	
+ 	tDementia_Costs_AMI				,
+ 	tDementia_Costs_Stroke
+};
+
+table_group tgDementiaTableVariants { //EN Dementia table variants 
+    tDementia_BMI		,		
+ 	tDementia_PackYears		,		 
+	tDementia_DrinksLastWeek	,		
+	tDementia_PhysicalActivity	,		
+	tDementia_SmokingStatus		,	
+	tDementia_AlcoholStatus		,	
+	tDementia_Ethnicity			,	
+ 	tDementia_Education			,	
+ 	tDementia_ImmigrantStatus	,		
+	tDementia_Income			,	
+	tDementia_Diabetes			,	
+ 	tDementia_AMI				,
+ 	tDementia_Stroke
+};
+
+// Dementia incidence and prevalence by age, sex and province
+
+table Person tDementia																		//EN Dementia by sex, age and year
+[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia Prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*report_calendar_year																//EN Year  
+		* split(lifespan_age, AGE_GROUP_20_TO_90_BY_5) +									//EN Age groups used for validation against the synthetic CCDSS targets- internal validation 
+
+	};
+
+	table Person tDementia_BMI																//EN Dementia by sex, age, year and BMI status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia Prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia Prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*split(gBMI4_dementia, BMI4CAT) +													//EN BMI status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_PackYears														//EN Dementia by sex, age, year and number of pack-years smoked
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*split(total_packyears_smoked, PACKYEARSCAT) +										//EN Total number of pack-years smoked
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_DrinksLastWeek													//EN Dementia by sex, age, year and number of drinks last week
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*split(number_drinks_past_week, DRINKSLASTWEEKCAT) +								//EN Number of drinks last week
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_PhysicalActivity													//EN Dementia by sex, age, year and physical activity
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*split(physical_activity_met, METS4CAT) +											//EN Physical Activity
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_SmokingStatus													//EN Dementia by sex, age, year and smoking status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*smoking_status3 +																	//EN Smoking Status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_AlcoholStatus													//EN Dementia by sex, age, year and alcohol status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gAlcohol5 +																		//EN Alcohol status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_Ethnicity														//EN Dementia by sex, age, year and ethnicity
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gEthnicityNonWhite +																//EN Ethnicity
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_Education														//EN Dementia by sex, age, year and education
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gEducation +																		//EN Education
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_ImmigrantStatus													//EN Dementia by sex, age, year and immigrant status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population Count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gImmigrantEver +																	//EN Immigrant status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_Income															//EN Dementia by sex, age, year and income quartile
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population Count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gIncomeQuartile +																	//EN Income quartile
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_Diabetes															//EN Dementia by sex, age, year and diabetes status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population Count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*gDiabetes_use +																	//EN Diabetes status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_AMI																//EN Dementia by sex, age, year and AMI status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population Count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*acute_myocardial_infract +															//EN AMI status
+		*report_calendar_year +																//EN Year
+	};
+
+	table Person tDementia_Stroke															//EN Dementia by sex, age, year and stroke status
+		[in_tabulation_scope && report_calendar_year == calendar_year]
+	{
+		sex +																				//EN Sex
+		*
+		{
+			weighted_duration(age_at_dementia_onset) / duration(dementia, DEMENTIA_YES),	//EN Average age at dementia onset	
+			duration(),																		//EN Person-years alive duration()  	decimals=1
+			duration(dementia, DEMENTIA_NO),												//EN Person-years alive without dementia		decimals=1
+			nz_delta(duration()),															//EN Population Count
+			entrances(dementia, DEMENTIA_YES),												//EN Dementia incidence
+			entrances(dementia, DEMENTIA_YES) / duration(dementia, DEMENTIA_NO),			//EN Dementia incidence rate      decimals=4
+			nz_delta(duration(dementia, DEMENTIA_YES)),										//EN Dementia prevalence counts
+			duration(dementia, DEMENTIA_YES) / duration()									//EN Dementia prevalence proportion  decimals=4
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +										//EN Age group
+		*stroke +																			//EN Stroke status
+		*report_calendar_year +																//EN Year
+	};
+
+	/* NOTE(tDementia_Costs)
+	*  "Year prior to diagnosis" costs are tabulated at the moment dementia incidence occurs
+	*  "Diagnosis year"          costs are tabulated at the moment dementia incidence occurs
+	*  "End-of-life"             costs are tabulated at time of death (provided person had dementia).  Costs will be partial if duration with dementia is less than a year.
+	*  "Progression" costs
+	   -  tabulated continuously during prevalence (billed each nanoyear, i.e. if annual costs is 47 then each nanoyear is billed 0.000000047 )
+	   -  At time of death, the annual cost is subtracted.  If total time with dementia is less than one year (e.g. 0.4 year), substraction will be partial (0.4*annual cost)
+	   -  It is therefore possible/likely to have negative "Progression" cost at the time of death.  In aggregate, it should hopefully be fine
+
+	*/
+	table Person tDementia_Costs														//EN Total costs of dementia by sex, age, year, care domains and time categories
+		[in_tabulation_scope]
+	{
+		sex +																			//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,							//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,							//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,							//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,							//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,							//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)								//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +									//EN Age group
+		*tabulate_dementia_cost_in_this_time_cat +										//EN Dementia time category
+		*report_calendar_year +															//EN Year
+	};
+
+	table Person tDementia_Costs_BMI										//EN Total costs of dementia by sex, age, year, care domains, time categories and BMI status
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*split(gBMI4_dementia, BMI4CAT) +									//EN BMI status
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_PackYears									//EN Total costs of dementia by sex, age, year, care domains, time categories and number of pack-years smoked
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*split(total_packyears_smoked, PACKYEARSCAT) +						//EN Total number of pack-years smoked
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_DrinksLastWeek								//EN Total costs of dementia by sex, age, year, care domains, time categories and number of drinks last week
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*split(number_drinks_past_week, DRINKSLASTWEEKCAT) +				//EN Number of drinks last week
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_PhysicalActivity							//EN Total costs of dementia by sex, age, year, care domains, time categories and physical activity
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*split(physical_activity_met, METS4CAT) +							//EN Physical Activity
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_SmokingStatus								//EN Total costs of dementia by sex, age, year, care domains, time categories and smoking status
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*smoking_status3 +													//EN Smoking Status
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_AlcoholStatus								//EN Total costs of dementia by sex, age, year, care domains, time categories and alcohol status
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +						//EN Age group
+		*gAlcohol5 +														//EN Alcohol status
+		*tabulate_dementia_cost_in_this_time_cat +							//EN Dementia time category
+		*report_calendar_year +												//EN Year
+	};
+
+	table Person tDementia_Costs_Ethnicity									//EN Total costs of dementia by sex, age, year, care domains, time categories and ethnicity
+		[in_tabulation_scope]
+	{
+		sex +																//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,				//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,				//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,				//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,				//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,				//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)					//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*gEthnicityNonWhite +											//EN Ethnicity
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_Education								//EN Total costs of dementia by sex, age, year, care domains, time categories and education
+		[in_tabulation_scope]
+	{
+		sex +															//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,			//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,			//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,			//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,			//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,			//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)				//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*gEducation +													//EN Education
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_ImmigrantStatus						//EN Total costs of dementia by sex, age, year, care domains, time categories and immigrant status
+		[in_tabulation_scope]
+	{
+		sex +															//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,			//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,			//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,			//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,			//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,			//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)				//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*gImmigrantEver +												//EN Immigrant status
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_Income									//EN Total costs of dementia by sex, age, year, care domains, time categories and income quartile
+		[in_tabulation_scope]
+	{
+		sex +															//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,			//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,			//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,			//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,			//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,			//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)				//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*gIncomeQuartile +												//EN Income quartile
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_Diabetes								//EN Total costs of dementia by sex, age, year, care domains, time categories and diabetes status
+		[in_tabulation_scope]
+	{
+		sex +															//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,			//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,			//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,			//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,			//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,			//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)				//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*gDiabetes_use +												//EN Diabetes status
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_AMI									//EN Total costs of dementia by sex, age, year, care domains, time categories and AMI status
+		[in_tabulation_scope]
+	{
+		sex +															//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,			//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,			//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,			//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,			//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,			//EN Dementia costs: long-term care
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)				//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +					//EN Age group
+		*acute_myocardial_infract +										//EN AMI status
+		*tabulate_dementia_cost_in_this_time_cat +						//EN Dementia time category
+		*report_calendar_year +											//EN Year
+	};
+
+	table Person tDementia_Costs_Stroke											//EN Total costs of dementia by sex, age, year, care domains, time categories and stroke status
+		[in_tabulation_scope]
+	{
+		sex +																	//EN Sex
+		*
+		{
+			 event(punctual_dementia_costs_physician) + weighted_duration(dementia_physician_progression)           ,					//EN Dementia costs: physician
+			 event(punctual_dementia_costs_prescription) + weighted_duration(dementia_prescription_progression)        ,					//EN Dementia costs: prescription
+			 event(punctual_dementia_costs_hospital_admissions) + weighted_duration(dementia_hospital_admissions_progression) ,					//EN Dementia costs: hospital admissions
+			 event(punctual_dementia_costs_homecare) + weighted_duration(dementia_homecare_progression)            ,					//EN Dementia costs: homecare
+			 event(punctual_dementia_costs_longtermcare) + weighted_duration(dementia_longtermcare_progression)        ,					//EN Dementia costs: longtermcare
+			 event(punctual_dementia_costs_assistive_devices) + weighted_duration(dementia_assistive_devices_progression)						//EN Dementia costs: assistive devices
+		}
+		*split(lifespan_age,AGE_GROUP_20_TO_90_BY_5) +							//EN Age group
+		*stroke +																//EN Stroke status
+		*tabulate_dementia_cost_in_this_time_cat +								//EN Dementia time category
+		*report_calendar_year +													//EN Year
+	};
+
+	table Person tDementia_Mortality											//EN Mortality by age, sex, year and dementia status
+		[in_tabulation_scope && report_calendar_year == calendar_year && calendar_year < MaxYear]
+	{
+		{
+			entrances(alive, FALSE),											//EN Death counts
+			entrances(alive, FALSE) / duration(),								//EN Death hazard rate  decimals=5
+			nz_delta(duration()),												//EN Population counts
+			duration()															//EN Person-years		decimals=1
+		}
+		*split(lifespan_age, AGE_GROUP_20_TO_90_BY_5) +							//EN Age group
+		*sex +																	//EN Sex
+		*report_calendar_year													//EN Year
+		* dementia +															//EN Dementia status
+	};

@@ -1,0 +1,88 @@
+//LABEL(MortalityResidual, EN) Mortality Residual
+
+/*NOTE(MortalityResidual, EN)
+	This file adjusts general population-leve mortality, such as mortality hazards, 
+	to account for relative risk of smoking on selected causes and cause-specific models of mortality
+*/
+
+
+//EN Age group
+partition	AGE3565 {35, 65};
+
+
+parameters {
+
+	//EN Distribution of cause of death
+	double CauseOfDeath[SEX][COD_AGE_GROUP][DISEASES];	
+
+	/* NOTE ( ResidualMortalityHazard )
+	The residual mortality hazard represents the mortality hazard of all non-modelled diseases.
+	When a death is generated from the residual mortality hazards, the cause of death is assigned based 
+	on the distribution of the residual (non-modelled) diseases. 
+	The residual mortality is a competing risk with the disease-specific models of incidence, 
+	progression and mortality.
+	>>	The residual mortality is effectively calculated by by subtracting out the proprortion associated 
+	with modeled diseases (found in the cause of death parameter).
+	*/
+
+	model_generated double	ResidualMortalityHazard[SEX][YEAR][LIFE_SPAN];
+
+	model_generated cumrate	ResidualCauseOfDeath[SEX][LIFE_SPAN][DISEASES];
+
+};
+
+parameter_group MORTALITY_Residual_ExpertsOnly { //EN Residual Experts only
+	CauseOfDeath
+};
+model_generated_parameter_group MG_MORTALITY_ExpertsOnly { //EN Experts only    Note that this does nothing in modgen 11 and possibly nothing as well for modgen 12 as of March 2018
+	ResidualMortalityHazard,
+	ResidualCauseOfDeath
+};
+
+/*
+==========================================================
+Mortality PreSimulation
+==========================================================
+This PreSimulation code deletes the proportion of death 
+associated with the modeled or deleted (as of March 19, 2002) 
+diseases from the total hazard (actually a probability)
+all diseases mortality hazards.
+========================================================== 
+*/
+void PreSimulation()
+{
+	int		nSex;
+	int		nAgeGroup;
+	int		nAge;
+	int		nDisease;
+	int		nBirthYear = {0};
+	int		nYear = {0};
+	int		tYear = {0};
+
+	// CAUSE-SPECIFIC MORTALITY ADJUSTMENT
+	// Residual mortality hazards adjusted for cause-specific models
+
+	for ( nSex = 0; nSex < SIZE( SEX ); nSex++ ) 
+	{
+		for ( nBirthYear = 0; nBirthYear < SIZE( YEAR ); nBirthYear++ ) 
+		{
+		    for ( nAge = 0; nAge < SIZE( LIFE_SPAN ); nAge++ ) 
+		    {
+			    nAgeGroup = SPLIT( nAge, COD_AGE_GROUP );
+
+			    for ( nDisease = 0; nDisease < SIZE( DISEASES ); nDisease++ ) 
+			    {
+					int modeled_disease = (int) DISEASES_To_DISEASES_MODELED_PLUS_1( (DISEASES) nDisease);
+				    // disease has not been modeled explicitly so keep its contribution in the lifetable mortality
+					if (modeled_disease == DMP1_NOT_MODELED || !pDisease[(DISEASES_MODELED) modeled_disease][ROW_1])
+				    {	
+					    ResidualCauseOfDeath[nSex][nAge][nDisease] = CauseOfDeath[nSex][nAgeGroup][nDisease];
+					    ResidualMortalityHazard[nSex][nBirthYear][nAge] += ModelMortHazard[nSex][nBirthYear][nAge] * CauseOfDeath[nSex][nAgeGroup][nDisease];
+
+				    }
+			    }
+		    }
+	    }
+    }
+
+};

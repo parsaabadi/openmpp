@@ -1,0 +1,1398 @@
+//FILE_LABEL (EN) StartPop
+/* FILE_NOTE(EN) 
+	Core simulation functions to initialize the starting population
+	>Contains: 
+	- simulation and case_simulation code
+	- code to read sequentially all records on the input db StartPop
+	or to sameple (with replacement) from it.
+	- complex Presimulation that calculates the number of 
+	births and immigrants to genereate in future years (should the appropriate 
+	parameter be set by the user to request it). 
+*/
+
+
+model_type	case_based;
+time_type	double;
+
+// Dummy classification used to flip display of 1-D tables and parameters from one row to one column
+classification DUMMY_ROW_OR_COLUMN	//EN Value
+{
+	ROW_1	//EN Value
+};
+
+/* Notes 
+ - new fields added (ethnicity, immigrantever, arthritis, stroke), and order changed (HUI before Wtsam) Oct 31, 2007 Bill
+ - cDb_Ethnicity,		// Cultural Origin (White vs non-white) *** new October 2007
+ - cDb_CulturalOrigin   //Cultural Origin (White, Aboriginal, Black, Asian, Other, Unkown) *** new Feb 25 2008
+ - cDb_ImmigrantEver,	// Immigrant (ever) *** new October 2007
+ - cDb_Immig,			// Immigrant last 9 years (pumf) 
+ - cDb_Arthritis,			// Arthritis *** new October 2007
+ - cDb_Osteoarthritis,		// OsteoArthritis *** new December 2007
+ - cDb_Stroke,			// Stroke *** new October 2007
+ - cDb_HUI_Vis, ....,cDb_HUI_Pad // Individual HUI components, added October 2013
+ - cDb_SP_physactind,  ... , cDb_SP_alcoholmt       // SPoRT components added by Deirdre H. Feb 2014 
+ - cDb_PD_Diabetes, //Physician diagnosed diabetes added by Claude in June 2015 (but was initially added by Meltem in a parallel version of POHEM May 2014)
+ - cDb_PA_cancer, ... , cDb_PA_LTPA, // Physical activity (and friends) components added by Claude in June 2015
+*/
+
+classification DB_FIELDS {
+/*	cDb_AgeGrp,         //EN Five year age group djkdfkjfd djkdkjfdkkd ddd kjfksdjfsdjf skj sdgjsdgkjsdfjk fdskjgksjgjgkjg kjkgjksg dfj kfkjdskfjkdjfsd */  
+/* With the long description above, modgen will complain and won't cooperate when attempting to modify pStartPopReweightDefinitionFields in the modgen interface*/
+	cDb_AgeGrp,         //EN Five year age group  
+	cDb_Sex,            //EN Sex 
+	cDb_Province,       //EN Province 
+	cDb_Ethnicity,		//EN Ethnicity
+	cDb_CulturalOrigin,	//EN Cultural Origin
+	cDb_ImmigrantEver,	//EN Immigrant 
+	cDb_Immig,			//EN Recent immigrant (last 9 years) 
+	cDb_Education,      //EN Education 
+	cDb_IncomeQuartile, //EN Income
+	cDb_Alcohol,        //EN Alcohol drinks per week (dpw)
+	cDb_BMI,            //EN Body mass index in kg/(m^2)
+	cDb_Height_m,		//EN Height in meters
+
+// note that a current smoker may not be a regular smoker according to definitions - see SAS code used to derive these variables
+	cDb_SmokingRegular, //EN Regular smoker 
+	cDb_SmokingCurrentFormer8,	//EN Current/Former smoker 
+
+	cDb_Arthritis,	    //EN Arthritis 
+	cDb_Osteoarthritis,	//EN OsteoArthritis 
+	cDb_HeartAttack,    //EN Had heart attack
+	cDb_HeartAngina,    //EN Angina 
+	cDb_CHF,            //EN Congestive heart failure 
+	cDb_Stroke,			//EN Stroke
+	
+
+	cDb_HUI_Vis,		//EN HUI PUMF component vision problem 
+	cDb_HUI_Her,        //EN HUI PUMF component hearing problem 
+	cDb_HUI_Spe,        //EN HUI PUMF component speech problem 
+	cDb_HUI_Mob,        //EN HUI PUMF component mobility problem 
+	cDb_HUI_Dex,        //EN HUI PUMF component dexterity problem 
+	cDb_HUI_Emo,        //EN HUI PUMF component emotional problem 
+	cDb_HUI_Cog,        //EN HUI PUMF component cognitive problem 
+	cDb_HUI_Pad,        //EN HUI PUMF component pain problem 
+	cDb_HUI,            //EN HUI 
+
+	cDb_SP_physactind,  //EN SPoRT component physical activity  
+	cDb_SP_smokingrp,   //EN SPoRT component smoking     
+	cDb_SP_weeklyvegcarg,//EN SPoRT component diet (vegetable & carrot)
+	cDb_SP_selfpstress, //EN SPoRT component life stressful
+	cDb_SP_HRT,         //EN SPoRT component heart disease     
+	cDb_SP_DM,          //EN SPoRT component diabetes         
+	cDb_SP_HBP,         //EN SPoRT component hypertension           
+	cDb_SP_alcoholmt,   //EN SPoRT component alcohol 
+	
+	cDb_SmokingPackYears,//EN Smoke PackYears
+
+	cDb_PA_cancer,      //EN Has cancer
+	cDb_PA_cc_ex5,      //EN Number of chronic conditions 
+	cDb_PA_walk2job,    //EN Walk for errands
+	cDb_PA_bike2job,    //EN Bike for errands
+	cDb_PA_UsualDay,    //EN Level of physical activity for usual day
+	cDb_PA_LTPA,        //EN Leisure time physical activity
+
+	cDb_Dementia,		//EN Dementia 
+
+	cDb_Weight          //EN Survey weight 
+};
+
+/*  would use this if modgen bug was not present (modgen will complain and won't cooperate when attempting to modify pStartPopReweightDefinitionFields in the modgen interface)
+classification DB_FIELDS {
+	cDb_AgeGrp,         //EN Five year age group : 2 = <20, 3 = 20-24, 4 = 25-29, 5 = 30-34, 6 = 35-39, ... ,  13 = 70-74, 14 = 75-79, 15 = 80+
+	cDb_Sex,            //EN Sex : 0 = Female, 1 = Male
+	cDb_Province,       //EN Province : 0 = Newfoundland, 1 = PEI, 2 = Nova Scotia, 3 = New Brunswick, 4 = Quebec, 5 = Ontario, 6 = Manitoba, 7 = Saskatchewan, 8 = Alberta, 9 = BC
+	cDb_Ethnicity,		//EN Ethnicity : 0 = White, 1 = Non-white
+	cDb_CulturalOrigin,	//EN Cultural Origin : 0 = White, 1 = Aboriginal, 2 = Black, 3 = Chinese, 4 = South asian, 5 = Japanese or Korean, 6 = South east asian, 7 = Unknown
+	cDb_ImmigrantEver,	//EN Immigrant : 0 = No, 1 = Yes
+	cDb_Immig,			//EN Recent immigrant (last 9 years) : 0 = No, 1 = Yes 
+	cDb_Education,      //EN Education : 0 = Less than secondary, 1 = Secondary grad , 2 = Other post-secondary, 3 = Post-secondary grad
+	cDb_IncomeQuartile, //EN Income : 0 = Quartile 1 (poorest), 1 = Quartile 2 (lower middle), 2 = Quartile 3 (upper middle), 3 = quartile 4 (richest)
+	cDb_Alcohol,        //EN Alcohol drinks past week (dpw) : -2 = Never drank, -1 = Former drinker, otherwise provide drink count (0, 1, 2, 3,....)
+	cDb_BMI,            //EN Body mass index in kg/(m^2)
+	cDb_Height_m,		//EN Height in meters
+
+// note that a current smoker may not be a regular smoker according to definitions - see SAS code used to derive these variables
+	cDb_SmokingRegular, //EN Regular smoker : 0 = No, 1 = Yes
+	cDb_SmokingCurrentFormer8,	//EN Current/Former smoker : 0 = Never smoker, 1 = Current smoker, 2,3,4,5= Former occasional quit (0-1,1-2,2-5,5+ years ago), 6,7,8,9= Former daily quit (0-1,1-2,2-5,5+ years ago), 
+
+	cDb_Arthritis,	    //EN Arthritis : 0 = No, 1 = Yes
+	cDb_Osteoarthritis,	//EN OsteoArthritis : 0 = No, 1 = Yes
+	cDb_HeartAttack,    //EN Had heart attack : 0 = No, 1 = Yes
+	cDb_HeartAngina,    //EN Angina : 0 = No, 1 = Yes
+	cDb_CHF,            //EN Congestive heart failure : 0 = No, 1 = Yes
+	cDb_Stroke,			//EN Stroke : 0 = No, 1 = Yes
+
+	cDb_HUI_Vis,		//EN HUI PUMF component vision problem : 1 = No, 2 = corrected by lenses, 3 = distant not corrected, 4 = close not corrected, 5 = 	Problem seeing close & distant / no sight
+	cDb_HUI_Her,        //EN HUI PUMF component hearing problem :  1 = No, 2 = corrected, 3 = not corrected
+	cDb_HUI_Spe,        //EN HUI PUMF component speech problem : 1 = No, 2 = partially/not understood
+	cDb_HUI_Mob,        //EN HUI PUMF component mobility problem : 1 = No, 2 = Yes but no aid required, 3 = requires support/wheelchair, 4 = requires help/cannot walk
+	cDb_HUI_Dex,        //EN HUI PUMF component dexterity problem : 1 = No, 2 = Yes but no help required, 3 = needs help
+	cDb_HUI_Emo,        //EN HUI PUMF component emotional problem : 1 = Happy and interested in life, 2 = Somewhat happy, 3 = Somewhat unhappy, 4 = Very unhappy, 5 = So unhappy that life is not worthwhile
+	cDb_HUI_Cog,        //EN HUI PUMF component cognitive problem : 1 = No, 2 = little difficulty thinking, 3 = Somewhat forgetful, 4 = Somewhat forgetful/little difficulty thinking, 5 = Very forgetful/great difficulty thinking, 6 = Unable to remember/think
+	cDb_HUI_Pad,        //EN HUI PUMF component pain problem : 1 = No, 2 = Mild/moderate pain does not prevent activity, 3 = Moderate pain prevents a few activities, 4 = Moderate/severe pain prevents some activities, 5 = Severe pain prevents most activities
+	cDb_HUI,            //EN HUI 
+
+	cDb_SP_physactind,  //EN SPoRT component physical activity : 0 = active, 1 = moderate, 2 = inactive, 3 = not stated         
+	cDb_SP_smokingrp,   //EN SPoRT component smoking : 0 = 20+ daily cigarettes, 1 = <20 daily cigarettes or former daily smoker now occasional or never daily smoker , 2 = Former daily , 3 = Former occasional , 4 = Missing          
+	cDb_SP_weeklyvegcarg,//EN SPoRT component diet (vegetable & carrot) : 0 = 0-6 weekly, 1 = 7-13 weekly, 2 = 14+ weekly but not extreme, 3 = extreme ( > 140 carrots weekly or > 140 vegetable weekly) or missing
+	cDb_SP_selfpstress, //EN SPoRT component life stressful : 0 = not at all, 1 = not very, 2 = a bit, 3 = quite a bit, 4 = extremely, 5 = missing
+	cDb_SP_HRT,         //EN SPoRT component heart disease : 0 = No, 1 = Yes       
+	cDb_SP_DM,          //EN SPoRT component diabetes : 0 = No, 1 = Yes             
+	cDb_SP_HBP,         //EN SPoRT component hypertension : 0 = No, 1 = Yes            
+	cDb_SP_alcoholmt,   //EN SPoRT component alcohol : 0 = heavy, 1 = medium, 2 = light, 3 = occasional, 4 = former never, 5 = binge, 6 = missing      
+	
+	cDb_SmokingPackYears,//EN Smoke PackYears
+
+	cDb_PA_cancer,      //EN Has cancer : 0 = No, 1 = Yes  
+ 	cDb_PA_cc_ex5,      //EN Number of chronic conditions among following 16: a) food allergies, b) other allergies, c) asthma, d) fibromyalgia, e) back problems, f) migraine, g) bronchitis/emphysema/COPD , h) epilepsy, i) stomach/intestinal ulcers, j) stroke, k) incontinence, l) bowel disorder/Crohn Disease or colitis, m) Alzheimer/dementia (censored PUMF), n) cataracts, o) glaucoma, p) thyroid condition
+	cDb_PA_walk2job,    //EN Walk for errands : 0 = No, 1 = 0 to 5 hrs/week, 2 = 6 to 10 hrs/week, 3 = 11+ hrs/week 
+	cDb_PA_bike2job,    //EN Bike for errands : 0 = None, 1 = Some
+	cDb_PA_UsualDay,    //EN Level of physical activity for usual day : 0 = Sit, 1 = Stand or walk quite a lot , 2 = Lift/carry light , 3 =  heavy work/carry very heavy loads
+	cDb_PA_LTPA,        //EN Leisure time physical activity : hours/day (e.g. 0.45 hour/day)
+	cDb_Weight          //EN Survey weight : set to negative (positive) to run in population (clinical) mode
+};
+*/
+/* some alternatives to cDb_PA_cc_ex5
+//  cDb_PA_cc_ex5's description below seems too long for modgen.  Parameter pStartPopReweightDefinitionFields does not like it.
+// 	cDb_PA_cc_ex5,      //EN Number of chronic conditions among following 16: a) food allergies, b) other allergies, c) asthma, d) fibromyalgia, e) back problems, f) migraine, g) bronchitis/emphysema/COPD , h) epilepsy, i) stomach/intestinal ulcers, j) stroke, k) incontinence, l) bowel disorder/Crohn Disease or colitis, m) Alzheimer/dementia (censored PUMF), n) cataracts, o) glaucoma, p) thyroid condition
+// 	cDb_PA_cc_ex5,      //EN Number of chronic conditions (0, 1, 2, ... , 16) when diabetes, heart disease, hypertension, cancer, OA are excluded. The 21 - 5 = 16 remaining conditions are listed in the notes of the parameter currently consulted
+
+// cDb_PA_cc_ex5 excludes diabetes, heart disease, hypertension, cancer, OA
+*/
+
+classification STARTPOP_SUBPOPULATIONS {//EN Sub-populations
+	STARTPOP_SUBPOPULATION_1, //EN Sub-population 1
+	STARTPOP_SUBPOPULATION_2, //EN Sub-population 2
+	STARTPOP_SUBPOPULATION_3, //EN Sub-population 3
+	STARTPOP_SUBPOPULATION_4, //EN Sub-population 4
+	STARTPOP_SUBPOPULATION_5, //EN Sub-population 5
+	STARTPOP_SUBPOPULATION_6, //EN Sub-population 6
+	STARTPOP_SUBPOPULATION_7, //EN Sub-population 7
+	STARTPOP_SUBPOPULATION_8, //EN Sub-population 8
+	STARTPOP_SUBPOPULATION_9  //EN Sub-population 9
+};
+
+classification START_TIME_METHOD {	//EN Method of initializing time and birthday for StartPop cases
+	cStart_Jan01,		//EN Time starts January 1, birthdays assigned uniformly
+	cStart_Bday,		//EN Time starts on Birthday which is assigned uniformly
+	cStart_BdayIsJan01	//EN Time starts January 1, Birthday is set to January 1 (recommended)
+};
+
+classification cPopulationStartMethod {
+	cSAMPLE,		//EN Sample (random selection with replacement)
+	cFULL			//EN Full (sequentially process every case on DB and clone for case weight)
+};
+ 
+
+classification cPopulationSource {//EN POHEM entry point
+	cStartPop,		//EN StartPop database
+	cNewBirth,		//EN New births
+	cNewImmig		//EN New immigrants
+};
+
+classification DB_AGE_DECODE { //EN StartPop age decode
+	cDbBeginAge,	//EN Start age of group
+	cDbEndAge		//EN End age of group
+};
+
+/* 
+//EN database records (CCHS 2001 = 130880; CCHS 2001 Aggregated = 71071;)
+range DB_RECORDS { 0, 130879 };
+*/
+//EN database records (maximum)
+//the program can bomb if input database exceeds sizes below
+range DB_RECORDS          {0, 99999  };	//EN database records
+range DB_RECORDS_IMMIG    {0, 250    };	//EN database records: immigrants
+range DB_RECORDS_BIRTHS   {0, 10000  };	//EN database records: new births
+range DB_RECORDS_CDF      {0, 99000  };	//EN database records: CDF calculations         
+
+
+range DB_AGE_CODE { 0, 99 };//EN Age code in StartPop database
+
+classification CONDITIONS_REWEIGHT //EN Conditions to reweight a CCHS record
+{
+	CONDITIONS_REWEIGHT_1,  //EN First condition
+    CONDITIONS_REWEIGHT_2,  //EN Second condition
+	CONDITIONS_REWEIGHT_3,  //EN Third condition
+	CONDITIONS_REWEIGHT_4,  //EN Fourth condition
+	CONDITIONS_REWEIGHT_5   //EN Fifth condition
+};
+
+
+
+classification RECORD_X_Y_CDFINF_CDFSUP {  //EN Infomation for conditional CDF
+RXYCC_RECORD,
+RXYCC_X_GROUP,
+RXYCC_Y,
+RXYCC_CDFINF,
+RXYCC_CDFSUP
+};
+
+/* Leaner version of RECORD_X_Y_CDFINF_CDFSUP considered when thinking of ways to avoid some stack overflow issues.  In the end, this was resolved without need to overhaul code using RECORD_X_Y_CDFINF_CDFSUP
+classification XGROUP_Y_CDF {  //EN Infomation for conditional CDF
+XYC_X_GROUP,
+XYC_Y,
+XYC_CDF
+};
+*/
+
+classification COVARIATE_X  {  //EN 4 variables
+ COVARIATE_X1,
+ COVARIATE_X2,
+ COVARIATE_X3,
+ COVARIATE_X4
+};
+
+
+hide( pStartPop );	//EN StartPop is too large to open in Modgen Interface, and meaningless to imagine changing its content this way.
+hide( pStartPopYear );
+hide( pPopulationStartMethod ); //EN This was decomissioned with POHEM 7040
+
+
+
+
+parameter_group pgStartPopImmigrants {//EN StartPop - Population controls : Immigrants
+pImmig,
+AimAtAllFutureImmigrants,
+ForceInitialisationToNonImmigrant,
+pgImmigrationTiming
+};
+
+
+parameter_group pgStartPopReweight {//EN StartPop - Population controls : Case reweighting
+pStartPopReweightDefinitionFields,
+pStartPopReweightDefinitionBounds,
+pStartPopReweightMultiplier
+};
+
+parameter_group pgStartPop {	//EN StartPop - Population controls
+pgKeyDemographyControls,
+pPopulationStartMethod,
+pStartYear,
+
+AimAtAllFutureYoungAdults,
+UseNewUnduplicationMethod,
+pStartTimeMethod,
+pReportYear,
+pDbAgeDecode,
+
+TimingFirstUpdate,
+
+pUseInputPopulationToAssignAge,
+pPOPULATION,
+FictivePersonCharacteristics,
+pgStartPopReweight,
+pgStartPopImmigrants
+};
+
+parameter_group pgKeyDemographyControls  {	//EN Some key demography controls 
+	pNewArrivalsControl,
+	pMaxYearNewArrivals,
+	MaxYear,
+	MinLife,
+	MaxLife
+};
+
+parameters 
+{
+	logical ForceInitialisationToNonImmigrant [cPopulationSource] ; //EN Set actor initial immigrant status to non-immigrant 
+
+
+	//EN Open or Closed population
+	logical pNewArrivalsControl[cPopulationSource];
+
+	//EN Last year for generating Future Births and Immigrants
+	int		pMaxYearNewArrivals;
+
+	/* NOTE ( pPopulationStartMethod, EN )
+	The "Sample" option initializes simulation cases by random sampling (with replacement) 
+	of the records on pStartPop database according to their weight.
+
+	The "Full" option sequentially processes every record on the database (pStartPop), 
+	cloning according to the sample weight associated with each record. 
+
+	Setting the number of Cases for the scenario:
+	1. For a "Sample" run, you decide just as will all previous versions of POHEM. 
+		The cases will be distributed between the database file and the births and 
+		new immigrants in a proportionnally appropriate way.
+
+	2. For a "Full" run, you need to know a specific number to specify: the sum 
+		of the number of records in the initialization database pStartPop + the 
+		number of births and new immigrants to generate in subsequent years.
+
+		A user table has been generated to answer this question. It evaluates
+		the input parameters pStartPop, pPOPULATION and pImmig (and pArrivalGate)
+		to determine exactly the number of records of each type and indicates the total. 
+
+		To get the answer table, run the simulation once (specify a small number of cases
+		so that it will be fast, say 10). 
+
+		The answer table is called utCases.
+		More information is provided in its table notes under Properties.
+	*/
+	//EN Sample or Full population
+	cPopulationStartMethod pPopulationStartMethod;
+
+
+
+
+
+	/* NOTE ( AimAtAllFutureImmigrants )
+	Set this parameter to TRUE (checked) if want all immigrants in future years.
+	Set this parameter to FALSE (unchecked) if want some future immigrants to be denied access to Canada as per pre-POHEM 8100 logic.
+
+	The pre-POHEM 8100 logic goes like this. If the parameter "Number of new immigrants by sex, age, province and year" (aka pImmig) states that
+	there were (or will be) 200 male immigrants of a given age in given province in a given year, POHEM will aim at creating 200*p = 196
+	such immigrants. p essentially represents the proportion of the adult population that is in scope for the CCHS survey
+	(e.g. poeple living in institutions are out of scope for CCHS).  p is a little bit less than 98%.
+	*/
+
+	//EN Include all future immigrants
+	logical AimAtAllFutureImmigrants;
+
+	/* NOTE ( AimAtAllFutureYoungAdults )
+	Set this parameter to TRUE (checked   ) if, in future years, you want to generate all new young (20 year old) adults in future years.
+	Set this parameter to FALSE (unchecked) if, in future years, you want to generate only those new young (20 year old) adults that would be in scope according to CCHS definition.
+	*/
+
+	//EN Include all future young adults
+	logical AimAtAllFutureYoungAdults;
+
+
+	/* NOTE ( UseNewUnduplicationMethod )
+	Parameter "Number of new immigrants by sex, age, province and year" (aka pImmig) and parameter "Population by sex, age and province and territory" (aka pPOPULATION) may both call for 
+	the introduction of new young (20 year old) adults in future year.  Some cautionary steps need to be done to avoid duplication. Two different methodologies may be used.
+	Set this parameter to TRUE (checked) to use methodology introduced in POHEM 8100. 
+	Set this parameter to FALSE (unchecked) to use the pre-POHEM 8100 methodology. 
+	
+	The main difference is that the old methodology would carry out unnecessary un-duplication for a scenario that calls for the creation of new young adults but 
+	no immigrants (see parameter "Open or Closed population" aka pNewArrivalsControl).
+	*/
+
+	//EN Use new unduplication method
+	logical UseNewUnduplicationMethod;
+
+
+
+
+	/* NOTE ( pStartTimeMethod )
+	This applies to how the time and birthdate are assigned for cases generated in the
+	starting year of the simulation from the initializaiton database. 
+
+	cStart_Jan01		=> Time starts January 1, birthdays assigned uniformly through year
+	cStart_Bday			=> Time starts on Birthday which is assigned uniformly through year
+	cStart_BdayIsJan01	=> Time starts January 1, Birthday is set to January 1 (recommended)
+
+	It does not apply to births and new immigrants created in subsequent years.
+	*/
+	//EN Start person on their birthday and/or on beginning of year.
+	START_TIME_METHOD pStartTimeMethod;
+
+	
+	//EN Distribution of population at beginning of simulation
+	double pStartPop[DB_RECORDS][DB_FIELDS];  
+
+	/* NOTE(mgStartPopCopy)
+	 This is used as temporary array/variable in a couple of PreSimulation. 
+	 However, declaring it as local array/variable (e.g. YoungestPool in POHEM 8121) leads to stack_overflow whereas declaring it as model_generated works OK.
+	 Ditto for mgStartPopAlternativeX and mgStartPopAlternativeY.
+	 */
+	model_generated double mgStartPopCopy[DB_RECORDS_CDF][RECORD_X_Y_CDFINF_CDFSUP]; 
+	model_generated double mgStartPopAlternativeX[DB_RECORDS]; // Same number of rows as pStartPop since this is an alternative thereof
+	model_generated double mgStartPopAlternativeY[DB_RECORDS]; // Same number of rows as pStartPop since this is an alternative thereof
+	
+
+	//EN Reweight population data base: field
+	DB_FIELDS pStartPopReweightDefinitionFields[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT];
+
+	//EN Reweight population data base: acceptance range
+	double    pStartPopReweightDefinitionBounds[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT][cLOWER_UPPER_BOUNDS];
+
+	//EN Reweight population data base: multiplier
+	double    pStartPopReweightMultiplier[STARTPOP_SUBPOPULATIONS][DUMMY_ROW_OR_COLUMN];
+
+	int    pStartPopYear ; //EN Year corresponing to pStartPop
+	
+
+	/* NOTE ( pStartYear )
+		Start year of the simulation
+	*/
+	//EN Start year of simulation 
+	int pStartYear;
+
+	/* NOTE ( pReportYear )
+		Used for reporting on or up to a specific year
+		Set to 2050 when trying to estimate the prevalence of OA by path (starting with zero prevalence in 2001)
+		Set to 2025 when producing results (number of surgeries up to this point.
+	*/
+	//EN Used for reporting on or up to a specific year
+	int pReportYear; 
+	
+
+	/* NOTE ( pDbAgeDecode )
+	The initialization database (pStartPop) contains age codes representing an age range.
+	
+	This parameter is used to decode the age ranges.
+	
+	The index of this parameter represents the age code (not age itself).
+	
+	The begin and end ages identify the age group associated with the age code.
+	Values of -1 indicate that the age code is not applicable.
+	
+	For example, if code 5 is used to represent age 20-24, then for index 
+	5, the begin age is set to 20 and the end age is set to 24. 
+	
+	This is interpretted by the simulation to mean the age range: 20 <= age < 25
+
+  	If there is a code in pStartPop that is not identified with an age range in this 
+	parameter, the simulation will stop due to a fatal error, however the error
+	message will not indicate the cause.
+
+	*/
+	//EN StartPop age group decoder
+	int pDbAgeDecode[DB_AGE_CODE][DB_AGE_DECODE];
+
+	
+	//EN Number of new immigrants by sex, age, province and year
+	int pImmig[YEARS][SEX][cPROVINCE][LIFE]; 
+
+	
+
+	/* NOTE ( pUseInputPopulationToAssignAge, EN )
+	Cases initialized from pStartPop are by age group. In the simulation we assign a specific
+	value of age within that age group. To assign the age according to distribution of age in 
+	the population (see parameter pPOPULATION), check this box (recommended). 
+	Otherwise the age will be assigned uniformly within age group.
+	*/
+	//EN Use population structure to assign age from age group
+	logical pUseInputPopulationToAssignAge;	
+	
+	
+	//EN Population by sex, age, province (territory) and year
+	int	pPOPULATION[YEARS][SEX][cPROVINCE][LIFE_SPAN];
+
+	model_generated double mgCumPOPULATION[PROVINCE][SEX][LIFE_SPAN];	//EN Cum distribution of population within age group, by sex and province
+
+	model_generated logical mgStartPopDone;
+
+	// double mgSumPersonNRecord[rTHREADS][VERIFY_CLASS];	// only mgSumPersonNRecord[0][cExpected] was assigned something and in the end contained rubbish (0+1+2+3+4+5+ ... + 105336) = 105336*105337/2
+	
+	/* NOTE(mgBirth,EN) 
+		Model generated births as a cumrate defined for the range
+		of years determined by pStartYear+1 and pMaxYearNewArrivals
+	*/
+	//EN cum distribution of new "births" at youngest age
+	model_generated cumrate[3]	mgBirth[SEX][YEARS][PROVINCE];
+
+	//EN Youngest age on pStartPop
+	model_generated int	mgYoungestAge;
+
+	//EN Youngest age group on pStartPop
+	model_generated int mgAgeCodeYoungest;
+
+	//EN Oldest age group on pStartPop
+	model_generated int mgAgeCodeOldest;
+	
+
+	//EN Youngest age group weights on pStartPop by sex and province
+	model_generated cumrate mgCumStartPopWeightYoungest[SEX][PROVINCE][DB_RECORDS_BIRTHS];
+
+	//EN Youngest age group case record number on init db, for lookup
+	model_generated int mgStartPopYoungestDecode[DB_RECORDS_BIRTHS];
+
+//BEGIN Immigrants
+	//EN Immigration cumrate for selected years and age ranges
+	model_generated cumrate[4] mgImmig[YEARS][SEX][cPROVINCE][LIFE];
+
+	//EN Immigration weights as cumrate copied from initialization db for hot-deck lookup by province
+	model_generated cumrate mgCumStartPopWeightImmig[SEX][cPROVINCE][DB_AGE_CODE][DB_RECORDS_IMMIG];
+
+	//EN Immigration weights as cumrate copied from initialization db for hot-deck lookup by region-- changed by DH and BF Feb 2015 see documentation
+	model_generated cumrate mgCumStartPopWeightImmigReg[SEX][REGION][DB_AGE_CODE][DB_RECORDS_IMMIG];
+
+	//EN Immigration weights as cumrate copied from initialization db for hot-deck lookup in the whole of Canada-- changed by DH and BF Feb 2015 see documentation
+	model_generated cumrate mgCumStartPopWeightImmigCan[SEX][DB_AGE_CODE][DB_RECORDS_IMMIG];
+	
+	//EN Immigration record number on init db, for hot-deck lookup
+	model_generated int mgStartPopImmigDecode[SEX][DB_AGE_CODE][DB_RECORDS_IMMIG];
+
+//END Immigrants
+
+
+	//EN All valid weights copied from initialization db, typed as cumrate for Lookup fn
+	model_generated cumrate mgCumStartPopWeight[DB_RECORDS];	
+
+	//EN Probability of initializing case from StartPop Database versus new arrivals in subsequent years
+	//model_generated double	mgPopulationSourceDistribution[cPopulationSource];
+	model_generated cumrate	mgPopulationSourceDistribution[cPopulationSource];
+
+	//EN Number of cases to be generated from StartPop Database versus new arrivals in subsequent years
+	model_generated double mgNumCases[cPopulationSource];
+
+	model_generated double mgNumCasesRaw[cPopulationSource];
+
+	//EN Number of cases to be generated from StartPop Database versus new arrivals in subsequent years
+	model_generated int    mgNumRecordsOnStartPopFile;
+
+	//EN adjustment to the number of new births to be similated (relative to naive calculation)
+	model_generated double mgNewBirthAdjustFactor;
+	model_generated double mgNewBirthAdjustFactorUnduplicate;
+	model_generated double mgNewBirthAdjustFactorReduceAim;
+
+
+	//EN adjustment to the number of new immigrants to be similated (relative to naive calculation)
+	model_generated double mgNewImmigAdjustFactor;
+
+
+
+	/* NOTE ( mgStartPop_SROA_Rate, EN )
+	Rate of SROA derived from StartPop records.
+	It is used to conditionally assign OA prevalence cases at start of simulation.
+	*/
+	//EN Rate of SROA in StartPop
+	model_generated double mgStartPop_SROA_Rate[SEX][LIFE];
+};
+
+/*actor Person
+{
+	DB_RECORDS PersonNRecord = MAX(DB_RECORDS); 	//EN Record number in StartPop database (initialized to last)
+};*/
+
+
+//New CaseSimulation Function
+void CaseSimulation(case_info& ci)
+{
+	extern void SimulateEvents(); // defined elsewhere
+	extern long long GetCaseCounterInThread(); // defined elsewhere
+	// TODO - assign nRecord to case # in thread, in both Modgen and ompp
+	int nRecord = (int)GetCaseCounterInThread();
+
+	cPopulationSource lPopulationSource;
+
+	int ConvertAgeGroup(int nRecord = 0);
+
+	//CRandState	rRandState;
+
+	Person *prDominant;
+
+
+	// ******************************************************************************
+	// Determine what type of case to create:
+	// (1) pStartPop database in pStartYear
+	// (2) new birth in subsequent years
+	// (3) new immigrant  in subsequent years
+	// Processed in this order based on the % done and % of each required
+	// =============================================================================
+	// MODGEN automatically splits the Cases requested amongst the Threads (processors)
+	// available on the computer. For each thread the CaseSimulation, variable  
+	// lCase runs from 0 to the number for that thread. This causes some challenges
+	// when trying to sequentially process the pStartPop database without duplication
+	// and additionally adding on the new births and new immigrants (FULL option).
+	// Adding further to the complexity is that we want this same code to work when
+	// the user chooses the SAMPLE option. The dPercendDone is used to facilitate these
+	// processes with additional code in the "FULL" setup below, to avoid duplication.
+	// ******************************************************************************
+
+	logical	lStartPopDone = FALSE;	// Applies within thread
+	double dPercentDone = 1.0;
+	double dCasesPerThread;
+	int nThreads = GetThreads();	// assuming a non-zero value always
+	int nAllCases = int(GetAllCases());
+
+	logical	UseUnstableRunningMode = FALSE; //This used to be a parameter with default value TRUE.  Now it is hardcoded with FALSE.
+	if (UseUnstableRunningMode)
+	{
+		dCasesPerThread = (double)nAllCases / nThreads;
+		if (dCasesPerThread > 0.0)
+			dPercentDone = (double)nRecord / dCasesPerThread;
+	}
+	else
+		dPercentDone = RandUniform(108);
+
+	// ******************************************************************************
+
+	int lookup_result;
+	Lookup_mgPopulationSourceDistribution(dPercentDone, &lookup_result);
+	lPopulationSource = cPopulationSource(lookup_result);
+
+	/*
+	// Everyone is an individual !
+	GetRandState( rRandState );
+	*/
+
+
+	// ===============================================
+	// Create the person actor and simulate their life
+	// ===============================================
+	prDominant = new Person();
+	prDominant->Start(lPopulationSource);
+
+
+	SimulateEvents();
+}
+// *****************************************************************************
+
+
+
+
+
+/* file notes
+
+In the simulation starting year (pStartYear):
+  Cases are simulated from pStartPop
+  The database pStartPop can be used in two ways to generate the sample person cases:
+  (1) Sample - Select through random sampling with replacement
+  (2) Full - processes every record and clones according to the sample weight
+
+
+In years after pStartYear to pMaxYearNewArrivals:
+  New "births" (at youngest age) are based on pPOPULATION (by sex, province and year) 
+  New immigrants are based on pImmig (by age at immigration and sex and year)
+
+  New Births:
+	The number of new births is based on the ratio of the total new births in 
+	these subsequent years to the number in year pStartYear (taken from pPOPULATION), 
+	multiplied by the number of births on the pStartPop database in pStartYear.
+
+  New Immigrants
+	The number of new immigrants is somewhat more complicated because the pStartPop
+	may not represent every age group; Thus a first step is to determine the number
+	of new immigrants for the same age range as pStartPop. Then the ratio of the total 
+	new immigrants in the subsequent years to the number in pStartyear is multiplied
+	by the number of new immigrants in pStartPop database in pStartYear.
+
+  Why proportions: (mgPopulationSourceDistribution)
+	These new births and new immigrant counts are if the total startpop were run. 
+	To allow it to be scaled to the number of cases requested by the user,
+	we convert these and the number of startpop cases into proportions.
+	The simulation keeps track of the % of cases finished and switches from generating
+	cases from pStartPop, to new births and finally to new immigrants.
+
+  Open issues:
+	For new immigrants (and maybe similar questions for new births) how do we 
+	assign characteristics, like diseases, risk profile etc ? 
+	Ideally we will impute from immigrants with similar characterisics. All we now from 
+	the generated case is the year and age and sex.
+
+See file CasesImmigrants.txt for more comments on steps followed.	
+
+
+General comments on initializing cases:
+
+  There will be different ways to initialize cases in the simulation
+
+  1. by StartPop database representative of population in pStartYear
+	 and set pMaxYearNewArrivals = pStartYear to have no new births in subsequent years
+
+  2. by StartPop database of birth cohort in pStartYear (only age=0)
+	 and set pMaxYearNewArrivals = pStartYear to have no new births in subsequent years
+
+  3. by StartPop database representative of population in pStartYear 
+	PLUS new births and new immigrants for pStartYear < years <= pMaxYearNewArrivals
+	Here, the new cases need to be generated in the right proportion to the
+	StartPop weight (see the Presimulation code that defines mgPopulationSourceDistribution)
+
+	Notice that birth rates are set to 0 for years outside pStartYear to pMaxYearNewArrivals 
+	in the presimulation code that define mgBirth.
+*/
+
+// *****************************************************************************
+// PRE-SIMULATION
+// *****************************************************************************
+
+
+
+void PreSimulation()
+{
+	SetMaxTime(2051+110);
+
+	int		nRecord =0;
+
+
+	int		nProv  = {0};
+	int		nProvince = {0};
+	int		nAgeCode = {0};
+	int		nAge = {0};
+
+
+	double	dBirthStartYear ={0.0};
+	
+	
+	//double	dStartPopWeightImmigTotal={0.0};
+	double	dStartPopWeightYoungestTotal = 0.0;
+	double	dTotalCases={0.0};
+
+
+	double	dCumPrev = {0.0};
+
+	int		nImmigRecord = 0;
+	int     ImmigCount[SIZE(SEX)][SIZE(DB_AGE_CODE)];
+
+
+	int		nYoungestRecord = 0;
+	int		nYoungestGroupEnd =-1;
+
+	logical lYoungestFound = FALSE;
+
+	int		nGrandTotalYoungest =0;
+	int		nGrandTotalYoungestGroup =0;
+	int		nTotalYoungestGroup[SIZE(SEX)][SIZE(PROVINCE)];
+	double	dPropYoungest[SIZE(SEX)][SIZE(PROVINCE)];
+	double	dGrandPropYoungest=0.0;
+//	int		nCasesbyAgeGroup[SIZE(LIFE)];
+
+	int		nTotalPop[SIZE(DB_AGE_CODE)]; //EN Used to total population by age group in presim
+
+	double	dTotalPopulation = {0.0};
+	double	dSROA_WT[SIZE(SEX)][SIZE(DB_AGE_CODE)];	// Local array for counting SROA cases
+	double	dPOP_WT[SIZE(SEX)][SIZE(DB_AGE_CODE)];	// Local array for counting POPulation cases
+	double	dSROA_prob = {0.0};
+	double	dOA_prob = {0.0};
+	int		nSROA = {0};
+
+
+
+// ==========================================================================
+// Span of yougest age group 
+// ==========================================================================
+	nYoungestGroupEnd = pDbAgeDecode[mgAgeCodeYoungest][cDbEndAge];    //note that mgAgeCodeYoungest is computed in AAAPresimulation.mpp
+	mgYoungestAge     = pDbAgeDecode[mgAgeCodeYoungest][cDbBeginAge];
+
+// ==========================================================================
+// YEAR - convert calendar year to index year in parameters 
+// ==========================================================================
+	int nStartYear = pStartYear - MIN( YEARS );
+	int nEndYear = COERCE(YEARS , pMaxYearNewArrivals ) - MIN( YEARS );
+
+	// Initialize local arrays with zeros
+	for ( nAgeCode = 0; nAgeCode< SIZE(DB_AGE_CODE) ; nAgeCode++ ) {
+		for (int nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+			dSROA_WT[nSex][nAgeCode]= 0.0;
+			dPOP_WT[nSex][nAgeCode]= 0.0;
+			ImmigCount[nSex][nAgeCode]=0;
+		}
+		nTotalPop [nAgeCode] = 0;
+	}
+
+	
+
+
+
+	/* ========================================================================= */
+	/*  POPULATION in pStartYear for ages and provinces represented in pStartPop */ 
+	/* ========================================================================= */
+	/*
+	AGE GROUP --> AGE
+
+	AGE STRUCTURE OF POPULATION USED TO ASSIGN SPECIFIC AGE FROM AGE GROUP
+	IN YEAR pStartYear
+
+	mgTotalPop and mgCumPOPULATION are created so that the age group
+	of an individual from pStartPop can be assigned a specific age
+	based on the distribution of age within the population
+
+	Build a special cumrate-like parameter from pPOPULATION	to contain the 
+	age-group distribution of the population by sex and province. In other 
+	words, within every age group, there is a cumulative distribution;
+	Example, for province=x, sex=y, and age group = 50-54, if there were
+	10,000 people at each age then this parameter would be 20% per age and would
+	be written out as 
+		mgCumPOPULATION[x][y][50] = 0.2
+		mgCumPOPULATION[x][y][51] = 0.4
+		mgCumPOPULATION[x][y][52] = 0.6
+		mgCumPOPULATION[x][y][53] = 0.8
+		mgCumPOPULATION[x][y][54] = 1.0
+
+	Note1: pPOPULATION was defined in the PHI version and will be used here 
+	in CCORT. PROVINCE exlcuded the terroritories YUKON, NWT, NUNAVIT
+	so the nProv loop will ignore the territories in pPOPULATION
+
+	Note2: The age group loop starts from the youngest age found on pStartPop 
+	so that the population here matches the population in pStartPop, 
+	and nAgeCode starts with the corresponding youngest age group code.
+	*/
+
+	for ( nProv = 0; nProv < SIZE( PROVINCE ); nProv++) {
+		for (int nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+			nAgeCode = mgAgeCodeYoungest;
+			nTotalPop[nAgeCode]=0;
+			for ( nAge = mgYoungestAge; nAge < SIZE( LIFE_SPAN ); nAge++ ) 
+			{
+				//if age > upper age of group in next group
+				if ( nAge > pDbAgeDecode[nAgeCode][cDbEndAge] )
+				{
+					nAgeCode = COERCE(DB_AGE_CODE, nAgeCode + 1 );
+					nTotalPop[nAgeCode]=0;
+				}
+				// if age > lower age of group, process current group 
+				// (excludes the ages lower than first age group from calculation)
+				if ( nAge >= pDbAgeDecode[nAgeCode][cDbBeginAge] )
+				{
+					nTotalPop[nAgeCode] += pPOPULATION[nStartYear][nSex][nProv][nAge];
+					dTotalPopulation    += pPOPULATION[nStartYear][nSex][nProv][nAge];
+				}
+			}
+
+			nAgeCode =mgAgeCodeYoungest;
+			for ( nAge = mgYoungestAge; nAge < SIZE( LIFE_SPAN ); nAge++ ) 
+			{
+				// mgCumPOPULATION is initialized to 0.0 by modgen be default
+				if ( nAge > pDbAgeDecode[nAgeCode][cDbEndAge] ) {
+					nAgeCode = COERCE(DB_AGE_CODE, nAgeCode + 1 );
+					dCumPrev = 0.0;
+				}
+				if ( nAge >= pDbAgeDecode[nAgeCode][cDbBeginAge] ) {
+					if ( nTotalPop[nAgeCode] > 0 ) {
+						mgCumPOPULATION[nProv][nSex][nAge] = dCumPrev +
+							(double) pPOPULATION[nStartYear][nSex][nProv][nAge] 
+									/ nTotalPop[nAgeCode];
+						dCumPrev = mgCumPOPULATION[nProv][nSex][nAge];
+					}
+				}
+			}
+		}
+	}
+	/* =============================================================================== */
+
+
+	/* ========================================================= */
+	/* FUTURE BIRTHS (youngest age in pStartPop	in pStartYear	 */
+	/* ========================================================= */
+	/*	Get the ratio of the population count of those at the youngest age 
+		to those in the youngest age group from POPULATION parameter in pStartYear
+		It will be used to apportion the weight of the youngest age group cases 
+		coming from pStartPop
+	*/
+	int nEqualParts = nYoungestGroupEnd - mgYoungestAge + 1;
+	for ( nProv = 0; nProv < SIZE( PROVINCE ); nProv++) {
+		for (int nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+			nTotalYoungestGroup[nSex][nProv] = 0;
+			dPropYoungest[nSex][nProv] =0.0;
+			for ( nAge = mgYoungestAge; nAge <= nYoungestGroupEnd; nAge++ )  {
+				nTotalYoungestGroup[nSex][nProv] += pPOPULATION[nStartYear][nSex][nProv][nAge];
+				nGrandTotalYoungestGroup         += pPOPULATION[nStartYear][nSex][nProv][nAge];
+			}
+			if ( nTotalYoungestGroup[nSex][nProv] > 0 ) {
+				dPropYoungest[nSex][nProv] = 
+						(double) pPOPULATION[nStartYear][nSex][nProv][mgYoungestAge]
+							/ nTotalYoungestGroup[nSex][nProv];
+			}
+			else {
+				dPropYoungest[nSex][nProv] = (double) (1.0/nEqualParts);
+			}
+			nGrandTotalYoungest += pPOPULATION[nStartYear][nSex][nProv][mgYoungestAge];
+		}
+	}
+	if (nGrandTotalYoungestGroup > 0 ) {
+		dGrandPropYoungest = (double) nGrandTotalYoungest / nGrandTotalYoungestGroup;
+	}
+	else {
+		dGrandPropYoungest = (double) (1.0/nEqualParts);
+	}
+
+
+	/* ============================================= */
+	/* NUMBER OF CASES TO GENERATE					 */
+	/* ============================================= */
+	// Loop through all records on pStartPop 
+	// Count the number of real records on the database
+	// Create cumrate parameter for ease of case generation in start year based 
+	// on case weights
+	// Create similar cumrate parameters for new "births" (youngest age represented)
+	// and new immigrants, based on weights to be used in hot-deck imputation.
+	// Tally total weights for new "births" and new immigrants to be used to determine
+	// how many cases to generate
+	// Note that "real" records on pStartPop have a weight >=0; filler records
+	// have a weight of -1.
+	// ==========================================================================
+
+
+	// Create cumrate parameters for easy Lookup 
+	mgNumRecordsOnStartPopFile = 0;   //Initialise the number of in-scope cases (records) on db
+	mgNumCases[cStartPop]     = 0.0; //Initialise the total weight of in-scope cases (records) on db
+
+	
+
+	for ( nRecord = 0; nRecord < SIZE( DB_RECORDS ); nRecord++ ) 
+	{		 
+		double	dRecordWeight = mgCumStartPopWeight[nRecord] ;
+
+		if (dRecordWeight > 0.0 )
+		{   // IN-SCOPE records on db 
+
+			mgNumRecordsOnStartPopFile ++;
+			mgNumCases[cStartPop] +=dRecordWeight;
+
+
+			/* ============================================= */
+			/*  SROA precounts for							 */
+			/*  SROA and OA PREVALENCE calculations later 	 */
+			/* ============================================= */
+			// Sum weight for SROA cases and for POPulation by 
+			// agegroup and sex
+			// to calculate the proportion of cases that SROA
+			// Bill March 22, 2008 
+			/* ============================================= */
+			int donor_sex = (int) pStartPop[nRecord][cDb_Sex];
+			int donor_AgeCode = (int) pStartPop[nRecord][cDb_AgeGrp];
+			nSROA = (int) pStartPop[nRecord][cDb_Osteoarthritis];
+			
+			dPOP_WT[donor_sex][donor_AgeCode]+= dRecordWeight;
+			if ( nSROA == 1 ) {	// SROA case
+				dSROA_WT[donor_sex][donor_AgeCode]+= dRecordWeight;
+			};
+			// calculation of proportion done outside of loop
+			/* ============================= */
+
+			/* ============================= */
+			/* RECENT Immigrants			 */
+			/* ============================= */
+
+			// These are immigrants who have arrived within the last N years 
+			// (N=9 currently to match PUMF) and will be used to impute the
+			// characteristics for future immigrants
+
+			if ( pStartPop[nRecord][cDb_Immig] == 1 )
+			{	
+				// Track sample weights of immigrants for hot-deck imputation when new immigrants created
+
+				nProvince = (int) pStartPop[nRecord][cDb_Province];
+				//nRegion = (int) pStartPop[nRecord][cDb_Region];
+				int nRegion={0};
+				
+				if ( nProvince <=3 ) 
+				{
+					nRegion= 0 ; // ATLANTIC
+				}
+				else if ( nProvince == 4 ) 
+				{
+					nRegion= 1 ; // QUEBEC
+				}
+				else if ( nProvince == 5 ) 
+				{
+					nRegion= 2 ; // ON
+				}
+				else if ( nProvince >= 6 && nProvince <= 8 ) 
+				{
+					nRegion= 3 ; // Prairies
+				}
+				else 
+				{
+					nRegion= 4 ; // BCregion
+				}
+
+				int donor_id_within_age_sex = ImmigCount[donor_sex][donor_AgeCode];
+				// Save the weight in special cumrate parameter for Lookup_
+				mgCumStartPopWeightImmig   [donor_sex][nProvince][donor_AgeCode][donor_id_within_age_sex] = dRecordWeight;
+
+				mgCumStartPopWeightImmigReg[donor_sex][nRegion]  [donor_AgeCode][donor_id_within_age_sex] = dRecordWeight;
+
+				mgCumStartPopWeightImmigCan[donor_sex]           [donor_AgeCode][donor_id_within_age_sex] = dRecordWeight;
+				
+				// Save the record number too as a link back to the original record in pStartPop
+				mgStartPopImmigDecode[donor_sex][donor_AgeCode][donor_id_within_age_sex] = nRecord;
+
+				/*
+				char line[199];
+				sprintf_s(line, 199, " %i,%i,%i,%i \n", nImmigRecord, donor_sex, donor_AgeCode, ImmigCount[donor_sex][donor_AgeCode]);
+				WriteDebugLogEntry(line);
+				*/
+				
+				ImmigCount[donor_sex][donor_AgeCode]++;
+				nImmigRecord++;
+				if (ImmigCount[donor_sex][donor_AgeCode] > SIZE(DB_RECORDS_IMMIG))
+					ModelExit("\n SIZE(DB_RECORDS_IMMIG]) too small");
+
+			
+
+				/*	The input variable from pStartPop is RECENT immigrant, not NEW immigrant; 
+					so instead of adding a second immigration variable to pStartPop, I 
+					changed the way the total weight of new immigrants would be estimated 
+					for future years. See "New Immigrant" sections below.
+				// dStartPopWeightImmigTotal += dRecordWeight;	//recent immigrant weights
+				*/
+			}
+
+			/* ================================================ */
+			/* FUTURE "BIRTHS" based on youngest age in pStartPop	*/
+			/* ================================================ */
+			/* it will include "new immigrants" which will have */
+			/* to be subtracted out later to arrive at			*/
+			/* non-new-immigrant "births"						*/
+			/* ================================================ */
+			
+
+			if ( donor_AgeCode == mgAgeCodeYoungest ) {
+				// used in hot-deck imputation of "new births" in future years
+				// Save the weight in special cumrate parameter for Lookup_
+				
+
+				nProvince = (int) pStartPop[nRecord][cDb_Province];
+
+				mgCumStartPopWeightYoungest[donor_sex][nProvince][nYoungestRecord] = dPropYoungest[donor_sex][nProvince] * dRecordWeight;
+				
+				// The total weight of the youngest is used to estimate how many 
+				// new cases to generate in future years (new "births")
+				dStartPopWeightYoungestTotal                                 +=	dPropYoungest[donor_sex][nProvince] * dRecordWeight;
+
+
+				// Save the record number too as a link back to the original record in pStartPop
+				mgStartPopYoungestDecode[nYoungestRecord] = nRecord;
+				nYoungestRecord++;
+			}
+
+			
+		}
+		//else dRecordWeight == 0  record not in scope  --> nothing to do
+
+	} //END for ( nRecord = 0; nRecord < SIZE( DB_RECORDS ); nRecord++ ) 
+	mgNumCasesRaw[cStartPop]=mgNumCases[cStartPop];
+
+
+	//Check if ran out of bounds
+	if(nYoungestRecord > SIZE(DB_RECORDS_BIRTHS)) 
+		ModelExit("StartPop file has more people in the first age category than the maximum expected\n");
+
+
+	/* ============================================= */
+	/*  Calculate Rate of SROA						 */
+	/* ============================================= */
+	for (int nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+		for ( nAge = 0; nAge < mgYoungestAge ; nAge++ ) {
+			mgStartPop_SROA_Rate[nSex][nAge] =0.0;
+		}
+		nAgeCode = mgAgeCodeYoungest;
+		for ( nAge = mgYoungestAge; nAge < SIZE(LIFE) ; nAge++ ) {
+			if ( nAge > pDbAgeDecode[nAgeCode][cDbEndAge] ) {
+				nAgeCode++;
+			}
+			dSROA_prob = 0.0;
+			if ( dPOP_WT[nSex][nAgeCode] > 0.0 ) {
+				dSROA_prob = dSROA_WT[nSex][nAgeCode]/dPOP_WT[nSex][nAgeCode];
+			};
+			mgStartPop_SROA_Rate[nSex][nAge] = dSROA_prob;
+		}
+	}; 
+
+
+	// ==========================================================================
+	// FUTURE "BIRTHS" AND NEW IMMIGRANTS after pStartYear
+	// ==========================================================================
+
+
+	// Model cum births (mgBirth is initialized to 0 by MODGEN)
+	mgNumCases[cNewBirth] = 0.0;
+	for (int nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+		for (int nYear = nStartYear; nYear <= nEndYear; nYear++ ) {
+			for ( nProv = 0; nProv < SIZE( PROVINCE ); nProv++) {
+				if ( nYear == nStartYear )
+				{
+					dBirthStartYear            += 	pPOPULATION[nYear][nSex][nProv][mgYoungestAge];
+				}
+				else
+				{
+					mgBirth[nSex][nYear][nProv] =  	pPOPULATION[nYear][nSex][nProv][mgYoungestAge];
+
+					mgNumCases[cNewBirth]      +=  	pPOPULATION[nYear][nSex][nProv][mgYoungestAge];
+				}
+			}
+		}
+	};
+	mgNumCasesRaw[cNewBirth]=mgNumCases[cNewBirth];
+
+	/* ============================= */
+	/* New Immigrants				 */
+	/* ============================= */
+
+	// New immigrants are generated for years after pStartYear up to pMaxYearNewArrivals
+	// AND ONLY for AGES and PROVINCES In pStartPop
+	// mgImmig is initialized to 0 by MODGEN
+
+	
+	mgNumCases[cNewImmig] = 0.0;
+	double	dImmigStartYearYoungest = {0.0}; 
+	double  dImmigMultiYearYoungest = {0.0}; 
+	for (nAgeCode = mgAgeCodeYoungest, nAge = mgYoungestAge; nAge < SIZE( LIFE ); nAge++ )
+	{
+
+		if ( nAge > pDbAgeDecode[nAgeCode][cDbEndAge] ) 
+			nAgeCode++;
+
+		if ( 0 <= pDbAgeDecode[nAgeCode][cDbBeginAge]  &&
+			      pDbAgeDecode[nAgeCode][cDbBeginAge] <= nAge )
+		{
+			for (int nSex = 0; nSex < SIZE( SEX ); nSex++ )
+				for ( nProv = 0; nProv < SIZE( PROVINCE ); nProv++)
+				{
+
+					//dImmigStartYear 			+= (double) pImmig[nStartYear][nSex][nProv][nAge];
+
+					if ( nAge == mgYoungestAge )
+					{
+						dImmigStartYearYoungest +=  pImmig[nStartYear][nSex][nProv][nAge];
+					}
+
+					for (int nYear = nStartYear+1; nYear <= nEndYear; nYear++ )
+					{
+						if ( nAge == mgYoungestAge )
+						{
+							dImmigMultiYearYoungest     +=  pImmig[nYear][nSex][nProv][nAge];
+						}
+
+						mgImmig[nYear][nSex][nProv][nAge] = pImmig[nYear][nSex][nProv][nAge];
+
+						mgNumCases[cNewImmig] 	         += pImmig[nYear][nSex][nProv][nAge];
+
+
+					}
+				}
+		}
+	}
+	mgNumCasesRaw[cNewImmig]=mgNumCases[cNewImmig];
+
+
+	/* =============================================================================== 
+		Derive the number of cases and the probability that a case will be 
+		generated from the StartPop database versus from future year new births 
+		and new immigrants
+	=============================================================================== */
+
+	
+	
+	
+
+	/* ============================= */
+	/* New Immigrants ( could be 0 ) */
+	/* ============================= */
+
+	/* 
+	if ( dImmigStartYear > 0 ) {
+		mgNumCases[cNewImmig] = ( dStartPopWeightImmigTotal / dImmigStartYear ) * mgNumCases[cNewImmig];
+	};
+
+	This method was conceptually correct, however, without adding 
+	another	variable to the pStartPop db that identified new immigrants 
+	(<=1 year in Canada), we cannot know the total weight of 
+	new immigrants in pStartPop.
+
+	Thus, the following expression is another way to approximate the proportion 
+	of immigrants based on the total weight in CCHS compared to the total 
+	population (aged 12+) from FULL counts. Notice if StartPop was identical 
+	to the FULL of the population, which it attempts to represent, then the 
+	"weight" of future immigrants is simply the number of projected immigrants,
+	which is completely intuitive.
+	*/
+
+	mgNewImmigAdjustFactor = 1.0;
+	if ( dTotalPopulation  > 0 && !AimAtAllFutureImmigrants ) 
+	{
+		mgNewImmigAdjustFactor   =  mgNumCases[cStartPop] / dTotalPopulation  ;
+		mgNumCases[cNewImmig]       *= mgNewImmigAdjustFactor;
+		dImmigStartYearYoungest     *= mgNewImmigAdjustFactor;
+	}
+
+
+	/* ============================ */
+	/* New "Births" ( could be 0 )	*/
+	/* ============================ */
+
+	/* Notice if the StartPop was identical to the FULL of the population 
+	(at least for those at the age in question), which it attempts to represent, 
+	then the "weight" of future "births" (aged 12) is simply the number of 
+	projected births (aged 12), which is completely intuitive.
+
+	Note: dStartPopWeightYoungestTotal includes new immigrants at youngest age in pStartYear
+	so they should be subtracted out when estimating the number of new "births" in Canada
+	(persons living in Canada who would get one year older in the next year)
+	*/
+	
+	mgNewBirthAdjustFactor = -1.0;
+	if ( dBirthStartYear > 0 ) 
+	{
+		mgNewBirthAdjustFactorReduceAim = AimAtAllFutureYoungAdults ? 1.0 : dStartPopWeightYoungestTotal  / dBirthStartYear;    
+		double removal = 0.0;
+		if(UseNewUnduplicationMethod)
+		{
+			mgNumCases[cNewBirth]  *= 	mgNewBirthAdjustFactorReduceAim ;
+
+		  //removal += ( pNewArrivalsControl[cNewImmig   ] ?   dImmigStartYearYoungest : 0.0);		
+			removal += ( pNewArrivalsControl[cNewImmig   ] ?   dImmigMultiYearYoungest : 0.0);
+
+			if(mgNumCases[cNewBirth] > 0.0)
+			{
+				mgNewBirthAdjustFactorUnduplicate = 1.0 - removal / mgNumCases[cNewBirth];
+				mgNumCases[cNewBirth] *= mgNewBirthAdjustFactorUnduplicate ;  
+				//above line is the same as mgNumCases[cNewBirth] -= removal;
+			}
+		}
+		else
+		{
+			removal +=   dImmigStartYearYoungest ; // always remove regardless of whether immigrants are simulated
+
+			mgNewBirthAdjustFactorUnduplicate = 1.0 - removal / dStartPopWeightYoungestTotal;  
+
+			mgNumCases[cNewBirth]  *= 	mgNewBirthAdjustFactorUnduplicate * mgNewBirthAdjustFactorReduceAim ;
+
+			// mgNewBirthAdjustFactor should be equivalent to mgNewBirthAdjustFactorUnduplicate * mgNewBirthAdjustFactorReduceAim .  Not used except for user table utPresimView
+			mgNewBirthAdjustFactor = (dStartPopWeightYoungestTotal - dImmigStartYearYoungest) / dBirthStartYear ; 
+		}
+	}
+
+
+	/* 	CHECK TO SEE IF WE WILL SIMULATE THE NEW BIRTHS AND NEW IMMIGRANTS
+		The counts of births and new immigrants have just been calculated, 
+		however, they are not necessarily generated by the simulation
+		that depends on the setting in pNewArrivalsControl in the scenario.
+	*/
+
+	mgNumCases[cStartPop   ] *= (pNewArrivalsControl[cStartPop   ] ? 1.0 : 0.0);
+	mgNumCases[cNewBirth   ] *= (pNewArrivalsControl[cNewBirth   ] ? 1.0 : 0.0);
+	mgNumCases[cNewImmig   ] *= (pNewArrivalsControl[cNewImmig   ] ? 1.0 : 0.0);
+
+
+	/*	FULL vs SAMPLE
+
+		Note that the number of cases selected from StartPop differs depending on 
+		whether the user has selected a FULL type run or a SAMPLE type run. 
+		
+		In a FULL run, the number of cases is the total number of records, 
+		because each record will be selected exactly once and cloned an amount
+		equivalent to its sample weight. 
+		
+		In a SAMPLE run, the number of cases is based on the total weight, from which 
+		a subsample will be selected, the probability of selection is based on
+		the individual records sample weight.
+	*/
+
+	if ( pPopulationStartMethod == cFULL ) 
+	{
+		ModelExit("Full Run (i.e. sequentially process every case on DB and clone for case weight) was decomissioned in POHEM 7040");
+	}
+	else { // cSAMPLE 
+
+		//Total number of cases
+		dTotalCases = mgNumCases[cStartPop] + mgNumCases[cNewImmig] + mgNumCases[cNewBirth] ;
+
+		if ( dTotalCases > 0 ) {
+			mgPopulationSourceDistribution[cStartPop]    = mgNumCases[cStartPop]    / dTotalCases;
+			mgPopulationSourceDistribution[cNewImmig]    = mgNumCases[cNewImmig]    / dTotalCases;
+			mgPopulationSourceDistribution[cNewBirth]    = mgNumCases[cNewBirth]    / dTotalCases;
+		}
+		else
+			ModelExit("No case requested.  May want to check if something was selected in parameter \"Open or Closed population\" (aka pNewArrivalsControl). \n");
+	}
+
+	// ScenarioCases: Prepare variables for utCases to identify number of cases required
+
+	int ScenarioCases = (int) (mgNumRecordsOnStartPopFile + mgNumCases[cNewBirth] + mgNumCases[cNewImmig] ); 	
+	int CaseClones = (int) (mgNumCases[cStartPop] - mgNumRecordsOnStartPopFile);
+	long lPopulation = long(ScenarioCases + CaseClones);  //This could differ by 1 or 2 relative to alternative below.  We use this because it is what utCases table gave and hence was more convenient for testing purposes
+	//long lPopulation = long(mgNumCases[cStartPop]  + mgNumCases[cNewBirth] + mgNumCases[cNewImmig] ); //This may be more logical
+	SetPopulation( lPopulation );  // Automatically scales population to expected population
+
+	// Special variable
+	mgStartPopDone = FALSE; // Initialize (used in thread control of case generation)
+
+
+	char line[99];
+	snprintf(line,99,"Not an error --> Number of Canadians per case: %9.4f \n",((double)GetPopulation()) /GetAllCases()); 
+	//ProgressMessage(line); //No "Error:" prefix but only visible a few seconds
+	WarningMsg(line);  //Has "Error:" prefix but always visible 
+	
+	/*  BEGIN   investigate educ distribution
+	double educ_dist[SIZE(SEX)][20][SIZE(EDUCATION)];
+
+	for(int sexe = 0; sexe<SIZE(SEX); sexe++)
+		for(int nAgeG =0;nAgeG<20 ;nAgeG++ )
+			for(int nEduc = 0;nEduc<SIZE(EDUCATION);nEduc++)
+				educ_dist[sexe][nAgeG][nEduc]=0.0;
+
+	for(int nRec=0; nRec<SIZE(DB_RECORDS); nRec++)
+	{
+		double poids  =  mgCumStartPopWeight[nRec];
+		int sexe  = (int)pStartPop[nRec][cDb_Sex];
+		int nAgeG = (int)pStartPop[nRec][cDb_AgeGrp];
+		int nEduc = (int)pStartPop[nRec][cDb_Education];
+
+		if(poids>0.0)
+			educ_dist[sexe][nAgeG][nEduc] += poids;
+			
+	}
+
+	char line[199];
+	for(int sexe = 0; sexe<SIZE(SEX); sexe++)
+		for(int nAgeG =0;nAgeG<20 ;nAgeG++ )
+			for(int nEduc = 0;nEduc<SIZE(EDUCATION);nEduc++)
+			{
+					snprintf(line,199,"%i,%i,%i,%0.7f  \n",sexe,nAgeG ,nEduc,educ_dist[sexe][nAgeG][nEduc]); 
+					WriteDebugLogEntry(line);
+			}
+	 END investigate educ distribution */
+
+/*  BEGIN   investigate SES (education or income) distribution 
+	DB_FIELDS field_of_interest = cDb_IncomeQuartile; //cDb_Education or cDb_IncomeQuartile;
+
+	double SES_dist[SIZE(SEX)][20][4];  // exploiting the fact that SIZE(INCOME_QUARTILE)=SIZE(EDUCATION)=4
+
+	for(int sexe = 0; sexe<SIZE(SEX); sexe++)
+		for(int nAgeG =0;nAgeG<20 ;nAgeG++ )
+			for(int nSES = 0;nSES<4;nSES++)
+				SES_dist[sexe][nAgeG][nSES]=0.0;
+
+	for(int nRec=0; nRec<SIZE(DB_RECORDS); nRec++)
+	{
+		double poids  =  mgCumStartPopWeight[nRec];
+		int sexe  = (int)pStartPop[nRec][cDb_Sex];
+		int nAgeG = (int)pStartPop[nRec][cDb_AgeGrp];
+		int nSES  = (int)pStartPop[nRec][field_of_interest];
+
+		if(poids>0.0)
+			SES_dist[sexe][nAgeG][nSES] += poids;	
+	}
+
+	if(field_of_interest == cDb_Education)
+		WriteDebugLogEntry("BEGIN Education distribution from StartPop file\n");
+	if(field_of_interest == cDb_IncomeQuartile)
+		WriteDebugLogEntry("BEGIN Income distribution from StartPop file\n");
+
+	char line[199];
+	for(int sexe = 0; sexe<SIZE(SEX); sexe++)
+		for(int nAgeG =0;nAgeG<20 ;nAgeG++ )
+			for(int nSES = 0;nSES<4;nSES++)
+			{
+					snprintf(line,199,"%i,%i,%i,%0.7f  \n",sexe,nAgeG ,nSES,SES_dist[sexe][nAgeG][nSES]); 
+					WriteDebugLogEntry(line);
+			}
+
+	if(field_of_interest == cDb_Education)
+		WriteDebugLogEntry("END Education distribution from StartPop file\n");
+	if(field_of_interest == cDb_IncomeQuartile)
+		WriteDebugLogEntry("END Income distribution from StartPop file\n");
+	  END   investigate SES (education or income) distribution */
+};
+
+
+//		utCases to determine the right number to request. However, cases 
+//		will still be generated with priority to first generate as many cases from pStartPop 
+//		as the number requested allows, then new births and then new immigrants 
+//		(alternatively, could set the mgPropStartPop to 0 so that no cases are generated?)
+
+/**
+ * Invoked at the beginning of the Simulation function.
+ *
+ * @param [in,out] ci Additional information related to the case.
+ */
+void Simulation_start(case_info& ci)
+{
+	// Initialize case information in ci (if used).
+}
+
+/**
+ * Invoked at the end of the Simulation function.
+ *
+ * @param [in,out] ci Additional information related to the case.
+ */
+void Simulation_end(case_info& ci)
+{
+	// Finalize case information in ci (if used).
+}

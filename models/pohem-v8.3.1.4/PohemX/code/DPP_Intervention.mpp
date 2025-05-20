@@ -1,0 +1,605 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) DPP Intervention Model
+/* FILE_NOTE(EN) 
+	DPP Intervention
+	- After Bill's corrections Dec 18
+*/
+
+range	DPP_YEARS {0,10};
+hide( DPP_proportion_reduc_BMI );
+
+parameter_group pgDPP { //EN DPP intervention parameters
+	//pgDPP_00_InterventionActive,
+	DPP_Intervention_active,
+	DppAdherencePropensityCorrelation,
+	pgDPP_01_TargetPopn,
+	pgDPP_02_Adherence 
+};
+/*
+parameter_group pgDPP_00_InterventionActive { //EN Intervention active or not
+	DPP_Intervention_active
+};
+*/
+parameter_group pgDPP_01_TargetPopn { //EN Target population
+ DPP_gBMI ,
+ Threshold_for_Elevated_Plasma_Glucose,
+ DppAgeRange ,
+ Year_for_DPP_program
+};
+parameter_group pgDPP_02_Adherence { //EN Adherence and Effect
+ pgDPP_02_Adherence_BMI,
+ pgDPP_02_Adherence_PA,
+ pgDPP_02_Adherence_Metformin
+ };
+
+ parameter_group pgDPP_02_Adherence_BMI { //EN BMI
+	 DPP_AdherenceBMI,
+	 DPP_proportion_reduc_BMI,
+	 DPP_Reduction_in_BMI,
+	 DPP_NonAdherence_BMI_ResetToPrior
+ };
+
+ parameter_group pgDPP_02_Adherence_PA { //EN Physical activity
+	DPP_AdherencePA ,
+	DPP_proportion_shift_LTPA
+  };
+ parameter_group pgDPP_02_Adherence_Metformin { //EN Metformin
+	DPP_AdherenceMetformin,
+	pDiabetesRRMetformin
+ };
+
+parameters {
+	
+	double DPP_AdherenceBMI[DPP_YEARS][SEX][FROM_25_TO_75_BY_10];	//EN Adherence for BMI
+	double DPP_AdherencePA[DPP_YEARS][SEX][FROM_25_TO_75_BY_10];	//EN Adherence for PA
+	double DPP_AdherenceMetformin[DPP_YEARS][SEX][FROM_25_TO_75_BY_10];	//EN Adherence for Metformin
+	double DppAdherencePropensityCorrelation[SEX];                      //EN Correlation in propensity to adhere to DPP 3 aspects (PA, BMI, Metformin)
+
+	double DPP_gBMI[SEX];											//EN Minimum level of BMI (during year(s) for DPP program) to be a target
+	logical DPP_Intervention_active;                                //EN DPP Intervention active?
+	int  DppAgeRange           [SEX][cLOWER_UPPER_BOUNDS];			//EN Age range (during year(s) for DPP program) to be a target 
+	int  Year_for_DPP_program       [cLOWER_UPPER_BOUNDS];			//EN Year range for DPP program
+
+	logical DPP_NonAdherence_BMI_ResetToPrior;						//EN Mode of BMI evolution when DPP adherence ceases
+	double DPP_proportion_reduc_BMI[SEX][FROM_25_TO_75_BY_10];		//EN Proportion of DPP participants who experience shift in BMI (due to DPP) 
+	double DPP_proportion_shift_LTPA[LTPA_4CAT][SEX][FROM_25_TO_75_BY_10]; //EN Proportion of DPP participants who experience shift in LTPA (due to DPP) 
+	double DPP_Reduction_in_BMI[SEX][FROM_25_TO_75_BY_10];			//EN Relative reduction in BMI due to DPP
+	double Threshold_for_Elevated_Plasma_Glucose[SEX][FROM_25_TO_80_BY_5];	//EN DPoRT threshold for Elevated Plasma Glucose
+	
+
+
+};
+
+actor Person            // Core Individual
+{
+	logical		adherent_bmi={FALSE};                //EN Adheres to DPP: BMI
+	logical		adherent_pa={FALSE};                 //EN Adheres to DPP: Physical activity
+	logical		adherent_metformin={FALSE};          //EN Adheres to DPP: metformin
+	double      dpp_adherence_propensity_pa ;        //EN Propensity to adhere to DPP: Physical activity (low value means high propensity)
+	double      dpp_adherence_propensity_bmi;        //EN Propensity to adhere to DPP: BMI (low value means high propensity)
+	double      dpp_adherence_propensity_metformin;  //EN Propensity to adhere to DPP: metformin (low value means high propensity)
+
+	double		gBMI_after_DPP;
+	double		gBMI_before_DPP;
+	LTPA_4CAT	gLTPA_cat_after_DPP;
+	LTPA_4CAT	gLTPA_cat_before_DPP;
+	
+	logical		target_for_DPP= { FALSE };   //EN In scope for DPP (life long)
+	int			year_DPP= { 0 };             //  Probably should be DPP_YEARS rather than int.
+
+	void DPPInterv();
+	hook DPPInterv, RiskFactorInterventions, 0; // 0 = execution number, the higher the value, the later the execution ;
+
+	void DPPIntervBMI();
+	hook DPPIntervBMI, UpdateBMINPHS;  
+
+	int year_eligible_for_intervention= {9999};
+};
+
+void hook_DPPInterv() {};
+
+void Person::DPPInterv()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4); 
+	if (DPP_Intervention_active)
+	{
+		// Allow people to enter target population over a range of years, not just a single year (as originally done for DPP replication). Only for those not already in the target population.
+		if (calendar_year>=Year_for_DPP_program[LOWER_BOUND] && calendar_year<=Year_for_DPP_program[UPPER_BOUND] && !target_for_DPP)	// new implementation 2018-02-14 by DH and BF
+		{
+			target_for_DPP =  // conditions below are used to decide if a person becomes in scope ( target_for_DPP should go from FALSE to TRUE)
+				(Diabetes_Prob  >= Threshold_for_Elevated_Plasma_Glucose[sex][SPLIT(lifespan_age,FROM_25_TO_80_BY_5)]) &&
+				(gDiabetes_use == DIAB_NO) &&
+				(DppAgeRange[sex][LOWER_BOUND] <= lifespan_age && lifespan_age <= DppAgeRange[sex][UPPER_BOUND]) &&
+				(gBMI >=DPP_gBMI[sex]) ;
+			//note that target_for_DPP cannot go from TRUE to FALSE.  The person is a target for DPP during all life.
+
+			if (target_for_DPP)
+			{
+				year_DPP=0;  // year_DPP is the number of years after Year_for_DPP_program
+				year_eligible_for_intervention = calendar_year;
+
+				//BEGIN get 3 amigos :  dpp_adherence_propensity_pa, dpp_adherence_propensity_bmi, dpp_adherence_propensity_metformin
+
+				double cauchy_common; //Cauchy variate to implement compound symmetry correlation
+				double rho = DppAdherencePropensityCorrelation[sex]; //compound symmetry correlation 
+
+				cauchy_common = qcauchy(RandUniform(128),0,1);
+				dpp_adherence_propensity_pa        = pcauchy( (1-std::abs(rho))*qcauchy(RandUniform(129),0,1) + rho*cauchy_common ,0,1);
+				dpp_adherence_propensity_bmi       = pcauchy( (1-std::abs(rho))*qcauchy(RandUniform(130),0,1) + rho*cauchy_common ,0,1);
+				dpp_adherence_propensity_metformin = pcauchy( (1-std::abs(rho))*qcauchy(RandUniform(132),0,1) + rho*cauchy_common ,0,1);
+
+				//END   get 3 amigos :  dpp_adherence_propensity_pa, dpp_adherence_propensity_bmi, dpp_adherence_propensity_metformin
+
+
+				//===============================
+				// First, intervene on PA
+				//===============================
+				adherent_pa = dpp_adherence_propensity_pa <= DPP_AdherencePA[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)];
+
+				if( adherent_pa )
+				{
+					gLTPA_cat_before_DPP=gLTPA_cat;
+
+					if (gLTPA_cat != LTPA_60_plus &&  RandUniform(133) <= DPP_proportion_shift_LTPA[gLTPA_cat][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)])
+						gLTPA_cat++;  // Shift of gLTPA_cat occurs if (1) the person is a target, (2) the person is adherent for PA, and (3) a random numer is <= DPP_proportion_shift_LTPA
+
+					gLTPA_cat_after_DPP=gLTPA_cat; // Set gLTPA_cat_after_DPP to gLTPA_cat regardless of whether gLTPA_cat got changed above or not.
+				}
+				
+				
+				//===============================
+				// Second, intervene on BMI
+				//===============================
+				adherent_bmi = dpp_adherence_propensity_bmi <= DPP_AdherenceBMI[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)] ;
+				if(adherent_bmi)
+				{
+					gBMI_before_DPP=gBMI;
+					if (RandUniform(131) <=DPP_proportion_reduc_BMI[sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)])
+						gBMI=gBMI*(1-DPP_Reduction_in_BMI[sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)]);
+					// Reduction of gBMI occurs if (1) the person is a target, (2) the person is adherent for BMI, and (3) a random numer is <= DPP_reduc_BMI
+						
+					gBMI_after_DPP=gBMI;
+				}
+				
+				
+
+				//===============================
+				// Metformin intervention
+				//===============================
+				adherent_metformin = dpp_adherence_propensity_metformin <= DPP_AdherenceMetformin[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)] ;
+				// adherent_metformin impacts value of Diabetes_hazard whenever latter is computed	
+			}
+
+
+		}
+
+
+		// Years after first year of eligibility 
+		if (calendar_year > year_eligible_for_intervention)
+		{   
+			year_DPP = min(MAX(DPP_YEARS),calendar_year - year_eligible_for_intervention); // calculation of number of years after first year eligible (truncated at 10)
+	
+			//===================================================
+			// PA -- Check continued adherence to PA intervention
+			//===================================================
+			if(adherent_pa)
+			{ 
+				// if target, adherent for PA and stays adherent for PA : 
+					// re-install gLTPA_cat_after_DPP (includes the case where gLTPA_cat_after_DPP is 30-60 or 60+)
+				// if target, adherent for PA previous time but now no more adherent for PA : 
+					// set gLTPA_cat to gLTPA_cat_before_DPP (includes the case where gLTPA_cat_before_DPP is 30-60 or 60+)
+
+				if(dpp_adherence_propensity_pa <= DPP_AdherencePA[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)]) 
+				{
+					gLTPA_cat=gLTPA_cat_after_DPP;
+				}
+				else 
+				{ 
+					adherent_pa=FALSE;
+					gLTPA_cat=gLTPA_cat_before_DPP; 
+				}			
+			}
+			//else //  if target but already no more adherent then use gLTPA as obtained from usual mode  --> do nothing here
+
+
+			//===================================================
+			// BMI -- Check continued adherence to BMI intervention
+			//===================================================
+			if(adherent_bmi)
+			{
+				// if target, adherent for BMI and stays adherent for BMI : 
+					// re-install gBMI_after_DPP
+				// if target, adherent for BMI previous time but now no more adherent for BMI : 
+					// set gBMI to gBMI_before_DPP 
+
+				if(dpp_adherence_propensity_bmi <= DPP_AdherenceBMI[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)]) 
+				{
+					gBMI=gBMI_after_DPP;
+				}
+				else 
+				{
+					adherent_bmi=FALSE;
+					
+					// What value of gBMI to use in this case?
+					// if DPP_NonAdherence_BMI_ResetToPrior is true, use gBMI before DPP intervention
+					if ( DPP_NonAdherence_BMI_ResetToPrior ) {
+						gBMI=gBMI_before_DPP; 
+					};
+					// else use the gBMI assigned from the DPP intervention.
+					// In both cases the usual BMI model now takes over as the person is no longer adherent
+				}			
+			}
+			// else   if target but already no more adherent: use gBMI as obtained from usual models --> do nothing here
+
+
+			//=================================================================
+			// Metformin -- Check continued adherence to Metformin intervention
+			//=================================================================
+			adherent_metformin = adherent_metformin && dpp_adherence_propensity_metformin <= DPP_AdherenceMetformin[year_DPP][sex][SPLIT(truncated_age,FROM_25_TO_75_BY_10)];
+
+		}
+		// else  // if not a target: use gLTPA and gBMI as obtained from usual models  --> do nothing here
+	}
+
+	hook_DPPInterv();
+}
+
+void hook_DPPIntervBMI() {};
+
+// If still adherent to BMI, do not let an update of BMI from the real algorithm overwrite the DPP intervention
+void Person::DPPIntervBMI()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	if (DPP_Intervention_active)
+	{
+	if(adherent_bmi)
+	{
+		gBMI=gBMI_after_DPP;
+	}
+	}
+
+	hook_DPPIntervBMI();
+};
+
+void PreSimulation()
+{
+	if(std::abs(DppAdherencePropensityCorrelation[FEMALE])>1.0 || std::abs(DppAdherencePropensityCorrelation[MALE])>1.0)
+		ModelExit("The absolute value of parameter \"Correlation in propensity to adhere to DPP 3 aspects\" (aka DppAdherencePropensityCorrelation) should not exceed 1.\n");
+
+};
+
+// PUT PARAMETER NOTES BELOW THIS LINE //
+
+/* NOTE ( DPP_NonAdherence_BMI_ResetToPrior, EN )
+>PARAMETER	Mode of BMI evolution when DPP adherence ceases
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	When adherence to DPP ceases, this parameter tells POHEM to reset BMI
+to value prior to DPP intervention (TRUE) or use current intervention value (FALSE).
+Thereafter, the usual BMI equation takes over.
+>DIMENSIONS	none
+>SOURCE	
+>
+>DEFINITION	
+>
+>METHODS	Use this parameter to reset the BMI value after a person becomes
+non-adherent to DPP intervention on BMI.  Set to TRUE to reset the BMI value 
+at the level prior to the intervention before letting the BMI model take over 
+(for rest of simulated life).  Set to FALSE to leave the BMI value at its
+intervention level before letting the BMI model take over (for rest of simulated life).
+>
+>ASSUMPTIONS	
+>
+>DECISIONS	
+>
+>REFERENCES	
+>
+>RELATED PARAMETERS	
+>
+>COMMENTS
+
+*/
+/* NOTE ( DPP_gBMI, EN )
+>PARAMETER	Minimum level of BMI (during year(s) for DPP program) to be a target
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines the threshold value for BMI above which a
+person may be defined to belong to the target population.
+>DIMENSIONS	[SEX]
+>SOURCE	This parameter has been introduced as a component of the criteria for
+target population.
+>
+>DEFINITION	Threshold that BMI must reach or exceed so that a person may be
+considered a target in year Year_for_DPP_program (if other criteria are
+satisfied also).
+>The complete criterion to define target population is:
+>In Year_for_DPP_program (at birthday), the person must
+>-	Be non-diabetic
+>-	Have a BMI >= DPP_gBMI
+>-	Have age within DppAgeRange
+>-	Have 2-year probability of diabetes >=
+Threshold_for_Elevated_Plasma_Glucose
+>METHODS	-
+>
+>ASSUMPTIONS	Value in base scenario: 24.
+>
+>DECISIONS	The value chosen is the usual threshold used to define overweight or
+obese persons.
+>REFERENCES	None.
+>RELATED PARAMETERS	DppAgeRange,
+>Threshold_for_Elevated_Plasma_Glucose,
+>Year_for_DPP_program
+>COMMENTS
+*/
+/* NOTE ( DPP_AdherenceBMI, EN )
+>PARAMETERS	Adherence for BMI
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines what proportion of initial target
+population is adherent on BMI intervention, on Physical activity intervention
+in years following Year_for_DPP_program
+>DIMENSIONS	[DPP_YEARS][SEX][FROM_25_TO_75_BY_10]
+>
+>SOURCE	These parameters have been introduced as a component of the criteria to
+define scenarios.
+>
+>DEFINITION	Proportion of persons in target population that remain adherent
+ in BMI intervention in year y after Year_for_DPP_program.
+>
+>METHODS	Analysis done in … (ask Deirdre)
+>
+>ASSUMPTIONS
+>
+>DECISIONS
+>
+>RELATED PARAMETERS	DPP_proportion_reduction_BMI,
+>DPP_proportion_shift_LTPA,
+>DPP_Reduction_in_BMI,
+*/
+/* NOTE ( DPP_AdherencePA, EN )
+>PARAMETERS	Adherence for PA
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines what proportion of initial target
+population is adherent on BMI intervention, on Physical activity intervention
+in years following Year_for_DPP_program
+>DIMENSIONS	[DPP_YEARS][SEX][FROM_25_TO_75_BY_10]
+>
+>SOURCE	These parameters have been introduced as a component of the criteria to
+define scenarios.
+>
+>DEFINITION	Proportion of persons in target population that remain adherent
+in physical activity intervention in year y after Year_for_DPP_program
+>
+>METHODS	Analysis done in … (ask Deirdre)
+>
+>ASSUMPTIONS
+>
+>DECISIONS
+>RELATED PARAMETERS	DPP_proportion_reduction_BMI,
+>DPP_proportion_shift_LTPA,
+>DPP_Reduction_in_BMI,
+*/
+
+/* NOTE ( DPP_Intervention_active, EN )
+>PARAMETER	DPP Intervention active?
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter allows the user to switch the DPP intervention on or off. 
+>DIMENSIONS		None
+>
+>
+>SOURCE	
+>
+>DEFINITION	
+>
+>METHODS
+>
+>ASSUMPTIONS	Set to FALSE in the Base scenario.
+>
+>DECISIONS	
+>
+>REFERENCES	None.
+*/
+/* NOTE ( DppAgeRange, EN )
+>PARAMETERS	Age range (during year(s) for DPP program) to be a target
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	These parameters define together the range which a person's age
+must belong a person so that the person may be defined to belong to the target
+population
+>DIMENSIONS
+>[SEX][cLOWER_UPPER_BOUNDS]
+>
+>
+>SOURCE	This parameter has been introduced as a component of the criteria for
+target population.
+>
+>DEFINITION	Range to which age in Year_for_DPP_program must belong so that a
+person may be considered a target in year Year_for_DPP_program  (if other
+criteria are satisfied also).
+>The complete criterion to define target population is:
+>In Year_for_DPP_program (at birthday), the person must
+>-	Be non-diabetic
+>-	Have a BMI >= DPP_gBMI
+>-	Have age within DppAgeRange
+>-	Have 2-year probability of diabetes >=
+Threshold_for_Elevated_Plasma_Glucose
+>
+>METHODS
+>
+>ASSUMPTIONS	Values in base scenario: DppAgeRange = [25 , 79], i.e. age must be between 25 and 79 inclusively.
+>
+>DECISIONS	The values chosen correspond to the age range of the sample used in
+the surveys.
+>
+>REFERENCES	None.
+>RELATED PARAMETERS	DPP_gBMI,
+>DppAgeRange,
+>Year_for_DPP_program
+*/
+
+/* NOTE ( DPP_proportion_reduc_BMI, EN )
+>PARAMETERS	Proportion of DPP participants who experience shift in BMI (due to DPP)
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines what proportion of persons who are target
+and adherent on BMI intervention are effected by DPP_Reduction_in_BMI
+>DIMENSIONS	[SEX][FROM_25_TO_75_BY_10]
+>
+>SOURCE	This parameter has been introduced as a component of the criteria to
+define scenarios.
+>
+>DEFINITION	Proportion of persons in target population and who are adherent on
+BMI for who BMI is reduced by DPP_Reduction_in_BMI
+>
+>METHODS
+>
+>ASSUMPTIONS
+>
+>DECISIONS	
+>
+>RELATED PARAMETERS	DPP_AdherenceBMI,
+>DPP_Adherence_PA,
+>DPP_proportion_shift_LTPA,
+>DPP_Reduction_in_BMI,
+*/
+/* NOTE ( DPP_proportion_shift_LTPA, EN )
+>PARAMETERS	Proportion of DPP participants who experience shift in LTPA (due to DPP)
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines what proportion of persons who are target
+and adherent on LTPA intervention are effected
+>DIMENSIONS	[LTPA_4CAT][SEX][FROM_25_TO_75_BY_10]
+>
+>SOURCE	This parameter has been introduced as a component of the criteria to
+define scenarios.
+>
+>DEFINITION	Proportion of persons in target population and who are adherent on
+BMI for who LTPA low categories will be shifted to a category above
+>
+>METHODS
+>
+>ASSUMPTIONS
+>
+>DECISIONS	
+>RELATED PARAMETERS	DPP_Adherence_BMI,
+>DPP_Adherence_PA,
+>DPP_proportion_reduction_BMI,
+>DPP_Reduction_in_BMI,
+*/
+/* NOTE ( DPP_Reduction_in_BMI, EN )
+>PARAMETERS	Relative reduction in BMI due to DPP
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines by what proportion BMI of persons who are
+target and adherent on BMI intervention will be reduced.
+>DIMENSIONS	[SEX][FROM_25_TO_75_BY_10]
+>
+>SOURCE	This parameter has been introduced as a component of the criteria to
+define scenarios.
+>
+>DEFINITION	Proportion by which BMI is reduced
+>
+>METHODS
+>
+>ASSUMPTIONS
+>
+>DECISIONS	Value in Base scenario fixed at .05, under the assumption that the
+combined effect of intervention on PA and intervention on BMI will produce a
+decrease of 7% of average BMI
+>
+>RELATED PARAMETERS	DPP_AdherenceBMI,
+>DPP_Adherence_PA,
+>DPP_proportion_shift_LTPA
+>
+*/
+/* NOTE ( Threshold_for_Elevated_Plasma_Glucose, EN )
+>PARAMETERS	DPoRT threshold for Elevated Plasma Glucose
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines the threshold above which the 10-year
+probability of diabetes must lie so that the person may be defined to belong to
+the target population
+>DIMENSIONS	[SEX][FROM_25_TO_80_BY_5]
+>
+>SOURCE	This parameter has been introduced as a component of the criteria for
+target population.
+>
+>DEFINITION	Threshold that 10-year probability of diabetes must reach or exceed
+so that a person may be considered a target in year Year_for_DPP_program (if
+other criteria are satisfied also).
+>The complete criterion to define target population is:
+>In Year_for_DPP_program (at birthday), the person must
+>-	Be non-diabetic
+>-	Have a BMI >= DPP_gBMI
+>-	Have age within DppAgeRange
+>-	Have 2-year probability of diabetes >=
+Threshold_for_Elevated_Plasma_Glucose
+>
+>METHODS	Analysis done in CHMS: a distribution of Elevated Plasma Glucose was
+obtained using CHMS.  From this, percentage was defined for values above 5.3
+and 6.1.  The parameter was then modified with small steps in successive
+scenarios to determine values that give the percentages observed
+>
+>
+>DECISIONS This was updated in June 2019 due to changes to DPoRT earlier in 2019 
+and the use of 2 year risk rather than 10 year risk.
+>RELATED PARAMETERS	DPP_gBMI,
+>DppAgeRange,
+>Year_for_DPP_program
+*/
+/* NOTE ( Year_for_DPP_program, EN )
+>PARAMETERS	Year range for DPP program
+>LOCATION	Base(DPP_Intervention).dat
+>LAST UPDATE	December 2015
+>
+>DESCRIPTION	This parameter defines the year at which target population is
+defined
+>DIMENSIONS	[cLOWER_UPPER_BOUNDS]
+>
+>SOURCE	This parameter has been introduced as a component of the criteria for
+target population.
+>
+>DEFINITION	Year at which a person is defined target or not (for life).
+>The complete criterion to define target population is:
+>In Year_for_DPP_program (at birthday), the person must
+>-	Be non-diabetic
+>-	Have a BMI >= DPP_gBMI
+>-	Have age within DppAgeRange
+>-	Have 2-year probability of diabetes >=
+Threshold_for_Elevated_Plasma_Glucose
+>
+>METHODS	
+>
+>ASSUMPTIONS	Value in base scenario: 2015-2017
+>
+>DECISIONS	Year chosen to start DPP program
+>RELATED PARAMETERS	DPP_gBMI,
+>DppAgeRange,
+>Threshold_for_Elevated_Plasma_Glucose
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+

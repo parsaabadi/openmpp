@@ -1,0 +1,133 @@
+#include "pohem.h"
+//FILE_LABEL (EN) Diseases
+/* FILE_NOTE(EN) 
+	This file defines the diseases identified by cause of death, and is also controls which
+	diseases are modeled explicitly or as mortality-only.
+*/
+
+
+
+classification DISEASES {	// Diseases
+//	DISEASE_NUL,			// Null initial state
+	LUNG,					// Lung Cancer
+	BREAST,					// Breast Cancer
+	ENDOMETRIAL_CANCER,		// Endometrial Cancer
+	COLON_CANCER,			// Colon Cancer
+	RECTAL_CANCER,			// Rectal Cancer
+	OTHER_CANCER,			// Other Cancer
+	CAD_AMI,				// CAD AMI
+	STROKE,					// Stroke
+	OTHERCVA,				// Other Cerebrovascular disease
+	OTH_CIRC,				// Other circulatory disease
+	COPD,					// Cardio-pulmonary obstruction (bronchitis / emphysema)
+	SIDE_EFFECT_OF_DRUGS_FOR_OA,				// Side-effects from drugs for OA
+	OA,						// Osteoarthritis
+	DIABETES,				// Diabetes
+	PULMONARY_EMBOLISM,		// Pulmonary Embolism
+	MVA,					// Motor Vehicle Accidents
+	OTH_ACC,				// Other accidents / injuries
+	HIP,					// Hip fracture
+	SPINE_FRACTURE,			// Spine fracture
+	WRIST_FRACTURE,			// Wrist fracture
+	DVT,					// Deep Vein Thrombosis
+	CATARACT,				// Cataracts
+	OTHER_DISEASE			// Other diseases
+};
+
+classification DISEASES_MODELED {	// Diseases modeled
+	DM_CAD_AMI,				        // CAD AMI
+	DM_DIABETES,					// Diabetes
+	DM_OA,							// Osteoarthritis
+	DM_SIDE_EFFECT_OF_DRUGS_FOR_OA, // Side-effects from drugs for OA
+	DM_COPD                         // COPD
+};
+
+classification DISEASES_MODELED_PLUS_1 {	// Diseases modeled
+	DMP1_CAD_AMI,						// CAD AMI
+	DMP1_DIABETES,						// Diabetes
+	DMP1_OA,							// Osteoarthritis
+	DMP1_SIDE_EFFECT_OF_DRUGS_FOR_OA,	// Side-effects from drugs for OA
+	DMP1_COPD,	                        //  COPD
+	DMP1_NOT_MODELED
+};
+
+aggregation DISEASES_MODELED_PLUS_1, DISEASES  //This aggregation is not used through aggregate but rather through DISEASES_To_DISEASES_MODELED_PLUS_1
+{
+	DMP1_NOT_MODELED                , LUNG,					
+	DMP1_NOT_MODELED                , BREAST,				
+	DMP1_NOT_MODELED                , ENDOMETRIAL_CANCER,	
+	DMP1_NOT_MODELED                , COLON_CANCER,			
+	DMP1_NOT_MODELED                , RECTAL_CANCER,			
+	DMP1_NOT_MODELED                , OTHER_CANCER,		
+	DMP1_CAD_AMI                    , CAD_AMI,		
+	DMP1_NOT_MODELED                , STROKE,	
+	DMP1_NOT_MODELED                , OTHERCVA,			
+	DMP1_NOT_MODELED                , OTH_CIRC,				
+	DMP1_COPD                       , COPD,
+	DMP1_SIDE_EFFECT_OF_DRUGS_FOR_OA, SIDE_EFFECT_OF_DRUGS_FOR_OA,				
+	DMP1_OA                         , OA,						
+	DMP1_DIABETES                   , DIABETES,			
+	DMP1_NOT_MODELED                , PULMONARY_EMBOLISM,	
+	DMP1_NOT_MODELED                , MVA,				
+	DMP1_NOT_MODELED                , OTH_ACC,				
+	DMP1_NOT_MODELED                , HIP,					
+	DMP1_NOT_MODELED                , SPINE_FRACTURE,		
+	DMP1_NOT_MODELED                , WRIST_FRACTURE,			
+	DMP1_NOT_MODELED                , DVT,					
+	DMP1_NOT_MODELED                , CATARACT,			
+	DMP1_NOT_MODELED                , OTHER_DISEASE			
+}; 
+
+classification DISEASE_MODEL_CONTROL { //EN Disease model control
+	MODEL_ON,	//EN Disease model on
+	DELETED		//EN Disease deleted (not implemented)
+};
+
+parameter_group pgDiseases {		//EN Diseases
+	pDisease,
+	pgDiabetes,
+	pgOA,
+	pgCHRONIC_CONDITIONS_PA,
+//	pgDPP,
+	pgAMI_CVDPoRT,
+	pgSTROKE_CVDPoRT,
+	pgDEMENTIA,
+	pgDEMENTIA_Calibration_Inputs,
+	pgCOPD
+};
+
+parameters {
+/* NOTE ( pDisease, EN )
+MODEL_ON: 
+>When TRUE, the disease incidence-progression-mortality model is activated,
+and its mortality is subtracted from the population mortality (to avoid double counting it).
+>When off, mortality from this disease is assigned from the population mortality hazards.
+>Note:  If by mistake, a disease not modeled is turned on then it is like deleting the disease.
+>
+>DELETED: not currently implemented in this version
+>Purpose: To cause-delete a disease(s) from the population mortality to evaluate impact on
+life expectancy.
+*/
+	//EN Disease model on/off controls
+	logical pDisease[DISEASES_MODELED][DUMMY_ROW_OR_COLUMN];
+	//logical pDisease_1D[DISEASES_MODELED] ;
+
+	logical UseDport; //EN Use DPoRT algorithm for diabetes incidence 
+
+};
+
+actor Person            // Core Individual
+{
+	DISEASES    cause_of_death = {OTHER_DISEASE};	// Cause Of Death (** BILL May 25, 2004 ** initialized to other disease, since I removed DISEASE_NUL)
+};
+
+void PreSimulation()
+{
+	if(SIZE(DISEASES_MODELED_PLUS_1) != SIZE(DISEASES_MODELED) + 1)        ModelExit("\n SIZE(DISEASES_MODELED_PLUS_1) != SIZE(DISEASES_MODELED) + 1 ");
+	if(DMP1_CAD_AMI                     != DM_CAD_AMI)                     ModelExit("\n DMP1_CAD_AMI != DM_CAD_AMI ") ;
+	if(DMP1_DIABETES                    != DM_DIABETES)                    ModelExit("\n DMP1_DIABETES != DM_DIABETES ") ;
+	if(DMP1_OA                          != DM_OA )                         ModelExit("\n DMP1_OA != DM_OA ") ;
+	if(DMP1_SIDE_EFFECT_OF_DRUGS_FOR_OA != DM_SIDE_EFFECT_OF_DRUGS_FOR_OA) ModelExit("\n DMP1_SIDE_EFFECT_OF_DRUGS_FOR_OA != DM_SIDE_EFFECT_OF_DRUGS_FOR_OA ") ;
+	if(DMP1_COPD                        != DM_COPD )                       ModelExit("\n DMP1_COPD != DM_COPD ");
+
+};

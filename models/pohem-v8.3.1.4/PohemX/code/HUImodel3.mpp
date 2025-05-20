@@ -1,0 +1,405 @@
+
+
+#include "pohem.h"
+
+//FILE_LABEL (EN) HUI model 3 based on the Beta distribution (OA)
+/* FILE_NOTE(EN) 
+This file implements the HUI model based on the Beta distribution (aka HUI model # 3).
+It is the HUI model used in POHEM-PHAC which has been discussed in ???.doc. 
+*/
+
+
+
+classification HUI_MODEL3_LINEAR_PREDICTOR {
+	HUI_MODEL3_LP_INTERCEPT, //EN Intercept
+	HUI_MODEL3_LP_FEMALE,  //EN Female
+	HUI_MODEL3_LP_MALE,  //EN Male
+	HUI_MODEL3_LP_AGE_GROUP_LT20,   //EN Age group : [0,20[
+	HUI_MODEL3_LP_AGE_GROUP_20_30,  //EN Age group : [20,30[
+	HUI_MODEL3_LP_AGE_GROUP_30_40,  //EN Age group : [30,40[
+	HUI_MODEL3_LP_AGE_GROUP_40_50,  //EN Age group : [40,50[
+	HUI_MODEL3_LP_AGE_GROUP_50_60,  //EN Age group : [50,60[
+	HUI_MODEL3_LP_AGE_GROUP_60_70,  //EN Age group : [60,70[
+	HUI_MODEL3_LP_AGE_GROUP_70_80,  //EN Age group : [70,80[
+	HUI_MODEL3_LP_AGE_GROUP_80plus, //EN Age group : 80+
+	HUI_MODEL3_LP_AGE_PAST_85,			//EN Age past 85
+	HUI_MODEL3_LP_BMI_CAT1, //EN BMI < 18.5
+	HUI_MODEL3_LP_BMI_CAT2, //EN 18.5 <= BMI < 25
+	HUI_MODEL3_LP_BMI_CAT3, //EN 25 <= BMI < 30
+	HUI_MODEL3_LP_BMI_CAT4, //EN BMI >= 30
+	HUI_MODEL3_LP_ATLANTIC, //EN Region: Atlantic
+	HUI_MODEL3_LP_QUEBEC,   //EN Region: Quebec
+	HUI_MODEL3_LP_ONTARIO,  //EN Region: Ontario
+	HUI_MODEL3_LP_PRAIRIES, //EN Region: Prairies
+	HUI_MODEL3_LP_BCregion, //EN Region: British Columbia
+	HUI_MODEL3_LP_EDUC1, //EN Education: < than secondary
+	HUI_MODEL3_LP_EDUC2, //EN Education: secondary graduate  
+	HUI_MODEL3_LP_EDUC3, //EN Education: other post-secondary  
+	HUI_MODEL3_LP_EDUC4, //EN Education: post-secondary graduate
+	HUI_MODEL3_LP_INCOME_Q1,	//EN Income quartile 1 (poorest)
+	HUI_MODEL3_LP_INCOME_Q2,	//EN Income quartile 2 (lower middle)
+	HUI_MODEL3_LP_INCOME_Q3,	//EN Income quartile 3 (upper middle)
+	HUI_MODEL3_LP_INCOME_Q4,   //EN Income quartile 4 (richest)
+    HUI_MODEL3_LP_ALCOHOL_NEVER,    //EN Alcohol: Never drank alcohol
+    HUI_MODEL3_LP_ALCOHOL_FORMER,   //EN Alcohol: Former drinker
+    HUI_MODEL3_LP_ALCOHOL_LIGHT ,   //EN Alcohol: Less than 2 drinks per week
+    HUI_MODEL3_LP_ALCOHOL_MODERATE, //EN Alcohol: 2-14 (2-9) drinks per week for male (female)
+    HUI_MODEL3_LP_ALCOHOL_HEAVY,    //EN Alcohol: More than 14 (9) drinks per week for male (female)
+	HUI_MODEL3_LP_NEVER_SMOKER,			//EN Never Smoker
+	HUI_MODEL3_LP_FORMER_SMOKER,			//EN Former Smoker
+	HUI_MODEL3_LP_CURRENT_SMOKER,			//EN Current Smoker
+	HUI_MODEL3_LP_DIAB_NO,						//EN No diabetes reported
+	HUI_MODEL3_LP_DIAB_YES	,					//EN Diabetes reported
+	HUI_MODEL3_LP_CANCER_NO,					//EN No cancer reported
+	HUI_MODEL3_LP_CANCER_YES	,				//EN Cancer reported
+	HUI_MODEL3_LP_HEART_DISEASE_NO,			//EN No heart disease reported
+	HUI_MODEL3_LP_HEART_DISEASE_YES,			//EN Heart disease reported
+	HUI_MODEL3_LP_HYPERTENSION_NO,				//EN No hypertension reported
+	HUI_MODEL3_LP_HYPERTENSION_YES,			//EN Hypertension reported
+	HUI_MODEL3_LP_OA_NO,						//EN No osteoarthritis reported
+	HUI_MODEL3_LP_OA_YES,						//EN Osteoarthritis reported
+	HUI_MODEL3_LP_CC_COUNT_EX5_NONE,  //EN No chronic condition (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_CC_COUNT_EX5_1 ,    //EN One chronic condition (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_CC_COUNT_EX5_2,     //EN Two chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_CC_COUNT_EX5_3,     //EN Three chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_CC_COUNT_EX5_4,     //EN Four chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_CC_COUNT_EX5_5plus, //EN Five or more chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_USUAL_DAY_SIT,               //EN Usual day: Sit
+	HUI_MODEL3_LP_USUAL_DAY_STAND_WALK ,       //EN Usual day: Stand or walk quite a lot 
+	HUI_MODEL3_LP_USUAL_DAY_LIFT,              //EN Usual day: Usually lift or carry light loads 
+	HUI_MODEL3_LP_USUAL_DAY_HEAVY_WORK  ,      //EN Usual day: Do heavy work or carry very heavy loads
+	HUI_MODEL3_LP_LTPA_NO,                     //EN Physical activity from leisure time: No 
+	HUI_MODEL3_LP_LTPA_0_30 ,                  //EN Physical activity from leisure time: 0-30 minutes/day 
+	HUI_MODEL3_LP_LTPA_30_60,                  //EN Physical activity from leisure time: 30-60 minutes/day 
+	HUI_MODEL3_LP_LTPA_60_plus,                //EN Physical activity from leisure time: 60+ minutes/day 
+	HUI_MODEL3_LP_SUPER_SEDENTARY,             //EN Interaction: (Physical activity from leisure time = No) and (Usual day = Sit)
+	HUI_MODEL3_LP_OA_AGE_GROUP_LT20,   //EN Interaction: reported osteoarthritis and age group : [0,20[
+	HUI_MODEL3_LP_OA_AGE_GROUP_20_30,  //EN Interaction: reported osteoarthritis and age group : [20,30[
+	HUI_MODEL3_LP_OA_AGE_GROUP_30_40,  //EN Interaction: reported osteoarthritis and age group : [30,40[
+	HUI_MODEL3_LP_OA_AGE_GROUP_40_50,  //EN Interaction: reported osteoarthritis and age group : [40,50[
+	HUI_MODEL3_LP_OA_AGE_GROUP_50_60,  //EN Interaction: reported osteoarthritis and age group : [50,60[
+	HUI_MODEL3_LP_OA_AGE_GROUP_60_70,  //EN Interaction: reported osteoarthritis and age group : [60,70[
+	HUI_MODEL3_LP_OA_AGE_GROUP_70_80,  //EN Interaction: reported osteoarthritis and age group : [70,80[
+	HUI_MODEL3_LP_OA_AGE_GROUP_80plus, //EN Interaction: reported osteoarthritis and age group : 80+
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_NONE,  //EN Interaction: reported osteoarthritis and no chronic condition (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_1 ,    //EN Interaction: reported osteoarthritis and one chronic condition (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_2,     //EN Interaction: reported osteoarthritis and two chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_3,     //EN Interaction: reported osteoarthritis and three chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_4,     //EN Interaction: reported osteoarthritis and four chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_OA_CC_COUNT_EX5_5plus, //EN Interaction: reported osteoarthritis and five or more chronic conditions (excluding OA, CA, HD, DB, HPB)
+	HUI_MODEL3_LP_AGE_EDUC1, //EN Interaction: age gradient for education: < than secondary
+	HUI_MODEL3_LP_AGE_EDUC2, //EN Interaction: age gradient for education: secondary graduate  
+	HUI_MODEL3_LP_AGE_EDUC3, //EN Interaction: age gradient for education: other post-secondary  
+	HUI_MODEL3_LP_AGE_EDUC4  //EN Interaction: age gradient for education: post-secondary graduate
+};
+	
+
+
+parameter_group pgHuiModel3Mean { //EN HUI Model3 Mean (CCHS)
+ HuiModel3MeanMainLinearPred
+};
+
+parameter_group pgHuiModel3Alpha { //EN HUI Model3 Alpha (CCHS)
+ HuiModel3AlphaMainLinearPred
+};
+
+parameter_group pgHuiModel3 { //EN HUI Model3 (CCHS+NPHS)
+	HuiModel3SiloProbs,
+    HuiModel3Armaplus11,
+	HuiModel3CutOffLow,
+	HuiModel3CutOffHigh,
+
+	pgHuiModel3Mean,
+	pgHuiModel3Alpha,
+
+    HuiModel3BootstrapIndexMultiplier,
+    HuiModel3BootstrapOffset,
+	HuiModel3UltraDynamic,
+	HuiModel3UltraDynamicDelay
+
+};
+
+
+hide( HuiModel3UltraDynamic, HuiModel3UltraDynamicDelay);
+hide( HuiModel3CutOffLow   , HuiModel3CutOffHigh);
+
+parameters {
+
+int	HuiModel3BootstrapIndexMultiplier; //EN Allow the use of the bootstrap replicates (1) or not (0) for HUI model 3
+int HuiModel3BootstrapOffset; //EN Bootstrap estimate to be used initially for HUI model 3
+/**** BEGIN Imaginary cut-offs ************************************************************************************/
+
+/* NOTE ( HuiModel3CutOffLow, EN )
+    Initial values of HUI (from CCHS) equal to 0.973 and 1 are hypotethically seen as coming from a mapping of 
+	HUI_imaginary in [a,b] to HUI=0.973 and HUI_imaginary [b,1] to 1. This parameter gives the value of a.
+*/
+/* NOTE ( HuiModel3CutOffHigh, EN )
+	Value of the intercept for the alpha parameter of the Beta distribution used to model HUI
+*/
+double  HuiModel3CutOffLow;
+double  HuiModel3CutOffHigh;
+
+/****   END Imaginary cut-offs ************************************************************************************/
+
+/**** BEGIN ARMA(1,1) ***********************************************************************************************/
+
+/* NOTE ( HuiModel3Armaplus11, EN )
+	Value of phi, theta and kappa in the ARMAplus(1,1) process used to generate correlated uniform variates (quantiles of the HUI)
+*/
+double  HuiModel3Armaplus11[UNIFORM_SILOS][ARMAPLUS_11_PARAMETERS]; //EN ARMAplus(1,1) parameters used in HUI model #3
+
+double  HuiModel3SiloProbs[UNIFORM_SILOS];  //EN Probability of silos for the siloed uniform process used in HUI model #3
+
+/****   END ARMA(1,1) ***********************************************************************************************/
+
+
+
+/**** BEGIN regression coefficients of the alpha parameter of the Beta(alpha,mu) distribution *********************/                   
+
+/* NOTE ( HuiModel3AlphaMainLinearPred, EN )
+	Value of regression coefficients for the alpha parameter of the Beta distribution used to model HUI
+*/
+
+double HuiModel3AlphaMainLinearPred[BOOTSTRAP_INDEX_39][HUI_MODEL3_LINEAR_PREDICTOR]; //EN Alpha main coefficients (main and interactions) for HUI model 3 built on CCHS data
+
+/****   END regression coefficients of the alpha parameter of the Beta(alpha,mu) distribution *********************/  
+
+/**** BEGIN regression coefficients of the mu parameter of the Beta(alpha,mu) distribution *********************/  
+
+/* NOTE ( HuiModel3MeanMainLinearPred, EN )
+	Value of regression coefficients for the mean parameter of the Beta distribution used to model HUI
+*/
+double  HuiModel3MeanMainLinearPred[BOOTSTRAP_INDEX_39][HUI_MODEL3_LINEAR_PREDICTOR];  //EN Mean coefficients (main and interactions) for HUI model 3 built on CCHS data
+
+/**** END regression coefficients of the mu parameter of the Beta(alpha,mu) distribution *********************/  
+
+
+/**** BEGIN HUI update dynamics *********************/  
+/* NOTE ( HuiModel3UltraDynamic, EN )
+	Indicates if HUI is updated annually (FALSE) or whenever attributes involved in the distribution of HUI have changed (TRUE)
+*/
+/* NOTE ( HuiModel3UltraDynamicDelay, EN )
+	If HUI is updated anytime something relevant changed, this provides the time delay between such change and the update of HUI
+*/
+logical HuiModel3UltraDynamic ;
+double  HuiModel3UltraDynamicDelay ;
+/**** END HUI update dynamics *********************/  
+
+};
+
+
+actor Person            // Core Individual
+{
+	int     hui_model3_bootstrap_index={0}; 
+
+    double hui_model3_arma_11    [ARMAPLUS_11_ENTRIES]; //EN ARMAplus(1,1) stochastic process used to generate quantile for HUI model #3
+	double hui_model3_siloed_unif[SILOED_UNIF_PROCESS];
+
+	double hui_model3_quantile={0.0};           //EN HUI quantile 
+	double hui_model3_a ;                       //EN alpha parameter in the beta distribution for HUI model 3
+	double hui_model3_mu ;                      //EN mu parameter in the beta distribution for HUI model 3
+	double gHUI_model3 ;	                    //EN HUI model 3
+
+	
+	double  hui_model3_mean_linear_predictor_plus_quantile = 	/* HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_INTERCEPT ]
+	                                                             + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_FEMALE               + sex                                 ]
+																 + */
+	    HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_BMI_CAT1             + split(gBMI4HUI ,BMI4CAT)            ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_AGE_GROUP_LT20       + split(truncated_age,HUI_AGE_GROUP)  ]  
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_AGE_PAST_85                                                ]  * (max(truncated_age,85.0) -85.0) // this term was not in the model when it was estimated ==> Coefficients = 0
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_OA_NO                + gOA                                 ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_HYPERTENSION_NO      + gBP_PA                              ]  
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_DIAB_NO              + gDiabetes_PA                        ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_HEART_DISEASE_NO     + gHeartDisease_PA                    ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_CANCER_NO            + gCancer                             ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_CC_COUNT_EX5_NONE    + gCC_count_ex5_cap5                  ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_ATLANTIC             + gRegion                             ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_EDUC1                + gEducation                          ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_INCOME_Q1            + gIncomeQuartile                     ]  	
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_ALCOHOL_NEVER        + gAlcohol5                           ]
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_NEVER_SMOKER         + smoking_cancer_dynamic              ] 
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_USUAL_DAY_SIT        + gPA_usual_day                       ] 
+	  + HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index][HUI_MODEL3_LP_LTPA_NO              + gLTPA_cat                           ] 
+	   // + Interaction terms ignored
+		+ hui_model3_quantile;	
+	double hui_model3_mean_linear_predictor_plus_quantile_shadow = {0.0}; 
+
+	event	timeUpdateHuiModel3Event        , UpdateHuiModel3Event; //EN Looks out for changes that are relevant to HUI model 3
+	event	timeUpdateHuiModel3QuantileEvent, UpdateHuiModel3QuantileEvent; //EN Update HUI quantile every other year.
+
+
+	void    InitializeHuiModel3();            //EN Initialisation of the HUI model 3
+	void    UpdateHuiModel3();                //EN Updates the HUI if user selected annual updates
+	void	UpdateHuiModel3Distribution();    //EN Computes the parameters of the beta distribution used in the HUI model 3
+	void    UpdateHuiModel3Quantile() ;       //EN Updates the quantile for HUI model 3
+	double  ComputeHuiModel3LinearPredictor(const double * Coefficients);
+
+	hook  InitializeHuiModel3, InitializeHuiModel2; 
+	hook  UpdateHuiModel3, UpdateHuiModel2;          // updates gHUI_model3 every two years
+	
+
+};
+
+
+double Person::ComputeHuiModel3LinearPredictor(const double * Coefficients)
+{	
+	return  //Main terms 
+		Coefficients[HUI_MODEL3_LP_INTERCEPT                                                  ] 
+	  + Coefficients[HUI_MODEL3_LP_FEMALE               + sex                                 ]
+	  + Coefficients[HUI_MODEL3_LP_BMI_CAT1             + SPLIT(gBMI4HUI ,BMI4CAT)            ]
+	  + Coefficients[HUI_MODEL3_LP_AGE_GROUP_LT20       + SPLIT(truncated_age,HUI_AGE_GROUP)  ] 
+	  + Coefficients[HUI_MODEL3_LP_AGE_PAST_85                                                ]  * (max(truncated_age,85.0) -85.0) // this term was not in the model when it was estimated ==> Coefficients = 0
+	  + Coefficients[HUI_MODEL3_LP_OA_NO                + gOA                                 ]
+	  + Coefficients[HUI_MODEL3_LP_HYPERTENSION_NO      + gBP_PA                              ]  
+	  + Coefficients[HUI_MODEL3_LP_DIAB_NO              + gDiabetes_PA                        ]
+	  + Coefficients[HUI_MODEL3_LP_HEART_DISEASE_NO     + gHeartDisease_PA                    ]
+	  + Coefficients[HUI_MODEL3_LP_CANCER_NO            + gCancer                             ]
+	  + Coefficients[HUI_MODEL3_LP_CC_COUNT_EX5_NONE    + gCC_count_ex5_cap5                  ]
+	  + Coefficients[HUI_MODEL3_LP_ATLANTIC             + gRegion                             ]
+	  + Coefficients[HUI_MODEL3_LP_EDUC1                + gEducation                          ]
+	  + Coefficients[HUI_MODEL3_LP_INCOME_Q1            + gIncomeQuartile                     ]
+	  + Coefficients[HUI_MODEL3_LP_ALCOHOL_NEVER        + gAlcohol5                           ]
+	  + Coefficients[HUI_MODEL3_LP_NEVER_SMOKER         + smoking_cancer_dynamic                          ]
+	  + Coefficients[HUI_MODEL3_LP_USUAL_DAY_SIT        + gPA_usual_day                       ]
+	  + Coefficients[HUI_MODEL3_LP_LTPA_NO              + gLTPA_cat                           ]
+			 //Interaction terms
+	  + Coefficients[HUI_MODEL3_LP_SUPER_SEDENTARY                                            ] * (gPA_usual_day==SIT) * (gLTPA_cat==LTPA_NO)
+	  + Coefficients[HUI_MODEL3_LP_OA_CC_COUNT_EX5_NONE + gCC_count_ex5_cap5                  ] * gOA       
+	  + Coefficients[HUI_MODEL3_LP_OA_AGE_GROUP_LT20    + SPLIT(truncated_age,HUI_AGE_GROUP)  ] * gOA  
+	  + Coefficients[HUI_MODEL3_LP_AGE_EDUC1            + gEducation                          ] * SPLIT(truncated_age,HUI_AGE_GROUP) 
+	  ;
+}
+
+void hook_UpdateHuiModel3Distribution() {};
+
+void Person::UpdateHuiModel3Distribution()  //EN Computes the parameters of the beta distribution used in the HUI model 3
+{
+   double hui_alpha_linear_predictor;
+   double hui_mean_linear_predictor;
+
+   hui_alpha_linear_predictor = ComputeHuiModel3LinearPredictor( HuiModel3AlphaMainLinearPred[hui_model3_bootstrap_index] );
+
+   hui_mean_linear_predictor =	ComputeHuiModel3LinearPredictor(  HuiModel3MeanMainLinearPred[hui_model3_bootstrap_index] );	
+   
+   hui_model3_a = exp(hui_alpha_linear_predictor );
+   hui_model3_mu = 1.0/(1.0+exp(-hui_mean_linear_predictor));
+
+   hook_UpdateHuiModel3Distribution();
+}
+
+void hook_InitializeHuiModel3() {};
+
+void Person::InitializeHuiModel3()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	hui_model3_bootstrap_index =HuiModel3BootstrapOffset + HuiModel3BootstrapIndexMultiplier*(GetCaseSample() % (SIZE(BOOTSTRAP_INDEX_39)-HuiModel3BootstrapOffset));
+
+	if(HuiModelPreference[HUI_MODEL_MENU_3])
+	{
+		UpdateHuiModel3Distribution(); // Get hui_model3_a, hui_model3_mu
+		
+		// Next get hui_model3_quantile
+		if(gHUI_model3 > 95.0)
+			hui_model3_quantile = RandUniform(11); 
+		else
+		{  
+			if(gHUI_model3==1.0  ) hui_model3_quantile = runif(RandUniform(122),pbeta_a_mu(HuiModel3CutOffHigh, hui_model3_a, hui_model3_mu),1.0);
+			else if(gHUI_model3==0.973) hui_model3_quantile = runif(RandUniform(123),pbeta_a_mu(HuiModel3CutOffLow, hui_model3_a, hui_model3_mu),pbeta_a_mu(HuiModel3CutOffHigh, hui_model3_a, hui_model3_mu));
+			else hui_model3_quantile = pbeta_a_mu((gHUI_model3+0.36)/1.36, hui_model3_a, hui_model3_mu);
+		}
+		
+		UNIFORM_SILOS which_silo = (UNIFORM_SILOS)InitializeSiloedUniform(hui_model3_siloed_unif, HuiModel3SiloProbs, hui_model3_quantile);  //hui_model3_siloed_unif entries also get filled properly
+		ARMAPLUS_11_initialize(hui_model3_arma_11, HuiModel3Armaplus11[which_silo], qnorm(hui_model3_quantile,0.0,1.0),RandNormal(74), RandNormal(154));
+		
+		gHUI_model3 =  1.36 * qbeta_a_mu (hui_model3_quantile, hui_model3_a, hui_model3_mu)-0.36; 
+		/* if  HUI from startPOP    then  gHUI_model3 at this point  
+	        1)   < 0.973                   = HUI from startPOP
+		    2)   =0.973                     in [1.36*HuiModel3CutOffHigh-0.36 , 1.36*HuiModel3CutOffLow-0.36] = [0.9728 , 0.9932]
+	    	3)   =1.000                     in [1.36*HuiModel3CutOffHigh-0.36 , 1] = [0.9932, 1]
+	    	4)   > 1.000                    drawn from appropriate BETA distribution (and transformed 1.36 x - 0.36)
+        */
+	}
+
+	hook_InitializeHuiModel3();
+}
+
+void hook_UpdateHuiModel3Quantile() {};
+
+void Person::UpdateHuiModel3Quantile() 
+{
+	if (due_for_biennial_update)
+	{
+		ARMAPLUS_11_move_forward(hui_model3_arma_11,RandNormal(91), RandNormal(155));    //Updates hui_model3_arma_11[ARMAPLUS_11_Y_t] among other things
+		hui_model3_quantile = UpdateSiloedUniform(hui_model3_siloed_unif, hui_model3_arma_11[ARMAPLUS_11_Y_t]);
+	  //hui_model3_quantile=pnorm(hui_model3_arma_11[ARMAPLUS_11_Y_t],0.0,1.0);
+
+	}
+
+	hook_UpdateHuiModel3Quantile();
+};
+
+TIME Person::timeUpdateHuiModel3QuantileEvent()
+{	
+    TIME tWait_time = {TIME_INFINITE};
+
+	if(HuiModelPreference[HUI_MODEL_MENU_3] && HuiModel3UltraDynamic  )
+		tWait_time = WAIT(1.0);
+
+	return tWait_time;
+}
+
+void hook_UpdateHuiModel3QuantileEvent() {};
+
+void Person::UpdateHuiModel3QuantileEvent()
+{
+	UpdateHuiModel3Quantile() ; //Update hui_model3_quantile.  Note that the function checks for biennial timing.
+
+	hook_UpdateHuiModel3QuantileEvent();
+};
+
+
+
+TIME Person::timeUpdateHuiModel3Event()
+{	
+	TIME tWait_time = {TIME_INFINITE};
+
+	if(HuiModelPreference[HUI_MODEL_MENU_3] && HuiModel3UltraDynamic  && hui_model3_mean_linear_predictor_plus_quantile_shadow != hui_model3_mean_linear_predictor_plus_quantile /*&& truncated_age!=lifespan_age_start*/)
+		tWait_time = WAIT(HuiModel3UltraDynamicDelay);
+
+	return tWait_time;
+}
+
+void hook_UpdateHuiModel3Event() {};
+
+void Person::UpdateHuiModel3Event()
+{
+
+	if(HuiModelPreference[HUI_MODEL_MENU_3] && hui_model3_mean_linear_predictor_plus_quantile_shadow != 0.0)
+	{
+		UpdateHuiModel3Distribution(); // Update hui_model3_a, hui_model3_mu  
+		
+		gHUI_model3 =  1.36 * qbeta_a_mu (hui_model3_quantile, hui_model3_a, hui_model3_mu)-0.36;
+	}
+	hui_model3_mean_linear_predictor_plus_quantile_shadow = hui_model3_mean_linear_predictor_plus_quantile ;
+
+	hook_UpdateHuiModel3Event();
+};
+
+
+void hook_UpdateHuiModel3() {};
+
+void Person::UpdateHuiModel3()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	if ( !HuiModel3UltraDynamic && !(truncated_age==lifespan_age_start) )
+	{
+		UpdateHuiModel3Quantile() ; //Update hui_model3_quantile.  Note that the function checks for biennial timing.
+
+		UpdateHuiModel3Distribution(); // Update hui_model3_a, hui_model3_mu 
+
+		gHUI_model3 =  1.36 * qbeta_a_mu (hui_model3_quantile, hui_model3_a, hui_model3_mu)-0.36;
+	}
+
+	hook_UpdateHuiModel3();
+}
+

@@ -1,0 +1,222 @@
+partition HUI_CAT_PRE_SURG_4 {0.245, 0.544, 0.75};		// partitionning of HUI pre surgery
+partition SURGERY_AGES {1};									// partitionning of age
+partition YEAR2060_2080 {2060, 2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068, 2069, 
+						2070, 2071, 2072, 2073, 2074, 2075, 2076, 2077, 2078, 2079, 2080 };
+partition YEAR_2072_12RUNIN {2060, 2072};
+partition YEAR_2001_2021 {2001,2002,2021,2022};
+partition YEAR_2001_to_2021 {2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,
+                             2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,
+							 2021,2022};
+partition OA_CTR_OS_VISITS { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 
+							20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30};
+partition OA_CTR_PRIMARY_SURGERY	{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; //EN Maximum set through parameter pCtr_Surgery (Default Max 4)
+partition OA_CTR_REVISION_SURGERY	{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }; //EN Maximum set through parameter pCtr_Surgery (Default Max 4)
+partition OA_PREVALENCE_YEARS_TABLE { 2001, 2002, 2010, 2011, 2020, 2021, 2025, 2026, 2050, 2051, 2070, 2071, 2090, 2091, 2100, 2101 };
+partition OA_SURV_AGE_GROUP_PREV	{20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90 };
+
+
+table_group OA_All_Tables { //EN Osteoarthritis tables
+	OA_Tables,
+	OA_LE_Tables,
+	OA_Exploratory_Tables
+};
+
+table_group OA_LE_Tables { //EN OA Life Expectancy tables
+	tLife_Expectancy,
+	tLife_Expect_by_IndexOA_Age,
+	tLife_Expect_by_IndexOA_Age_Gr
+};
+
+table_group OA_Tables { //EN Main OA tables
+	tAvg_HUI_BMI_per_Year,
+	tAvg_HUI_BMI_per_Year_OAevents,
+	tOA_Canada
+};
+table_group OA_Exploratory_Tables { //EN Exploratory OA tables
+	tOA_BritishColumbia,
+	tOA_Prevalence,
+	tOA_Prev_At_Start_Abridged
+};
+
+//	OA_Prevalence_at_Start_Tables,
+//	vOA_Durations,
+//	vOA_Durations_Previous
+
+actor Person{
+	LIFE	life_age_IndexOA = COERCE(LIFE, int(age_IndexOA));
+};
+
+
+table Person tLife_Expectancy					//EN Life expectancy, HALE and average HUI by sex and age in start year only
+[in_tabulation_scope && calendar_year_start==pStartYear]
+{
+	sex+										//EN Sex
+	*
+	lifespan_age_start+							//EN Integer age when actor started
+	*
+	{
+		unit,									//EN Nb persons
+		duration(),								//EN Person-years decimals=2
+		weighted_duration(gHUI_rep),			//EN Total HUI
+		duration()/unit,						//EN LE decimals=2
+		weighted_duration(gHUI_rep)/unit,		//EN HALE decimals=2
+		weighted_duration(gHUI_rep)/duration()	//EN Average HUI decimals=2
+	}
+};
+
+table Person tLife_Expect_by_IndexOA_Age					//EN Life expectancy, HALE and average HUI by sex and age at OA diagnosis for OA cases
+[in_tabulation_scope && IndexOA_event == TRUE]
+{
+	sex+													//EN Sex
+	*
+	life_age_IndexOA+										//EN Age at index OA event
+	*
+	{
+		nz_delta(duration()),								//EN Count of persons (nzd)
+		duration(),											//EN Person-years decimals=2
+		duration()/nz_delta(duration()),					//EN LE decimals=2
+		weighted_duration(gHUI_rep)/nz_delta(duration()),	//EN HALE decimals=2
+		weighted_duration(gHUI_rep),						//EN Total HUI
+		weighted_duration(gHUI_rep)/duration()				//EN Average HUI decimals=2
+	}
+};
+
+//MADE by BEHNAM for SAEDIE's HUI work
+table Person tLife_Expect_by_IndexOA_Age_Gr					//EN Life expectancy, HALE and average HUI by sex and age group for OA cases 
+[in_tabulation_scope && IndexOA_event == TRUE]
+{
+	sex+													//EN Sex
+	*
+	split( truncated_age, SIDE_AGE_GROUP  )+				//EN Side effects age group
+	*
+	{
+		nz_delta(duration()),								//EN Count of persons (nzd)
+		duration(),											//EN Person-years decimals=2
+		duration()/nz_delta(duration()),					//EN LE decimals=2
+		weighted_duration(gHUI_rep)/nz_delta(duration()),	//EN HALE decimals=2
+		weighted_duration(gHUI_rep),						//EN Total HUI
+		weighted_duration(gHUI_rep)/duration()				//EN Average HUI decimals=2
+	}
+};
+
+table Person tAvg_HUI_BMI_per_Year						//EN Average HUI, BMI and AGE per year
+[in_tabulation_scope ]
+{
+	sex+												//EN Sex
+	*
+	report_calendar_year+								//EN Year
+	*
+	{
+		unit,											//EN Nb persons
+		duration(),										//EN Person-years decimals=2
+		weighted_duration(gHUI_rep)/duration(),			//EN Average HUI decimals=2
+		weighted_duration(truncated_age)/duration(),	//EN Average age decimals=2
+		weighted_duration(gBMI_PHAC)/duration()			//EN Average BMI decimals=2
+	}
+};
+
+table Person tAvg_HUI_BMI_per_Year_OAevents				//EN Average HUI, BMI and AGE per year by OA event
+[in_tabulation_scope ]
+{
+	sex+												//EN Sex
+	*
+	PrevOA_event+										//EN Had OA at startup
+	*
+	OA_Event_State+ 									//EN OA states from diagnosis to surgery
+	*
+	split( truncated_age, SIDE_AGE_GROUP  )+			//EN Age group
+	*
+	report_calendar_year+								//EN Year
+	*
+	{
+		unit,											//EN Nb persons
+		duration(),										//EN Person-years decimals=2
+		weighted_duration(gHUI_rep)/duration(),			//EN Average HUI decimals=2
+		weighted_duration(truncated_age)/duration(),	//EN Average age decimals=2
+		weighted_duration(gBMI_PHAC)/duration()			//EN Average BMI decimals=2
+	}
+};
+
+table Person tOA_Canada														//EN OA outcomes for Canada
+[in_tabulation_scope]
+{
+	sex+																	//EN Sex
+	*
+	split(truncated_age,OA_AGE_GROUP)+										//EN Age group
+	*
+	{	
+		nz_delta(duration()),												//EN Persons alive (N)
+		nz_delta(duration(IndexOA_event, TRUE)),							//EN Current Prevalence count (P)
+		nz_delta(duration(PrevOA_event, TRUE)),								//EN Startup Prevalence count (S)
+		event(entrances(IndexOA_event, TRUE)),								//EN Incidence count (I)
+		nz_delta(duration(IndexOA_event, TRUE))/nz_delta(duration()),		//EN Current Prevalence rate (P/N) decimals=3
+		nz_delta(duration(PrevOA_event, TRUE))/nz_delta(duration()),		//EN Startup Prevalence rate (S/N) decimals=3
+		event(entrances(IndexOA_event, TRUE))/duration(IndexOA_event,FALSE),//EN Incidence rate (I/R) decimals=3
+		duration(IndexOA_event, TRUE)/duration(),							//EN Current PY Prevalence Rate (Q/Y) decimals=3
+		duration(),															//EN Person-years alive (Y) decimals=3
+		duration(IndexOA_event, TRUE),										//EN Person-years with OA (Q) decimals=3
+		duration(IndexOA_event,FALSE),										//EN Person-years at risk of OA Incidence (R)
+  	    entrances(alive, FALSE),											//EN Deaths (D)
+		value_at_entrances(alive, FALSE, IndexOA_event),					//EN Had OA at time of death (X)
+		unit																//EN Persons alive (Unit) (U)
+	}
+	*
+	report_calendar_year+													//EN Year
+};
+
+table Person tOA_BritishColumbia												//EN OA outcomes for British Columbia
+	[in_tabulation_scope && gProvince==BC]
+{
+	sex+																		//EN Sex
+	*
+	split(truncated_age, OA_AGE_GROUP)+											//EN Age group
+	*
+	{	
+		nz_delta(duration()),													//EN Persons alive (N)
+		nz_delta(duration(IndexOA_event, TRUE)),								//EN Current Prevalence count (P)
+		nz_delta(duration(PrevOA_event, TRUE)),									//EN Startup Prevalence count (S)
+		event(entrances(IndexOA_event, TRUE)),									//EN Incidence count (I)
+		nz_delta(duration(IndexOA_event, TRUE))/nz_delta(duration()),			//EN Current Prevalence rate (P/N) decimals=3
+		nz_delta(duration(PrevOA_event, TRUE))/nz_delta(duration()),			//EN Startup Prevalence rate (S/N) decimals=3
+		event(entrances(IndexOA_event, TRUE))/duration(IndexOA_event,FALSE),	//EN Incidence rate (I/R) decimals=3
+		duration(IndexOA_event, TRUE)/duration(),								//EN Current PY Prevalence Rate (Q/Y) decimals=3
+		duration(),																//EN Person-years alive (Y) decimals=3
+		duration(IndexOA_event, TRUE),											//EN Person-years with OA (Q) decimals=3
+		duration(IndexOA_event,FALSE),											//EN Person-years at risk of OA Incidence (R)
+  	    entrances(alive, FALSE),												//EN Deaths (D)
+		value_at_entrances(alive, FALSE, IndexOA_event),						//EN Had OA at time of death (X)
+		unit																	//EN Persons alive (Unit) (U)
+	}
+	*
+	report_calendar_year + //EN Year
+};
+
+table Person tOA_Prev_At_Start_Abridged								//EN OA prevalence and population at simulation start by age group
+	[in_tabulation_scope &&  calendar_year == pStartYear ]
+{
+	sex+															//EN Sex
+	*
+	split(truncated_age, OA_SURV_AGE_GROUP_PREV)+					//EN Current age
+	*
+	{
+		nz_delta(duration()),										//EN Count of persons (nzd)					
+		nz_delta(duration(PrevOA_event, TRUE)),						//EN Count of OA prevalent cases at startup
+		nz_delta(duration(PrevOA_event, TRUE))/nz_delta(duration()) //EN Prevalence rate at startup decimals=3
+	}
+};
+
+table Person tOA_Prevalence							//EN OA prevalence by year 
+[in_tabulation_scope]
+{
+	sex+											//EN Sex
+	*
+	PrevOA_event+									//EN Had OA at startup
+	*
+	report_calendar_year+							//EN Year
+	*
+	{
+		nz_delta( duration( )),						//EN Count of persons
+		nz_delta( duration( IndexOA_event, TRUE)),	//EN All OA cases
+		entrances( IndexOA_event, TRUE)				//EN New OA cases
+	}
+};

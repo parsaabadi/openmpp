@@ -1,0 +1,5 @@
+parameters {
+	CHOICE_SMK smoking_module_choice = CRMM_SMOKING_MODULE;
+	int	ReportYear = 2010; //EN Year used in special tables to report only on events occuring for one year
+};
+

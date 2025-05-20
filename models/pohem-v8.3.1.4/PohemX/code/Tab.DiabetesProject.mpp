@@ -1,0 +1,221 @@
+
+//FILE_LABEL (EN) Tables for diabetes mortality project inclduing calibration tabels for diabetes prevalence at start- Deirdre Hennessy. Meltem Tuna and Douglas Manuel
+/* FILE_NOTE(EN) 
+	 POHEM Diabetes tables
+*/
+
+
+
+table_group tgDiabetes { //EN Diabetes
+	tgDPPTables,
+	tDiseaseEventsDiab,
+	tDbBMI,
+	tDbEDU,
+	tDB_SEP,
+	tDB_BMI
+};
+
+table Person tDebugDiabetes													//EN Main diabetes outcomes to check during recalibration
+	[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) ]
+{
+	sex+																	//EN Sex
+	*
+	{
+		unit,																//EN Persons alive
+		duration(),															//EN Person-years decimals=1
+		nz_delta(duration()),												//EN Population Count
+		entrances( alive, FALSE ),											//EN Mortality
+		nz_delta( duration( gDiabetes_use, DIAB_YES) ),						//EN Prevalence count
+		nz_delta( duration( gDiabetes_use, DIAB_YES) )/nz_delta(duration())	//EN Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+		
+	}
+	* report_calendar_year													//EN Year
+	*	split( lifespan_age, AGE_GROUP18_5)+								//EN 5 year age-group
+	
+};
+
+table Person tDiabetesReassign						//EN Table designed by Bill to assess reassignment of diabetes
+	[in_tabulation_scope &&  calendar_year==pStartPopYear ]
+{
+	
+	sex+											//EN Sex
+	*
+	province +										//EN Province
+	*
+
+	{
+		
+		nz_delta(duration()),						//EN Population Count
+		entrances( gDiabetes_use, DIAB_YES )		//EN Diabetes incidence
+		
+	}
+
+	*gDiabetes_Initial								//EN Initial diabetes state
+	*Imputed_Either									//EN Diabetes altered at case initialization
+	*	split( lifespan_age, AGE_GROUP18_5)+		//EN 5 year age-group
+	
+};
+
+
+// Diabetes project output tables
+
+
+
+
+//Table 1 Age and sex groups
+
+table Person tRiskFactorDiabAgeSex					//EN Diabetes risk factor Table 1 age and sex
+	[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) ]
+{
+	sex+											//EN Sex
+	*											
+	
+	{
+		unit,										//EN Persons alive
+		duration(),									//EN Person-years alive	decimals=1 duration()
+		weighted_duration(lifespan_age)/duration(), //EN Average age
+        nz_delta(duration())					    //EN Population Count	
+		
+	}
+
+	* report_calendar_year							//EN Year
+	*	split( lifespan_age, AGE_GROUP3080)+		//EN Age group							
+};
+
+//Table 1 Risk factors
+
+table Person tRiskFactorDiab														//EN Diabetes risk factors Table 1
+	[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) ]
+{
+												
+	
+	{
+		unit,																		//EN Persons alive
+		duration(),																	//EN Person-years alive	decimals=1
+        nz_delta(duration()),														//EN Population Count
+
+		nz_delta( duration( gImmigrantRecent, IMMIGRANT) )/ duration(),				//EN Proportion of immigrants decimals=2
+		nz_delta( duration( gEthnicityNonWhite, ETHNICITY_NONWHITE) )/ duration(), //EN Porportion nonwhite decimals=2
+		nz_delta( duration( gSmoker, cREGULAR_SMOKER) ) / duration(),				//EN Proportion of current smokers decimals=2
+		nz_delta( duration(gEducation, EDUC4)) /duration()							//EN Proportion post-secondary grad bachelor or higher decimals=2
+
+
+	}
+	* report_calendar_year															//EN Year	
+	*	split( lifespan_age, AGE_GROUP_RF20_79)+										//EN Age group							
+};
+
+table Person tRiskFactorBMI										//EN Diabetes risk factors Table 1 BMI
+	[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) ]
+{
+												
+	
+	{
+		unit,													//EN Persons alive
+		duration(),												//EN Person-years alive	decimals=1
+        nz_delta(duration()),									//EN Population Count
+
+		weighted_duration(gBMI_PHAC)/duration(),				//EN Average BMI
+		nz_delta( duration(bmi_PHAC, BMI_CAT_1) ) / duration(),	//EN BMI self-reported <18.5 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_2) ) / duration(),	//EN BMI self-reported 18.5 to <25 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_3) ) / duration(),	//EN BMI self-reported 25 to <30 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_4) ) / duration()	//EN BMI self-reported >=30 decimals=4 
+	  
+	}
+	
+	* report_calendar_year										//EN Year			
+	*	split( lifespan_age, AGE_GROUP_RF20_79)+					//EN Age group								
+};
+
+// Diabetes incidence and prevalence by age for standardization
+
+table Person tDiseaseEventsDiab										//EN Diabetes by sex, province, age and year
+	[in_tabulation_scope &&  report_calendar_year == calendar_year ]
+{
+	sex+															//EN Sex
+	*
+	gProvince+														//EN Province
+	*
+	{
+		unit,														//EN Persons alive
+		duration(),													//EN Person-years alive decimals=1
+        nz_delta(duration()),										//EN Population Count
+		entrances( gDiabetes_use, DIAB_YES ),						//EN Diabetes incidence
+		nz_delta( duration( gDiabetes_use, DIAB_YES) ),				//EN Diabetes Prevalence counts
+		duration( gDiabetes_use, DIAB_YES) /duration(),				//EN Diabetes Prevalence proportion  decimals=4
+		duration( gHeartDisease_PA, HEART_DISEASE_YES) /duration()	//EN HD proportion  decimals=4
+	}
+	* report_calendar_year											//EN Year  
+	*	split( lifespan_age, FROM_55)+					//EN Age		
+};
+
+// Diabetes cases by BMI and age for standardization
+
+table Person tDbBMI												//EN BMI distribution
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && gDiabetes_use==DIAB_YES ]
+{
+	sex+ *														//EN Sex
+	{
+		nz_delta( duration(bmi_PHAC, BMI_CAT_1) ) / duration(),	//EN BMI self-reported <18.5 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_2) ) / duration(),	//EN BMI self-reported 18.5 to <25 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_3) ) / duration(),	//EN BMI self-reported 25 to <30 decimals=4
+		nz_delta( duration(bmi_PHAC, BMI_CAT_4) ) / duration(),	//EN BMI self-reported >=30 decimals=4 
+	    duration()												//EN Total count of persons
+	}
+	*	report_calendar_year 									//EN Year
+	*	split( lifespan_age, AGE_GROUP_RF20_79)+					//EN Age group
+	
+};
+
+
+// Diabetes cases by education and age for standardization
+
+table Person tDbEDU												//EN EDU distribution
+[in_tabulation_scope &&  WITHIN(REPORT_YEAR, year) && gDiabetes_use==DIAB_YES ]
+{
+	sex+ *														//EN Sex
+	{
+		nz_delta(duration(gEducation, EDUC1) )/duration(),		//EN Proportion education less than highschool decimals=2
+		nz_delta(duration(gEducation, EDUC2) )/duration(),		//EN Proportion education secondary grad but no post-sec. decimals=2
+		nz_delta(duration(gEducation, EDUC3) )/duration(),		//EN Proportion other post-secondary but less than bachelor decimals=2
+		nz_delta(duration(gEducation, EDUC4) )/duration(),		//EN Proportion post-secondary grad bachelor or higher decimals=2
+		duration()												//EN Total count of persons
+	}
+	*	report_calendar_year 									//EN Year
+	*	split( lifespan_age, AGE_GROUP18_5)+					//EN Age group
+	
+};
+
+table Person  tDB_SEP											//EN Diabetes prevalence by SEP 
+  [in_tabulation_scope &&  WITHIN(REPORT_YEAR, year)]
+{
+	sex+														//EN Sex
+	*
+	split( lifespan_age, AGE_GROUP18_5)+						//EN Age (current)
+	*
+	gEducation+													//EN Self-reported education
+	*
+	{
+	
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),			//EN Diabetes (prevalence)nz_delta( duration( gDiabetes_use, DIAB_YES)) from Claude
+	  duration(),												//EN Total count of persons (duration)
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) )/duration() //EN Prevalence proportion
+	}
+	*	report_calendar_year 									//EN Year
+};
+
+table Person  tDB_BMI									//EN Diabetes prevalence by BMI 
+  [in_tabulation_scope &&  WITHIN(REPORT_YEAR, year)]
+{
+	sex+												//EN Sex
+	*
+	split( lifespan_age, AGE_GROUP_RF20_79)+				//EN Age (current)
+	*
+	bmi_PHAC +											//EN Self-reported BMI
+	*
+	{
+	  nz_delta( duration( gDiabetes_use, DIAB_YES) ),	//EN Diabetes (prevalence)nz_delta( duration ( gDiabetes_use, DIAB_YES)) from Claude
+	  duration()										//EN total count of persons (duration)
+	}
+	*	report_calendar_year							//EN Year	
+};

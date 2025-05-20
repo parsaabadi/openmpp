@@ -1,0 +1,136 @@
+parameters {
+	logical	BmiFeedBack = TRUE; //EN BmiFeedBack
+	BMI_MODEL	BmiModelUserChoice = BMI_MODEL3; //EN BMI model choice
+	double	sigma_multiplier = 1.0; //EN Multiplier used to modify spread of error term (usually 0 or 1)
+	int	max_auto_regressive_order = 4; //EN Order of auto-regressive model used by default
+
+	 //EN BuiltInBmiAlterationSpecs
+	double	BuiltInBmiAlterationSpecs[SEX][FROM_25_TO_80_BY_5][BMI_BUILT_IN_ALTERATION_SPECS] = {
+		// FEMALE
+		(3) {
+			2002, 2020, 25.0, 30, 0, 1.015, (2) 0, 9999, 0, 
+		},
+		(3) {
+			2002, 2020, 18.5, 9999, 0, 0.99, (2) 0, 9999, 0, 
+		},
+		(3) {
+			(6) 9999, (2) 0, 9999, 0, 
+		},
+		(3) {
+			2010, 2020, 18.5, 9999, 0, 0.99, (2) 0, 9999, 0, 
+		},
+		(6) 9999, (2) 0, 9999, 0, 
+		// MALE
+		(3) {
+			2002, 2020, 25, 28, 0, 0.99, (2) 0, 9999, 0, 
+		},
+		(3) {
+			(6) 9999, (2) 0, 9999, 0, 
+		},
+		(6) {
+			2002, 2020, 30, 9999, 0, 0.995, (2) 0, 9999, 0, 
+		},
+		(6) 9999, (2) 0, 9999, 0, 
+	};
+
+	
+
+/* NOTE ( pBmiCompoundChange, EN )
+
+*/
+	 //EN Compound change in BMI
+	double	pBmiCompoundChange[BMI_COMPOUND_CHANGE_PARAMETER] = {
+		(5) 0, 
+	};
+
+	 //EN Intercept in the calendar time BMI adjustment
+	double	BMI_TimeTravel_Intercept[SEX] = {
+		-0.0073934297, 0.0026340914, 
+	};
+
+	 //EN Slope in the calendar time BMI adjustment
+	double	BMI_TimeTravel_Slope[SEX] = {
+		0.0030843734, -0.0003233826, 
+	};
+
+	 //EN Scope of the calendar time BMI adjustment
+	int	BMI_TimeTravel_Scope[cLOWER_UPPER_BOUNDS] = {
+		2001, 1999, 
+	};
+
+	 //EN Elasticity of BMI with respect to risk factors
+	double	pBMI_ELASTICITY[SEX][BMI_INTERVENTION_FACTOR] = {
+		(2) {
+			(5) 0.0, 
+		},
+	};
+
+	 //EN Change in risk factors impacting BMI
+	double	pBMI_INTERVENTION[SEX][BMI_INTERVENTION_FACTOR][BMI_INTERVENTION_SWITCH] = {
+		// FEMALE
+		0.2, 0.0, 999, 2012, 2020, 
+		(3) {
+			0.0, 999, (3) 0.0, 
+		},
+		-0.1, 2, 14, 2012, 9999, 
+		// MALE
+		(5) {
+			(5) 0.0, 
+		},
+	};
+	double	PivotMultiplier = 1.0; //EN Multiplicative factor applied to lifelong error term in the conversion from self-reported to measured BMI
+
+	 //EN BMI coefficients for the conversion to measured BMI (variance part)
+	double	BMI_MeasuredReportedPivotVariance_BMI[SEX] = {
+		0.09030, 0.03745, 
+	};
+
+	 //EN education category coefficients for the conversion to measured BMI (variance part)
+	double	BMI_MeasuredReportedPivotVariance_Education[SEX][EDUCATION_NA] = {
+		-0.82187, -1.40475, -1.35261, -1.38960, -0.83874, 
+		0.12226, -0.22673, 0.46694, -0.02293, 0.20556, 
+	};
+
+	 //EN BMI coefficients for the conversion to measured BMI (mean part)
+	double	BMI_MeasuredReportedPivotMean_BMI[SEX] = {
+		1.080042393, 1.038161638, 
+	};
+
+	 //EN education category coefficients for the conversion to measured BMI (mean part)
+	double	BMI_MeasuredReportedPivotMean_Education[SEX][EDUCATION_NA] = {
+		-0.016311830, -0.662434057, -0.533661676, -0.357694392, -0.232505973, 
+		0.569455138, 0.616085124, 0.644963290, 0.778688209, 0.627148626, 
+	};
+
+	 //EN age category coefficients for the conversion to measured BMI (mean part)
+	double	BMI_MeasuredReportedPivotMean_AGE[SEX][FROM_25_TO_75_BY_10] = {
+		-0.756560747, -0.544846727, -0.482709632, -0.234475637, -0.176487544, -0.024323130, 0.0, 
+		-0.634864789, -0.303626151, -0.538285822, -0.370024003, 0.067215172, 0.475672127, 0.0, 
+	};
+
+	 //EN BMI category coefficients for the conversion to measured BMI (mean part)
+	double	BMI_MeasuredReportedPivotMean_BMIcat[SEX][BMI_STATE_NA] = {
+		0.174296126, -0.097212881, -0.203233987, -0.142070189, 0.0, 
+		0.276726881, -0.638671608, -0.322039545, -0.608809726, 0.0, 
+	};
+
+	// START of migration Base(BMImodel1_12FEB09_13h09_right_no_income).dat
+
+	//EN Mean adjustment from self-reported to measured BMI
+	double	pMeanDiffBMIm_sr[SEX][BMI_INDEX][AGE_BMI_GROUP3075] = {
+		// FEMALE
+		(5) 0.9860005991, 
+		1.0068676621, 1.0127376168, 1.0053630823, 1.017127919, 1.0099370317, 
+		1.0104518902, 0.9954324907, 1.0064824478, 1.0035361094, 1.0047473148, 
+		(2) 1.0413462757, 1.0397954435, (2) 1.0273930032, 
+		// MALE
+		(5) 1.0118709173, 
+		0.9914918966, 1.0047216962, 1.0074955289, 0.9862212257, 0.9658702107, 
+		0.9981251168, 1.0094115626, 0.9999366647, 1.0049911789, 1.0063583943, 
+		(2) 1.0085263097, 1.0160159476, (2) 1.0230169409, 
+	};
+
+	// END of migration Base(BMImodel1_12FEB09_13h09_right_no_income).dat
+
+};
+

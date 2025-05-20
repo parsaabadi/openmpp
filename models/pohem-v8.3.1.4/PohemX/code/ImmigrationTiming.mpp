@@ -1,0 +1,111 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Immigration timing
+/* FILE_NOTE(EN) 
+	This file set the time of immigration for immigrants.
+*/
+
+// use of immigration status not clearly defined
+classification IMMIGRATION_STATUS { //EN Immigration status
+	NON_IMMIGRANT,	//EN Non-immigrant
+	IMMIGRANT		//EN Immigrant
+};
+
+range FROM_1900_TO_2001  {1900 , 2001};  //EN Years
+
+parameter_group pgImmigrationTiming { // Immigration timing
+ImmigrationTimingAge,
+ImmigrationTimingYear,
+ImmigrationTimingInteractionYearAge
+};
+
+parameters {
+	double ImmigrationTimingAge               [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] ; //EN Distribution of immigration year: age linear splines coefficients
+	double ImmigrationTimingYear              [SEX][CUBIC_SPLINE_KNOTS_LOCATION_COEFFICIENT][CUBIC_SPLINE_KNOTS_INDEX] ; //EN Distribution of immigration year: year linear splines coefficients
+	double ImmigrationTimingInteractionYearAge[SEX][CUBIC_SPLINE_KNOTS_INDEX               ][CUBIC_SPLINE_KNOTS_INDEX] ; //EN Distribution of immigration year: Year x Age linear splines interaction coefficients
+
+};
+
+actor Person            // Core Individual
+{
+	IMMIGRATION_STATUS	gImmigrantRecent;				//EN Self-reported Recent immigrant (last 9 years)
+	IMMIGRATION_STATUS	gImmigrantEver;		//EN Self-reported Immigrant (ever)
+
+	int    age_immigration = {TIME_INFINITE};              //EN Age at immigration
+	int    time_since_immigration = gImmigrantEver ? lifespan_age - age_immigration : int(TIME_INFINITE);
+	double proportion_in_canada   = gImmigrantEver ? 1.0 - age_immigration/double(lifespan_age) : 1.0;
+
+	int   GetYearOfImmigrationForActorStartedIn2001();
+	void  ReadFromStartPopImmig();
+
+	hook  ReadFromStartPopImmig,ReadFromStartPop, 5; // 5 = execution number, the higher the value, the later the execution
+};
+
+void  Person::ReadFromStartPopImmig()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+
+	const double *record_to_be_read;
+	record_to_be_read = FictivePersonCharacteristics[ROW_1][cDb_Weight] < 0.0 ? pStartPop[cchs_record] : FictivePersonCharacteristics[ROW_1] ;
+
+	gImmigrantEver       = ForceInitialisationToNonImmigrant[population_source] ? (IMMIGRATION_STATUS)NON_IMMIGRANT : ( IMMIGRATION_STATUS    ) int(record_to_be_read[cDb_ImmigrantEver]);
+	gImmigrantRecent     = ForceInitialisationToNonImmigrant[population_source] ? (IMMIGRATION_STATUS)NON_IMMIGRANT : ( IMMIGRATION_STATUS    ) int(record_to_be_read[cDb_Immig]);
+
+	if(gImmigrantEver == IMMIGRANT)
+	{
+		if(population_source == cNewImmig)
+			age_immigration = lifespan_age ;
+		else
+			age_immigration = lifespan_age + (GetYearOfImmigrationForActorStartedIn2001() - 2001) ;
+
+		/*
+		char line[199];
+		snprintf(line,199,"%i, %15.1f,  %i, %i, %i, %i, %i, %i \n",(int)case_id, (double)case_seed, population_source, sex,gImmigrantRecent, lifespan_age, age_immigration , year);               
+		WriteDebugLogEntry(line);
+		*/
+	}
+
+};
+
+
+int Person::GetYearOfImmigrationForActorStartedIn2001()
+{
+	//This function is called for entries through 2001 door or new birth door for actors that are immigrants
+	//The function calculates the year of immigration as if actor entered through the 2001 door
+	int earliest_immigration_year = gImmigrantRecent == IMMIGRANT ? 2001 - 9 : 2001-lifespan_age; // implicitely assume that lifespan_age > 9 at the time actor is created
+	int   latest_immigration_year = gImmigrantRecent == IMMIGRANT ? 2001     : 2001-10          ; // implicitely assume that lifespan_age > 9 at the time actor is created
+	logical possible_immigration_year_exists = FALSE; // check if there is at least one year where immigration is possible
+
+	double prob[SIZE(FROM_1900_TO_2001)];
+	
+	for(int year_looper=MIN(FROM_1900_TO_2001); year_looper<=MAX(FROM_1900_TO_2001); year_looper++)
+	{
+		int index_pos=RANGE_POS(FROM_1900_TO_2001,year_looper);
+		prob[index_pos] = 0.0;
+
+		if(earliest_immigration_year <= year_looper && year_looper <=  latest_immigration_year )
+		{
+			//Compute Prob(Year immig = year_looper | lifespan_age, sex )
+			double year_knot, age_knot;
+			for(int year_spline_looper=0; year_knot=ImmigrationTimingYear[sex][CUBIC_SPLINE_KNOTS_LOCATION][year_spline_looper] , year_knot>=0.0 && year_spline_looper<SIZE(CUBIC_SPLINE_KNOTS_INDEX) ;year_spline_looper++)
+				prob[index_pos] +=  max(0,year_looper-year_knot) * ImmigrationTimingYear[sex][CUBIC_SPLINE_KNOTS_COEFFICIENT][year_spline_looper] ;
+
+			for(int year_spline_looper=0;   year_knot=ImmigrationTimingYear[sex][CUBIC_SPLINE_KNOTS_LOCATION][year_spline_looper] , year_knot>=0.0 && year_spline_looper<SIZE(CUBIC_SPLINE_KNOTS_INDEX);year_spline_looper++)
+				for(int age_spline_looper=0; age_knot=ImmigrationTimingAge [sex][CUBIC_SPLINE_KNOTS_LOCATION][ age_spline_looper] ,  age_knot>=0.0 &&  age_spline_looper<SIZE(CUBIC_SPLINE_KNOTS_INDEX); age_spline_looper++)
+					prob[index_pos] +=  max(0,year_looper-year_knot)*max(0,lifespan_age-age_knot) * ImmigrationTimingInteractionYearAge[sex][year_spline_looper][age_spline_looper]  ;
+			
+			if(prob[index_pos] < mgLOG_DBL_MAX )
+				prob[index_pos] = exp( prob[index_pos] );
+			else
+				ModelExit("Overflow in function GetYearOfImmigrationForActorStartedIn2001.");
+
+			possible_immigration_year_exists = TRUE;
+		}
+	}
+	
+
+	if(!possible_immigration_year_exists)
+		ModelExit("\n No possible year of immigration was found.");
+
+	return MIN(FROM_1900_TO_2001) + pps_sampling(RandUniform(7), prob, SIZE(FROM_1900_TO_2001));
+};

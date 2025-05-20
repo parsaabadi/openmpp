@@ -1,0 +1,203 @@
+/*
+***************************************************************************************************************
+READ BEFORE PORTING THE SMOKING CODE FROM CRMM IF IT IS EVER RE-PORTED / UPDATED
+****************************************************************************************************************
+The reason for creating this "plus" file 
+is to leave the code from CRMM in Smoking_crm.mpp as untouched as possible. This facilitates easier updating (re-porting)
+should the module be updated in CRMM in future.
+
+This code is meant to "complete" the code ported from CRM for smoking. 
+"Completing" means declaring other parameters and variables used by this module but were found in other MPPs in CRMM.
+"Completing" also means initialzing certain of the smoking variables with information from StartPop (CCHS).
+
+****************************************************************************************************************
+Code in Smoking_crm.mpp is a copy of CRMM module called Smoking.mpp renamed here with some changes.
+
+Due to conflicts in the classifications EDUCATION and PROVINCE i.e., same classification name but different number of elements,
+the CRMM classification was renamed to CRM_EDUCATION and CRM_PROVINCE. This is a manual step performed in Smoking_crm.mpp
+
+	PROVINCE -> CRM_PROVINCE
+	EDUCATION-> CRM_EDUCATION
+The file LABEL and NOTE changed to
+	Smoking -> Smoking_CRM
+Plus other touch-ups.
+****************************************************************************************************************
+*/
+
+#include "pohem.h"
+
+// Not sure that smoking state 3 belongs in here but since it was in previous version of Smoking_crm.mpp, I have simply extracted it out here. 
+
+classification SMOKING_STATE3 {  //EN Smoking State (3)
+	SMOKING_STATE3_NEVER,			//EN Never Smoker
+	SMOKING_STATE3_FORMER,			//EN Former Smoker
+	SMOKING_STATE3_CURRENT			//EN Current Smoker
+};
+aggregation SMOKING_STATE3, SMOKING_STATE4
+{
+	SMOKING_STATE3_NEVER,   SMOKER_NUL,	
+	SMOKING_STATE3_NEVER,   NEVER_smoker,	
+	SMOKING_STATE3_CURRENT, LIGHT_smoker,	
+	SMOKING_STATE3_CURRENT, HEAVY_smoker,	
+	SMOKING_STATE3_FORMER,  FORMER_smoker	
+};
+
+actor Person            // Core Individual
+{
+	SMOKING_STATE3  smoking_status3	=	aggregate(smoking_status4, SMOKING_STATE3);			//EN Smoking status
+	int	years_since_quit_smoking = {0};														//EN Years since quit smoking
+	logical ever_was_heavy_smoker_in_pohem    = undergone_entrance(smoking_status4 , HEAVY_smoker);                    //EN Ever was heavy smoker in the course of simulation
+	logical ever_was_light_smoker_in_pohem    = undergone_entrance(smoking_status4 , LIGHT_smoker);                    //EN Ever was light smoker in the course of simulation
+	logical ever_was_smoker_in_pohem          = ever_was_light_smoker_in_pohem || ever_was_heavy_smoker_in_pohem    ;  //EN Ever was       smoker in the course of simulation
+	logical ever_was_heavy_smoker             = ever_was_heavy_smoker_in_pohem || ever_was_heavy_smoker_before_pohem;  //EN Ever was heavy smoker in life
+	int     former_smoker_spell_in_pohem      = duration_counter(smoking_status4,FORMER_smoker,1);    
+	int     time_since_quit_smoking_before_pohem = {0};
+	int     time_since_quit_smoking          = smoking_status4 != FORMER_smoker ? 0 
+		                                      : ( former_smoker_spell_in_pohem + time_since_quit_smoking_before_pohem * (ever_was_smoker_in_pohem ? 0 : 1))  ; //EN time since quit smoking
+};
+
+parameters {
+	//EN Lag years between smoking exposure and increased risk of lung cancer
+	int LungCancerSmokingLagPeriod[SEX];
+};
+
+
+actor Person            // Core Individual
+{
+	void	Smoking_CRM_Initialize();					//EN Initialize smoking variables
+	hook	Smoking_CRM_Initialize, SmokingInitialize;	
+};
+
+void hook_Smoking_CRM_Initialize() {};
+
+void Person::Smoking_CRM_Initialize()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+// Note that smoking_status has been defined using the regular smoker classification, not the "current" smoker classification.
+
+	if ( gSmokingRegular == cNOT_REGULAR_SMOKER ) // cchs
+	{
+		smoking_status=NON_SMOKER; 
+		daily_smoker=FALSE;
+	}
+	else if ( gSmokingRegular == cREGULAR_SMOKER ) // cchs 
+	{
+		double propLS=
+			SmokingMarginalProbs[SMOKING_1999_2004][sex][province][LIGHT_SMOKER]
+			/( SmokingMarginalProbs[SMOKING_1999_2004][sex][province][LIGHT_SMOKER]
+				+ SmokingMarginalProbs[SMOKING_1999_2004][sex][province][HEAVY_SMOKER] );
+				
+		if ( RandUniform(32) < propLS ) 
+		{
+			smoking_status=LIGHT_SMOKER;
+		} 
+		else {
+			smoking_status=HEAVY_SMOKER;
+		} 
+		daily_smoker=TRUE;
+	}
+
+	// new code to initialize smoking_status4 which in turn initializes smoking_status3 and will be consistent with gSmokingCurrent by construction
+	if ( gSmokingCurrent == SMOKING_STATE3_NEVER)
+	{
+		smoking_status4 = NEVER_smoker;
+	}
+	else if ( gSmokingCurrent== SMOKING_STATE3_FORMER)
+	{
+		smoking_status4 = FORMER_smoker;
+	}
+	else if ( gSmokingCurrent == SMOKING_STATE3_CURRENT)
+	{
+		if ( smoking_status==LIGHT_SMOKER) 
+		{
+			smoking_status4 = LIGHT_smoker;
+		} 
+		else 
+		{
+			smoking_status4 = HEAVY_smoker;
+		} 
+	}
+	// ===========================
+	// Initialize other variables like packs_smoked_per_year and packyears_smoked_thisyear, amongst others, required to have proper updating of 
+	// total_packs_smoked  and total_packyears_smoked in subsequent years until next change in age group (when it is updated by existing code) 
+	// ===========================
+	UpdateSmokingStatus( int(smoking_status) ); 
+
+	// ===========================
+	// Update Smoking History directly from StartPop pack-years (do not call the function which 
+	// Initialize pack and pack-years using the values read from StartPop (CCHS)
+	// Note that 1 pack-year is the equivalent of 365 packs in a one-year period
+	// ===========================
+	total_packs_smoked += gSmokePackyears * 365.0;
+	total_packyears_smoked += gSmokePackyears;
+
+/*
+========================================================================================
+ADDITIONAL INITIALIZATION IS REQUIRED TO MAKE THE Smoking_CRM.mpp code fully available; POHEM doesn't use them for now but for completeness should be done
+========================================================================================
+CODE BELOW THIS POINT IS EXPERMENTAL AND NOT TO BE TRUSTED - LEFT HERE TO PICK UP TRAIL LATER. WMF 2016-06-07
+========================================================================================
+	// Update other smoking variables 
+	// Note: there is redundancy with the assignments just made above, but easiest way to update the other variables
+	UpdateSmokingStatus( int(smoking_status) );
+
+	//NOTE THE packs_smoked[] ARRAY IS NOT BEING INITIALIZED PROPERLY GIVEN THAT POHEM STARTS WITH SMOKING HISTORY - 
+	// NEED TO RETHINK WHAT VARIABLES OR MODEL WE WANT FROM CCHS TO POPULATE THIS
+	 WMF 2016-06-07	CRUDE SOLUTION / THINKING
+	if we have pack-years from StartPop (CCHS), we should use it to initialize this parameter too, 
+	in the event we every wish to use cum lagged pack-years for lung cancer risk (other conditions with lagged effect of smoking
+	this cannot be done perfectly from a single pack-year value because ideally we have the cumulative pack-years over a 10 or 20 lagged period.
+	ideally, we would bring in more information from CCHS if we cared a great deal, but since we have no immediate application within POHEM
+	we can do something appoximate: evenly distribute the pack-years over a period of years, say over the years between current age and age 20, 
+	up to a maxium of lagged years; if the age is wider than the lagged years cumulative the tail in the lagged index
+		
+	Example 1: 
+	- a person aged 60 with a total of 40 pack-years. 
+	- assuming person started at age 20, leads us to an average of 1 pack-year per year. 
+	- if the lag parameter is set to 10 years then the lage index position is 10 and we would assign 30 pack-years to it (the cumulative pack-years up to 10 years ago)
+	- the index positions 9, 8, ..., 0 would have pack-years of 31, 32, 33, ... 40 respectively.
+
+	Example 2: 
+	- a person aged 25 with a total of 5 pack-years
+	- assuming person started at age 20, leads us to an average of 1 pack-year per year. 
+	- if the lag parameter is set to 10 years then the lage index position is 10 and we would assign 0 pack-years to it (the cumulative pack-years up to 10 years ago)
+	- the index positions 9, 8, ..., 4, 3, 2, 1, 0 would have pack-years of 0, 0, 0, 0, 0, 1, 2, 3, 4, 5 respectively.
+	
+	This will be less than perfect in many ways, for instance, if the person is now a former smoker, and other rules could be applied. But let's do something, even if
+	not everything
+
+WARNING: THIS CODE BIT IS NOT NEEDED AT THIS POINT AND IS CURRENTLY WRONG -- NEED TO REVIEW WITH HOW DONE IN CRMM -- MAINLY NOT CUMULATIVE, PACKS PER YEAR, OTHER VARIABLES TO INITIALIZE TOO
+	int		years_since_quit_smoking	= {0};
+	int		nMaxLagYears				= SIZE(SMOKE_LAG_YEARS)-1;
+	int		nLagYears					= LungCancerSmokingLagPeriod[sex];
+	int		nLagIndex					= COERCE( SMOKE_LAG_YEARS, nMaxLagYears - nLagYears );
+	int		nYoungestAge				= int( mgYoungestAge );			// Youngest age was determined directly from the StartPop (rather than hardcoding here is age 20), +1 so non-zero
+	int		nYears_smoker				= integer_age - nYoungestAge + 1; 
+	int		nLagYearsIndexMin			= nMaxLagYears - min(nYears_smoker, nLagYears);
+	double	dPacks, dPacksperYear;
+
+	//	int		nCum_years_at_lag			= nYears_smoker - nLagYears;	// in example 1, this is (60-20) - 10 = 40-10 = 30.
+//	double	dCum_packyears_at_lag		= dAvgPackYearsperYear * double( nCum_years_at_lag );
+	
+	dPacks = total_packs_smoked;
+	if ( nYears_smoker > 0 ) {
+		dPacksperYear = dPacks / double( nYears_smoker );
+	}
+	else {
+		dPacksperYear = dPacks;
+	};
+
+	for	(int i=nMaxLagYears; i >=nLagYearsIndexMin; i--) 
+	{
+		packs_smoked[i] = (float) dPacks ;
+		dPacks -= dPacksperYear;	// cumulates to current age, year by year
+
+	}
+========================================================================================
+END OF EXPERIMENTAL CODE
+========================================================================================
+*/ 
+
+
+	hook_Smoking_CRM_Initialize();
+};

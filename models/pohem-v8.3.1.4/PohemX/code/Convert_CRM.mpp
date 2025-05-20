@@ -1,0 +1,127 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) Convert
+/* FILE_NOTE(EN) 
+	Converts variables used in smoking
+*/
+
+classification CHOICE_SMK
+{ 
+	CRMM_SMOKING_MODULE,	//EN Linear interpolation from cross-sectional data
+	NPHS_SMOKING_MODULE		//EN Markov chain model from longitudinal data
+};
+classification  CRM_EDUCATION {	//EN Education
+	EDUC_NO_HS,	    //EN No high school diploma
+	EDUC_HS_COLL,    //EN High school diploma or post-secondary less than a Bachelor's degree
+    EDUC_UNIVERSITY   //EN University degree, bachelor or above
+};
+classification CRM_PROVINCE {        //EN Province
+	NL,			//EN Newfoundland and Labrador
+	PE,         //EN Prince Edward Island
+	NS,         //EN Nova Scotia
+	NB,         //EN New Brunswick
+	QC,			//EN Quebec
+	ON,			//EN Ontario
+	MB,			//EN Manitoba
+	SK,			//EN Saskatchewan
+	AB,			//EN Alberta
+	BC,         //EN British Columbia
+	YK,			//EN Yukon
+	NT          //EN North West Territories and Nunavut
+};
+
+
+
+parameter_group TG01_Smoking_Parameters { //EN Smoking
+	smoking_module_choice,
+	TimeSinceQuitDistribution,
+	TG02_CRMM_Smoking_Parameters,
+	TG03_NPHS_Smoking_Parameters
+};
+parameter_group TG02_CRMM_Smoking_Parameters { //EN Smoking CRMM module
+	Smoking_Parameters
+};
+parameter_group TG03_NPHS_Smoking_Parameters { //EN Smoking NPHS module
+	SmokTrans
+};
+parameter_group TG04_Special_Tabulation_Parameters { //EN Special Tabulation Parameters 
+	ReportYear
+};
+
+
+parameters {
+	/* NOTE ( smoking_module_choice, EN )
+	This parameter allows the user to choose between two models of change in smoking:
+	>1. Smoking modeled by linear interpolation of cross-sectional data (CHS 1979, NPHS 1994, CCHS 2008)
+	>2. Smoking modeled as Markov chain from longitudinal data (NPHS 1994-2004)
+	*/
+	//EN Smoking model choice
+	CHOICE_SMK smoking_module_choice;
+
+	
+	//EN Year to report in single year tables (ReportYear)
+	int	ReportYear;
+
+};
+
+actor Person            // Core Individual
+{
+
+	CRM_EDUCATION eventual_education;
+
+	CRM_PROVINCE province = CRM_PROVINCE( gProvince ); //EN Province
+
+	SMOKER1 gSmoker = (smoking_module_choice == NPHS_SMOKING_MODULE ) //EN Smoker regular (or not)
+						? gSmoking_NPHS
+						: ( smoking_status==NON_SMOKER ) 
+							? cNOT_REGULAR_SMOKER 
+							: cREGULAR_SMOKER; 
+
+
+	logical resident = {TRUE};
+	LIFE	integer_age = truncated_age; 
+	YEARS	year=calendar_year; 
+	void	Conversion();					
+	hook	Conversion, InitializationEmptyHub, 30; // 30 = execution number, the higher the value, the later the execution
+}; 
+ 
+void hook_Conversion() {};
+
+void Person::Conversion()
+{
+	 //MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	/*
+	if (gProvince==NFLD) { province=NL; }
+	else if (gProvince==PEI) { province=PE; }
+	else if (gProvince==N_S) { province=NS; }
+	else if (gProvince==N_B) { province=NB; }
+	else if (gProvince==QUE) { province=QC; }
+	else if (gProvince==ONT) { province=ON; }
+	else if (gProvince==MAN) { province=MB; }
+	else if (gProvince==SASK) { province=SK; }
+	else if (gProvince==ALTA) { province=AB; }
+	else if (gProvince==B_C) { province=BC; };
+*/
+
+// ***************************************************************************************************************
+// Note: the smoking initialization code was moved to new mpp called Smoking_crm_plus.mpp since it was about initialzing the variables 
+// inherited with the CRM code
+// ***************************************************************************************************************
+
+	// Note that the smoking_crm module doesn't really work with the education dimension so the parameter 
+	// containing the relative risk of smoking by education level should not be used.
+	if ( gEducation==EDUC1 )
+	{
+		eventual_education=EDUC_NO_HS;
+	}
+	else if ( gEducation==EDUC2 || gEducation==EDUC3 ) 
+	{ 
+		eventual_education=EDUC_HS_COLL;
+	}
+	else if ( gEducation==EDUC4 ) 
+	{
+		eventual_education=EDUC_UNIVERSITY;
+	};
+
+	hook_Conversion();
+};

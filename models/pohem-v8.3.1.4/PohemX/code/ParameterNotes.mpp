@@ -1,0 +1,4382 @@
+hide(UselessParameterEmptyShellToDumpParameterNotes);
+parameters{
+
+
+		logical	UselessParameterEmptyShellToDumpParameterNotes; //EN The only raison d'etre of this note is that modgen does not like empty parameters statements
+
+
+
+	/* DUMP real parameter notes below
+   1. remove  >?
+   2. replace >"tab   (that is >"	) by >*
+   3. replace symbol for le by <=
+   4. replace symbol for ne by !=
+   5. replace bullet by *
+
+	   */
+
+	   //icitte see parameter "..." rather than see parameter pImmig
+
+
+  //==============================================
+
+/* NOTE (PaDispatcher, EN )
+>
+>PARAMETER	Physical activity dispatcher
+>LOCATION	Base(Physical_activity).dat
+>LAST UPDATE	January 2021
+>
+>DESCRIPTION	This parameter allows one to specify physical activity
+interventions that may depend on sex, age, calendar year and body mass index
+(BMI).
+>
+>DIMENSIONS
+>Characteristic of intervention program, Intervention program element
+>
+>
+>SOURCE
+>
+>DEFINITION
+>
+>METHODS	This parameter is consulted every two years in POHEM, provided that
+the parameter “Switch for physical activity intervention” is turned on.
+>The “consultation” of this parameter consists in picking up the first
+column/element that applies to the simulated person at a given time.  A column
+"applies" if all of the following conditions are met
+>*	sex: If the line “Sex (0=female, 1=male, 2=both)” contains 0, it means that
+the corresponding column is restricted to females; if it contains 1, it means
+that the corresponding column is restricted to males. If the line contains 2,
+it means that the corresponding column applies to males and females.
+>*	age  range: person is in the age range described by lines "Age start" and
+"Age end" (i.e. "Age start"<= age <= "Age end"). Note that age is integer.
+>*	time range: current calendar year is in the range described by lines "Year
+start" and "Year end" (i.e. "Year start"<= year <= "Year end"). Note that year is
+integer.
+>*	BMI  range: person is in the BMI range described by lines "BMI lower bound"
+and "BMI upper bound" (i.e. "BMI lower bound” <= BMI <= "BMI upper bound").
+>
+>If none of the columns applies, the person will not be subject to a physical
+activity intervention/alteration at this particular moment (time at which
+dispatcher is being consulted).  Otherwise, the selected column will lead to
+assigning the person to an intervention group (last line of the dispatcher).
+The eligible groups are 1, 2, 3, 4, or 5.  This intervention group will be used
+to grab the proper slice of the following four input parameters which will then
+carry out the desired physical activity alteration.
+>1.	transition matrix to implement intervention on leisure time physical
+activity
+>2.	transition matrix to implement intervention on usual day level of activity
+>3.	transition matrix to implement intervention on walking for errands
+>4.	transition matrix to implement intervention on biking for errands
+>
+>ASSUMPTIONS
+>
+>DECISIONS
+>
+>REFERENCES
+>
+>COMMENTS
+>
+>
+>*/
+
+  /* NOTE (MortHazard, EN )
+  >PARAMETER	Cohort mortality rates
+  >LOCATION	Base(MortalityDisease).dat
+  >LAST UPDATE	November 2014
+  >
+  >DESCRIPTION	This parameter is the baseline mortality hazard of the Canadian
+  population.
+  >DIMENSIONS
+  >[SEX][YEAR][LIFE_SPAN]
+  >
+  >
+  >SOURCE	The parameter was obtained from LifePaths 4.1, however the parameter
+  was ultimately derived from cohort life tables published in "New Birth Cohort
+  Life Tables for Canada and Quebec, 1801-1991" by Robert Bourbeau, Jacques
+  Legare and Valerie Emond, Statistics Canada Catalog 91F0015MPE. The published
+  abridged (5 year) life tables were the source of cumulative hazard estimates.
+  >
+  >Incomplete cohort life tables are projected using mortality assumptions from
+  the Statistics Canada Medium official population projections, obtained from the
+  demography Division, for the period 2000-2026.  Cohort life tables that are
+  still incomplete (i.e., in the period after 2026) have been extrapolated using
+  the average rate of mortality improvement - by sex - from the projection period
+  2000-2026.  Mortality remains fixed at the levels of the 2026 birth cohort for
+  all cohorts born after 2026.
+  >
+  >DEFINITION
+  >
+  >METHODS	The single year hazards were obtained by differencing single year
+  estimates of the cumulative hazards which, in turn, were obtained by clamped,
+  cubic-spline interpolation of the abridged cumulative hazards.
+  >
+  >ASSUMPTIONS	The assumptions from the Statistics Canada Medium population
+  projections change by projection period.
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >RELATED PARAMETERS	PeriodMortHazardLOW
+  >PeriodMortHazardMID
+  >PeriodMortHazardHIGH
+  >COMMENTS	This parameter can be updated in April 2015 when new mortality
+  hazards will be available from DYSEM (SAMD). Only medium term projections will
+  be available from 2011 onwards.
+  >
+  >
+  >
+  >
+  >
+  >
+  >
+  >
+  >
+  >*//* NOTE (PeriodMortHazardLOW, EN )
+  >
+  >PARAMETER	Period mortality rates update - Low life expectancy scenario
+  >LOCATION
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter represents the most recent observed mortality
+  (1972-2004) appended to the most recent projected period mortality (2005-2051)
+  corresponding to LOW life expectancy assumptions.  	These values are used to
+  update extrapolated cohort mortality rates (MortHazard) in PreSimulation.
+  >
+  >DIMENSIONS	[SEX][LIFE_SPAN][PERIOD_UPDATE]
+  >
+  >SOURCE	The parameter was obtained from LifePaths 4.1
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+  >*//* NOTE (PeriodMortHazardMID, EN )
+  >
+  >PARAMETER	Period mortality rates update - Medium life expectancy scenario
+  >LOCATION
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter represents the most recent observed mortality
+  (1972-2004) appended to the most recent projected period mortality (2005-2051)
+  corresponding to MEDIUM life expectancy assumptions.  These values are used to
+  update extrapolated cohort mortality rates (MortHazard) in PreSimulation.
+  >
+  >DIMENSIONS	[SEX][LIFE_SPAN][PERIOD_UPDATE]
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+  >*//* NOTE (PeriodMortHazardHIGH, EN )
+  >
+  >PARAMETER	Period mortality rates update - High life expectancy scenario
+  >LOCATION
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter represents the most recent observed mortality
+  (1972-2004) appended to the most recent projected period mortality (2005-2051)
+  corresponding to HIGH life expectancy assumptions. These values are used to
+  update extrapolated cohort mortality rates (MortHazard) in PreSimulation.
+  >
+  >DIMENSIONS	[SEX][LIFE_SPAN][PERIOD_UPDATE]
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+  >*//* NOTE (CauseOfDeath, EN )
+  >
+  >PARAMETER	Distribution of cause of death
+  >LOCATION
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter is used to assign a cause of death for diseases not
+  explicitly modeled.
+  >For diseases explicitly modeled which create their own case-fatality, their
+  proportion
+  >of mortality is subtracted from the lifetable mortality hazards based on the
+  contribution shown in this table
+  >
+  >DIMENSIONS	[SEX][COD_AGE_GROUP][DISEASES]
+  >
+  >
+  >SOURCE	Data Source: Vital Statistics, Death October 1999 (IRMA)
+  >These values copied from previous versions of POHEM with this comment.
+  >"colon=0, rectal=0 included in other cancer so that disease incidence can be
+  modelled without explicit mortality Cause of Death updated with EC, Colon &
+  Rectal Cancer from vital statistics October 1999
+  > J:\1991 Life Tables\[CauseOfDeath.v3000.xls]COD Distribution 909192m"
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	Related parameters: pStartYear, pLifetable, MortHazard
+  >
+  >*//* NOTE (pDiabetes_RR_Mortality, EN )
+  >
+  >PARAMETER	Diabetes mortality relative risk: non-spline coefficients
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE	Jan 2015
+  >
+  >DESCRIPTION	Coefficients for the non-spline portion of the diabetes relative
+  risk of mortality
+  >
+  >DIMENSIONS	[DIABETES_RECENCY][DIABETES_RR_MORTALITY]
+  >
+  >SOURCE	Data from the Ontario Diabetes Database (ODD) and Ontario Registered
+  Persons Database (RPD) available through ICES.
+  >
+  >DEFINITION	Diabetes recency is the number of years since becoming an incident
+  case. After 2 years, a diabetes case becomes remote.
+  >
+  >METHODS	Relative risk (RR) of all cause death in diabetics in Ontario compared
+  to non-diabetics was modeled. The RR is calculated by a function sex, age and
+  year and depends on diabetes recency as defined above.
+  >
+  >The model involved cubic splines with respect to age and year as well as
+  non-spline covariates which are found, respectively, in “Diabetes mortality
+  relative risk: age cubic spline coefficients”, “Diabetes mortality relative
+  risk: year cubic spline coefficients”, and “Diabetes mortality relative risk:
+  non-spline coefficients”. Note that the implementation of cubic splines also
+  requires parameters “Diabetes mortality relative risk: age cubic spline
+  companion” and “Diabetes mortality relative risk: year cubic spline companion”.
+  >
+  >If a person is diabetic, his/her hazard is elevated/altered as follows
+  >hazardDIABETIC / hazardNonDIABETIC  = b0 + b1 sex + b2 min(age,96)
+  >                                          +LT(age)+LT(year)
+  >                                          +CS(age)+CS(year)
+  >The parameter “Diabetes mortality relative risk: non-spline coefficients”
+  contains (b0, b1, b2) and are “diabetes recency” specific. In the above, age is
+  integer age, year is calendar year.  Below, any of those two is denoted by
+  time.  LT and CS described below are “diabetes recency” specific but this is
+  not reflected in notation to ease reading.
+  >
+  >LT(time) = coefficient * (coerced(time) – (A+B)C/2) where coerced(time) is
+  time restricted to be no less than A and no more than B, i.e.
+  coerce(time)=max(min(time,B),A). In the above, C is 1 or 0 so that
+  coerced(time) is centered (C=1) or not (C=0).  Note that centering applies to
+  LT(time) only, not to CS(time) discussed below.  The parameter “Diabetes
+  mortality relative risk: <time> cubic spline companion” contains A, B, C and
+  the coefficient.
+  >CS(time) = sum coefficient(k) * CS(coerced(time)/scale,k) with CS(time,k)
+  being the kth restricted cubic spline and coefficient(k) being the
+  corresponding coefficient. The scale is the range of knots (largest minus
+  smallest) raised to the power found in the aforementioned “companion”
+  parameter.  The sum is taken over the first K-2 knots where K is the total
+  number of knots provided. The parameter “Diabetes mortality relative risk:
+  <time> cubic spline coefficients” provides the location of the K knots
+  (location is assumed to be non-negative) and the coefficients whereas
+  coerced(time) is the same as what was explained in the description of LT(time)
+  above.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+  https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+  >
+  >COMMENTS
+  >
+  >
+  >*/
+
+  /* NOTE (DiabetesMortalityRelRiskAgeSplineLocationCoef, EN )
+  >
+  >PARAMETER	Diabetes mortality relative risk: age cubic spline coefficients
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE	Jan 2015
+  >
+  >DESCRIPTION	Coefficients for the age cubic spline portion of the diabetes
+  relative risk of mortality
+  >
+  >DIMENSIONS	Diabetes recency, Cubic spline location/coefficient, Knot index
+  >
+  >SOURCE	Data from the Ontario Diabetes Database (ODD) and Ontario Registered
+  Persons Database (RPD) available through ICES.
+  >
+  >DEFINITION	Diabetes recency is the number of years since becoming an incident
+  case. After 2 years a diabetes case becomes remote.
+  >
+  >METHODS	Relative risk (RR) of all cause death in diabetics in Ontario compared
+  to non-diabetics was modeled. The RR is calculated by a function sex, age and
+  year and depends on diabetes recency as defined above.
+  >The model involved cubic splines with respect to age and year as well as
+  non-spline covariates which are found, respectively, in "Diabetes mortality
+  relative risk: age cubic spline coefficients", "Diabetes mortality relative
+  risk: year cubic spline coefficients", "Diabetes mortality relative risk:
+  non-spline coefficients". Note that the implementation of cubic splines also
+  requires parameters "Diabetes mortality relative risk: age cubic spline
+  companion" and "Diabetes mortality relative risk: year cubic spline companion".
+  >
+  >If a person is diabetic, his/her hazard is elevated/altered as follows
+  >hazardDIABETIC / hazardNonDIABETIC  = b0 + b1 sex + b2 min(age,96)
+  >                                          +LT(age)+LT(year)
+  >                                          +CS(age)+CS(year)
+  >The parameter "Diabetes mortality relative risk: non-spline coefficients"
+  contains (b0, b1, b2) and are "diabetes recency" specific. In the above, age is
+  integer age, year is calendar year.  Below, any of those two is denoted by
+  time.  LT and CS described below are "diabetes recency" specific but this is
+  not reflected in notation to ease reading.
+  >
+  >LT(time) = coefficient * (coerced(time) - (A+B)C/2) where coerced(time) is
+  time restricted to be no less than A and no more than B, i.e.
+  coerce(time)=max(min(time,B),A). In the above, C is 1 or 0 so that
+  coerced(time) is centered (C=1) or not (C=0).  Note that centering applies to
+  LT(time) only, not to CS(time) discussed below.   The parameter "Diabetes
+  mortality relative risk: <time>  cubic spline companion" contains A, B, C and
+  the coefficient.
+  >CS(time) = sum coefficient(k) * CS(coerced(time)/scale,k) with CS(time,k)
+  being the kth restricted cubic spline and coefficient(k) being the
+  corresponding coefficient. The scale is the range of knots (largest minus
+  smallest) raised to the power found in the aforementioned "companion"
+  parameter.  The sum is taken over the first K-2 knots where K is the total
+  number of knots provided. The parameter "Diabetes mortality relative risk:
+  <time>  cubic spline coefficients" provides the location of the K knots
+  (location is assumed to be non-negative) and the coefficients whereas
+  coerced(time) is the same as what was explained in the description of LT(time)
+  above.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+  https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+  >
+  >COMMENTS
+  >
+  >
+  >*//* NOTE (DiabetesMortalityRelRiskAgeSplineCompanion, EN )
+  >
+  >PARAMETER	Diabetes mortality relative risk: age cubic spline companion
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE	Jan 2015
+  >
+  >DESCRIPTION	Companion for the age cubic spline portion of the diabetes
+  relative risk of mortality
+  >
+  >DIMENSIONS	Diabetes recency, Cubic spline companion
+  >
+  >SOURCE	Data from the Ontario Diabetes Database (ODD) and Ontario Registered
+  Persons Database (RPD) available through ICES.
+  >
+  >DEFINITION	Diabetes recency is the number of years since becoming an incident
+  case. After 2 years a diabetes case becomes remote.
+  >
+  >METHODS	Relative risk (RR) of all cause death in diabetics in Ontario compared
+  to non-diabetics was modeled. The RR is calculated by a function sex, age and
+  year and depends on diabetes recency as defined above.
+  >The model involved cubic splines with respect to age and year as well as
+  non-spline covariates which are found, respectively, in "Diabetes mortality
+  relative risk: age cubic spline coefficients", "Diabetes mortality relative
+  risk: year cubic spline coefficients", "Diabetes mortality relative risk:
+  non-spline coefficients". Note that the implementation of cubic splines also
+  requires parameters "Diabetes mortality relative risk: age cubic spline
+  companion" and "Diabetes mortality relative risk: year cubic spline companion".
+  >
+  >If a person is diabetic, his/her hazard is elevated/altered as follows
+  >hazardDIABETIC / hazardNonDIABETIC  = b0 + b1 sex + b2 min(age,96)
+  >                                          +LT(age)+LT(year)
+  >                                          +CS(age)+CS(year)
+  >The parameter "Diabetes mortality relative risk: non-spline coefficients"
+  contains (b0, b1, b2) and are "diabetes recency" specific. In the above, age is
+  integer age, year is calendar year.  Below, any of those two is denoted by
+  time.  LT and CS described below are "diabetes recency" specific but this is
+  not reflected in notation to ease reading.
+  >
+  >LT(time) = coefficient * (coerced(time) - (A+B)C/2) where coerced(time) is
+  time restricted to be no less than A and no more than B, i.e.
+  coerce(time)=max(min(time,B),A). In the above, C is 1 or 0 so that
+  coerced(time) is centered (C=1) or not (C=0).  Note that centering applies to
+  LT(time) only, not to CS(time) discussed below.   The parameter "Diabetes
+  mortality relative risk: <time>  cubic spline companion" contains A, B, C and
+  the coefficient.
+  >CS(time) = sum coefficient(k) * CS(coerced(time)/scale,k) with CS(time,k)
+  being the kth restricted cubic spline and coefficient(k) being the
+  corresponding coefficient. The scale is the range of knots (largest minus
+  smallest) raised to the power found in the aforementioned "companion"
+  parameter.  The sum is taken over the first K-2 knots where K is the total
+  number of knots provided. The parameter "Diabetes mortality relative risk:
+  <time>  cubic spline coefficients" provides the location of the K knots
+  (location is assumed to be non-negative) and the coefficients whereas
+  coerced(time) is the same as what was explained in the description of LT(time)
+  above.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+  https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+  >
+  >COMMENTS
+  >
+  >
+  >*//* NOTE (DiabetesMortalityRelRiskYearSplineLocationCoef, EN )
+  >
+  >PARAMETER	Diabetes mortality relative risk: year cubic spline coefficients
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE	Jan 2015
+  >
+  >DESCRIPTION	Coefficients for the year cubic spline portion of the diabetes
+  relative risk of mortality
+  >
+  >DIMENSIONS	Diabetes recency, Cubic spline location/coefficient, Knot index
+  >
+  >SOURCE	Data from the Ontario Diabetes Database (ODD) and Ontario Registered
+  Persons Database (RPD) available through ICES.
+  >
+  >DEFINITION	Diabetes recency is the number of years since becoming an incident
+  case. After 2 years a diabetes case becomes remote.
+  >
+  >METHODS	Relative risk (RR) of all cause death in diabetics in Ontario compared
+  to non-diabetics was modeled. The RR is calculated by a function sex, age and
+  year and depends on diabetes recency as defined above.
+  >The model involved cubic splines with respect to age and year as well as
+  non-spline covariates which are found, respectively, in "Diabetes mortality
+  relative risk: age cubic spline coefficients", "Diabetes mortality relative
+  risk: year cubic spline coefficients", "Diabetes mortality relative risk:
+  non-spline coefficients". Note that the implementation of cubic splines also
+  requires parameters "Diabetes mortality relative risk: age cubic spline
+  companion" and "Diabetes mortality relative risk: year cubic spline companion".
+  >
+  >If a person is diabetic, his/her hazard is elevated/altered as follows
+  >hazardDIABETIC / hazardNonDIABETIC  = b0 + b1 sex + b2 min(age,96)
+  >                                          +LT(age)+LT(year)
+  >                                          +CS(age)+CS(year)
+  >The parameter "Diabetes mortality relative risk: non-spline coefficients"
+  contains (b0, b1, b2) and are "diabetes recency" specific. In the above, age is
+  integer age, year is calendar year.  Below, any of those two is denoted by
+  time.  LT and CS described below are "diabetes recency" specific but this is
+  not reflected in notation to ease reading.
+  >
+  >LT(time) = coefficient * (coerced(time) - (A+B)C/2) where coerced(time) is
+  time restricted to be no less than A and no more than B, i.e.
+  coerce(time)=max(min(time,B),A). In the above, C is 1 or 0 so that
+  coerced(time) is centered (C=1) or not (C=0).  Note that centering applies to
+  LT(time) only, not to CS(time) discussed below.   The parameter "Diabetes
+  mortality relative risk: <time>  cubic spline companion" contains A, B, C and
+  the coefficient.
+  >CS(time) = sum coefficient(k) * CS(coerced(time)/scale,k) with CS(time,k)
+  being the kth restricted cubic spline and coefficient(k) being the
+  corresponding coefficient. The scale is the range of knots (largest minus
+  smallest) raised to the power found in the aforementioned "companion"
+  parameter.  The sum is taken over the first K-2 knots where K is the total
+  number of knots provided. The parameter "Diabetes mortality relative risk:
+  <time>  cubic spline coefficients" provides the location of the K knots
+  (location is assumed to be non-negative) and the coefficients whereas
+  coerced(time) is the same as what was explained in the description of LT(time)
+  above.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+  https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+  >
+  >COMMENTS
+  >
+  >*//* NOTE (DiabetesMortalityRelRiskYearSplineCompanion, EN )
+  >
+  >PARAMETER	Diabetes mortality relative risk: year cubic spline companion
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE	Jan 2015
+  >
+  >DESCRIPTION	Companion for the year cubic spline portion of the diabetes
+  relative risk of mortality
+  >
+  >DIMENSIONS	Diabetes recency, Cubic spline companion
+  >
+  >SOURCE	Data from the Ontario Diabetes Database (ODD) and Ontario Registered
+  Persons Database (RPD) available through ICES.
+  >
+  >DEFINITION	Diabetes recency is the number of years since becoming an incident
+  case. After 2 years a diabetes case becomes remote.
+  >
+  >METHODS	Relative risk (RR) of all cause death in diabetics in Ontario compared
+  to non-diabetics was modeled. The RR is calculated by a function sex, age and
+  year and depends on diabetes recency as defined above.
+  >The model involved cubic splines with respect to age and year as well as
+  non-spline covariates which are found, respectively, in "Diabetes mortality
+  relative risk: age cubic spline coefficients", "Diabetes mortality relative
+  risk: year cubic spline coefficients", "Diabetes mortality relative risk:
+  non-spline coefficients". Note that the implementation of cubic splines also
+  requires parameters "Diabetes mortality relative risk: age cubic spline
+  companion" and "Diabetes mortality relative risk: year cubic spline companion".
+  >
+  >If a person is diabetic, his/her hazard is elevated/altered as follows
+  >hazardDIABETIC / hazardNonDIABETIC  = b0 + b1 sex + b2 min(age,96)
+  >                                          +LT(age)+LT(year)
+  >                                          +CS(age)+CS(year)
+  >The parameter "Diabetes mortality relative risk: non-spline coefficients"
+  contains (b0, b1, b2) and are "diabetes recency" specific. In the above, age is
+  integer age, year is calendar year.  Below, any of those two is denoted by
+  time.  LT and CS described below are "diabetes recency" specific but this is
+  not reflected in notation to ease reading.
+  >
+  >LT(time) = coefficient * (coerced(time) - (A+B)C/2) where coerced(time) is
+  time restricted to be no less than A and no more than B, i.e.
+  coerce(time)=max(min(time,B),A). In the above, C is 1 or 0 so that
+  coerced(time) is centered (C=1) or not (C=0).  Note that centering applies to
+  LT(time) only, not to CS(time) discussed below.   The parameter "Diabetes
+  mortality relative risk: <time>  cubic spline companion" contains A, B, C and
+  the coefficient.
+  >CS(time) = sum coefficient(k) * CS(coerced(time)/scale,k) with CS(time,k)
+  being the kth restricted cubic spline and coefficient(k) being the
+  corresponding coefficient. The scale is the range of knots (largest minus
+  smallest) raised to the power found in the aforementioned "companion"
+  parameter.  The sum is taken over the first K-2 knots where K is the total
+  number of knots provided. The parameter "Diabetes mortality relative risk:
+  <time>  cubic spline coefficients" provides the location of the K knots
+  (location is assumed to be non-negative) and the coefficients whereas
+  coerced(time) is the same as what was explained in the description of LT(time)
+  above.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+  https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+  >
+  >COMMENTS
+  >
+  >*/
+
+  /* NOTE (MaxYear, EN )
+  >
+  >PARAMETER	Year simulation ends
+  >LOCATION	Base(MortalityDisease).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This is the year beyond which nobody can live. The hecatomb occurs
+  at the beginning of the year, so if the parameter value is 2042 then everybody
+  who lived through 2041 will die on 2042's new year eve.
+  >
+  >DIMENSIONS	None
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+
+  >*//* NOTE (MaxLife, EN )
+  >
+  >PARAMETER	Maximum number of years of life
+  >LOCATION	Base(MortalityDisease).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This is the age beyond which nobody can live. So if the parameter
+  is 100 then the maximum age one can reach is 100 years, 0 day, 0 second.
+  >
+  >DIMENSIONS	None
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+
+  >*/
+
+
+  /* NOTE (pPOPULATION, EN )
+  >
+  >PARAMETER	Population by sex, age, province (territory) and year
+  >LOCATION	Base(Births).dat
+  >LAST UPDATE	September 2020
+  >
+  >DESCRIPTION
+  >
+  >DIMENSIONS	[YEARS][SEX][cPROVINCE][LIFE_SPAN]
+  >
+  >
+  >SOURCE	All values (by year, sex and province/territory, age) populated as
+  follows:
+  >* Observed estimates for 2001-2017 from CANSIM Table 17-10-0005-01 (formerly
+  Table 051-0001)
+  >* Projected (M3) estimates for 2018-2043 (see ASSUMPTIONS)
+  >* Imputed estimates for 2044-2100 based on 2043 estimates
+  >* Zero values for age groups 100-119 for all years, sexes and
+  provinces/territories
+  >
+  >DEFINITION
+  >
+  >METHODS	The population parameter has three functions/purposes:
+  >(1) The first is to help assign an exact age from the age group of the case
+  being initialized from the StartPop input parameter. (see parameter
+  pUseInputPopulationToAssignAge)
+  >(2) It is used in the projection of new cases ("births" and immigrants) in
+  future years.
+  >(3) It can be used to "scale" the results to the population distribution (by
+  age, sex and province, although this isn't necessary if the input database
+  StartPop is representative of the population.
+  >
+  >ASSUMPTIONS
+  >The M3 projections (The medium-growth and 1999/2000 to 2002/2003
+  interprovincial migrations trends) scenario is defined by the following
+  assumptions:
+  >(i) Canadian total fertility rate that reaches 1.67 births per woman in
+  2021/2022 and remains constant thereafter;
+  >(ii) Canadian life expectancy that reaches 87.5 years for males and 89.1 years
+  for females in 2062/2063;
+  >(iii) interprovincial migration based on the trends observed between 1999/2000
+  and 2002/2003;
+  >(iv) national immigration rate that reaches 0.75% in 2022/2023 and remains
+  constant thereafter;
+  >(v) annual number of non-permanent residents (Canada) that reaches 864,600 in
+  2021 and remains constant thereafter;
+  >(vi) National net emigration rate of 0.19%.
+  >The above is from demography documentation (may be outdated, was probably
+  correct circa November 2014)
+  >
+  >DECISIONS	In November 2014, we changed the dimensions of this parameter
+  beginning in 1971 to begin in 2001.
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >*/
+  
+  /* NOTE (FictivePersonCharacteristics, EN )
+  >
+  >PARAMETER	Characteristics of a fictive person to be simulated
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter may be used to run POHEM in clinical mode (rather
+  than population mode as POHEM's PO suggests – recall POHEM stands for
+  POpulation HEalth Model).  It may also be useful for debugging/probing
+  purposes.
+  >
+  >DIMENSIONS
+  >[DB_FIELDS]
+  >
+  >SOURCE
+  >
+  >DEFINITION	The codesets (e.g. Sex=1 corresponds to male) are found below
+  >Five year age group : 2 = <20, 3 = 20-24, 4 = 25-29, 5 = 30-34, 6 = 35-39, ...
+  ,  13 = 70-74, 14 = 75-79, 15 = 80+
+  >Sex : 0 = Female, 1 = Male
+  >Province : 0 = Newfoundland, 1 = PEI, 2 = Nova Scotia, 3 = New Brunswick, 4 =
+  Quebec, 5 = Ontario, 6 = Manitoba, 7 = Saskatchewan, 8 = Alberta, 9 = British
+  Columbia
+  >Ethnicity : 0 = White, 1 = Non-white
+  >Cultural Origin : 0 = White, 1 = Aboriginal, 2 = Black, 3 = Chinese, 4 = South
+  asian, 5 = Japanese or Korean, 6 = South east asian, 7 = Unknown (see comments
+  at bottom of these parameter notes)
+  >Immigrant : 0 = No, 1 = Yes
+  >Recent immigrant (last 9 years) : 0 = No, 1 = Yes
+  >Education : 0 = Less than secondary, 1 = Secondary grad , 2 = Other
+  post-secondary, 3 = Post-secondary grad
+  >Income : 0 = Quartile 1 (poorest), 1 = Quartile 2 (lower middle), 2 = Quartile
+  3 (upper middle), 3 = quartile 4 (richest)
+  >Alcohol drinks per week (dpw) : 0 = Never drank, 1 = Former drinker, 2 = light
+  (< 2 dpw), 3 = moderate (2-14 dpw for male, 2-9 dpw for female), 4 = heavy (>14
+  dpw for male, > 9 dpw for female)
+  >Body mass index in kg/(m^2)
+  >Height in meters
+  >Regular smoker : 0 = No, 1 = Yes
+  >Current/Former smoker : 0 = Never smoker, 1 = Former smoker, 2 = Current
+  smoker
+  >Arthritis : 0 = No, 1 = Yes
+  >OsteoArthritis : 0 = No, 1 = Yes
+  >Had heart attack : 0 = No, 1 = Yes
+  >Angina : 0 = No, 1 = Yes
+  >Congestive heart failure : 0 = No, 1 = Yes
+  >Stroke : 0 = No, 1 = Yes
+  >HUI PUMF component vision problem : 1 = No, 2 = corrected by lenses, 3 =
+  distant not corrected, 4 = close not corrected, 5 = Problem seeing close &
+  distant / no sight
+  >HUI PUMF component hearing problem :  1 = No, 2 = corrected, 3 = not corrected
+  >HUI PUMF component speech problem : 1 = No, 2 = partially/not understood
+  >HUI PUMF component mobility problem : 1 = No, 2 = Yes but no aid required, 3 =
+  requires support/wheelchair, 4 = requires help/cannot walk
+  >HUI PUMF component dexterity problem : 1 = No, 2 = Yes but no help required, 3
+  = needs help
+  >HUI PUMF component emotional problem : 1 = Happy and interested in life, 2 =
+  Somewhat happy, 3 = Somewhat unhappy, 4 = Very unhappy, 5 = So unhappy that
+  life is not worthwhile
+  >HUI PUMF component cognitive problem : 1 = No, 2 = little difficulty thinking,
+  3 = Somewhat forgetful, 4 = Somewhat forgetful/little difficulty thinking, 5 =
+  Very forgetful/great difficulty thinking, 6 = Unable to remember/think
+  >HUI PUMF component pain problem : 1 = No, 2 = Mild/moderate pain does not
+  prevent activity, 3 = Moderate pain prevents a few activities, 4 =
+  Moderate/severe pain prevents some activities, 5 = Severe pain prevents most
+  activities
+  >HUI
+  >SPoRT component physical activity : 0 = active, 1 = moderate, 2 = inactive, 3
+  = not stated
+  >SPoRT component smoking : 0 = 20+ daily cigarettes, 1 = <20 daily cigarettes
+  or former daily smoker now occasional or never daily smoker , 2 = Former daily
+  , 3 = Former occasional , 4 = Missing
+  >SPoRT component diet (vegetable & carrot) : 0 = 0-6 weekly, 1 = 7-13 weekly, 2
+  = 14+ weekly but not extreme, 3 = extreme ( > 140 carrots weekly or > 140
+  vegetable weekly) or missing
+  >SPoRT component life stressful : 0 = not at all, 1 = not very, 2 = a bit, 3 =
+  quite a bit, 4 = extremely, 5 = missing
+  >SPoRT component heart disease : 0 = No, 1 = Yes
+  >SPoRT component diabetes : 0 = No, 1 = Yes
+  >SPoRT component hypertension : 0 = No, 1 = Yes
+  >SPoRT component alcohol : 0 = heavy, 1 = medium, 2 = light, 3 = occasional, 4
+  = former never, 5 = binge, 6 = missing
+  >Smoke PackYears
+  >Has cancer : 0 = No, 1 = Yes
+  >Number of chronic conditions among following 16: a) food allergies, b) other
+  allergies, c) asthma, d) fibromyalgia, e) back problems, f) migraine, g)
+  bronchitis/emphysema/COPD , h) epilepsy, i) stomach/intestinal ulcers, j)
+  stroke, k) incontinence, l) bowel disorder/Crohn Disease or colitis, m)
+  Alzheimer/dementia (censored PUMF), n) cataracts, o) glaucoma, p) thyroid
+  condition
+  >Walk for errands : 0 = No, 1 = 0 to 5 hrs/week, 2 = 6 to 10 hrs/week, 3 = 11+
+  hrs/week
+  >Bike for errands : 0 = None, 1 = Some
+  >Level of physical activity for usual day : 0 = Sit, 1 = Stand or walk quite a
+  lot , 2 = Lift/carry light , 3 =  heavy work/carry very heavy loads
+  >Leisure time physical activity : hours/day (e.g. 0.45 hour/day)
+  >Survey weight
+  >
+  >METHODS	One needs to fill the CCHS-like questionnaire above.  The clinical
+  mode gets activated if a positive value is provided in the last question
+  (survey weight); a negative value calls for regular POHEM (population mode).
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	Regarding Cultural Origin, the codeset suggests 8 different
+  categories.  In POHEM, this information is only used to differentiate between
+  Aboriginal and others.  Therefore, if one uses this parameter to create a
+  fictive person, it will behave the same if Cultural Origin is set to 0 = White
+  or 2 = Black or 3 = Chinese or 4 = South asian or 5 = Japanese or Korean or 6 =
+  South east asian or 7 = Unknown.  Only the setting 1 = Aboriginal may lead to a
+  different lifepath.
+  >
+  >*/
+  /* NOTE (pImmig, EN )
+  >
+  >PARAMETER	Number of new immigrants by sex, age, province and year
+  >LOCATION	Base(Immig).dat
+  >LAST UPDATE	November 2020
+  >
+  >DESCRIPTION	Number of new immigrants by sex, age, province and year (aka
+  pImmig) provides POHEM with the number of immigrants by year, sex, province and
+  age. This parameter is used to generate the correct number of immigrants after
+  2001. In 2001 the number of immigrants is determined by the starting
+  population.
+  >More details in the SOURCE section below.
+  >
+  >DIMENSIONS	[YEARS][SEX][cPROVINCE][LIFE]
+  >
+  >SOURCE	All values (by year, sex and province/territory, age) populated as
+  follows:
+  >* Observed estimates for 2001-2018 from CANSIM Table 17-10-0014-01 (formerly
+  Table 051-0011)
+  >* Projected (M3) estimates for 2019-2042 (see ASSUMPTIONS)
+  >* Imputed estimates for 2043-2100 based on 2042 estimates
+  >
+  >DEFINITION
+  >
+  >METHODS	This parameter is used to determine the distribution of new immigrants
+  in future years (after pStartYear up to pMaxYearNewArrivals) by sex, age and
+  year of immigration.
+  >
+  >The remaining characteristics of the immigrants are assigned through hot-deck
+  imputation of immigrants (within the past 9 years) represented in the
+  initialization database.
+  >
+  >ASSUMPTIONS	For years 2019-2042, used official population projections from the
+  cohort component model for ages 0-110. These were the medium term projections
+  M3. According to the demography documentation, the medium-growth and 1999/2000
+  to 2002/2003 interprovincial migrations trends scenario is defined by the
+  following assumptions:
+  >(i) a Canadian total fertility rate that reaches 1.67 births per woman in
+  2021/2022 and remains constant thereafter;
+  >(ii) a Canadian life expectancy that reaches 87.5 years for males and 89.1
+  years for females in 2062/2063;
+  >(iii) interprovincial migration based on the trends observed between 1999/2000
+  and 2002/2003;
+  >(iv) a national immigration rate that reaches 0.75% in 2022/2023 and remains
+  constant thereafter;
+  >(v) an annual number of non-permanent residents (Canada) that reaches 864,600
+  in 2021 and remains constant thereafter;
+  >(vi) National net emigration rate of 0.19%.
+  >
+  >>Data Source: Demography Division, Statistics Canada. Obtained from Simone
+  Coulomb in November 2014
+  >The above is from Demography Division (Simone Coulomb in November 2014). It
+  may now be outdated.
+  >
+  >DECISIONS	In November 2014, we changed the dimensions of this parameter
+  beginning in 1971 to begin in 2001.
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+  >
+  >*//* NOTE (pStartPop, EN )
+  >
+  >PARAMETER	Distribution of population at beginning of simulation
+  >LOCATION
+  >LAST UPDATE	January 2019.  Reverted back to the 20160621 version (prior to
+  addition of veterans)
+  >
+  >DESCRIPTION	This contains micro data from the CCHS PUMF 2001 for about 50
+  variables on respondents aged 20+.  Some records are removed due to missing
+  values.
+  >
+  >DIMENSIONS
+  >[DB_RECORDS][DB_FIELDS]
+  >
+  >SOURCE	Mostly CCHS PUMF 2001.
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	Dummy records are filled with -1 in all fields.
+  >See parameter “Characteristics of a fictive person to be simulated” for the
+  list of fields/variables. Regarding Cultural Origin, it is always white in this
+  parameter because it is based on the PUMF which does not provide this
+  information (unlike the CCHS master file which was used in the distant past).
+  >
+  >
+  >*/
+  /* NOTE (pNewArrivalsControl, EN )
+  >
+  >PARAMETER	Open or Closed population
+  >LOCATION
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter determines which type of cases will be generated by
+  the simulation.
+  >
+  >If "StartPop database" is checked then cases will be generated in the start
+  year (pStartYear) of the simulation according to the cross-sectional
+  representation of the population found in the initialization database (see
+  parameter pStartPop).
+  >
+  >If "New Births" is checked then new cases will be generated in future years
+  (up to pMaxYearNewArrivals) to reflect the growth in the Canadian population.
+  Note that these cases are generated at a specific age equal to the youngest age
+  in pStartPop (uses parameter pPOPULATION)
+  >
+  >If "New immigrants" is checked then new cases will be generated in future
+  years (up to pMaxYearNewArrivals) to reflect projected immigration patterns
+  (see parameter pImmig)
+  >
+  >
+  >
+  >DIMENSIONS
+  >[cPopulationSource]
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	There are 8 possible ways to populate this parameter.
+  >
+
+  >*/
+
+  /* NOTE (pMaxYearNewArrivals, EN )
+  >
+  >PARAMETER	Last year for generating Future Births and Immigrants
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	The last year for generating Future Births and Immigrants. It is used
+  to decide how many cases are needed.
+  >
+  >DIMENSIONS
+  >None
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	Relations to other parameters
+  >Should be greater than or equal to pStartYear.
+  >There is also a parameter called "Year simulation ends" (aka MaxYear) which
+  allows lives to be lived sufficiently long for lifetime outcomes like life
+  expectancy.
+  >
+
+  >*//* NOTE (ForceInitialisationToNonImmigrant, EN )
+  >
+  >PARAMETER	Set actor initial immigration status to non-immigrant
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	Select TRUE (checked box) for each of POHEM's point of entry where
+  you would want the initial immigrant status to be set to non-immigrant
+  regardless of the actual donor immigrant status. This does not impact how
+  donors are selected; it just overwrites the immigrant status after the
+  selection of the donor.
+  >
+  >DIMENSIONS
+  >[cPopulationSource]
+  >
+  >SOURCE
+  >
+  >DEFINITION	In POHEM, there are 3 points of entry: (i) 2001, (ii) new births
+  after 2001, and (iii) new immigrants after 2001.
+  >
+  >METHODS	A simulated case entering through any point of entry will be
+  initialised by taking the characteristics of a suitable donor selected at
+  random from the donor file ("Distribution of population at beginning of
+  simulation"). Such donor may be an immigrant according to immigrant status
+  variable. If one had an issue with bringing in immigrants from a given point of
+  entry, the parameter "Set actor initial immigration status to non-immigrant"
+  currently discussed may be used to reset the immigrant status of the selected
+  donor to non-immigrant and then simulate his/her life.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS	In the default scenario, all boxes are set to FALSE (unchecked) so
+  that no overwriting of the donor's immigration status is performed.
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+
+  >*//* NOTE (pStartPopReweightDefinitionFields, EN )
+  >
+  >PARAMETER	Reweight population data base: field
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION
+  >
+  >DIMENSIONS
+  >[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT]
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS	The parameter "Distribution of population at beginning of simulation"
+  (aka pStartPop) comes with survey weights that may be altered through the
+  following trio of parameters:
+  >A: "Reweight population data base: field" (aka
+  pStartPopReweightDefinitionFields)
+  >B: "Reweight population data base: acceptance range" (aka
+  pStartPopReweightDefinitionBounds)
+  >C: "Reweight population data base: multiplier" (aka
+  pStartPopReweightMultiplier)
+  >
+  >Parameters A and B allow one to define up to 9 subpopulations and parameter C
+  allows one to specify how survey weights should be altered (multiplicatively)
+  for each population. For instance, if parameters A, B and C are set up to (i)
+  multiply survey weights of women (subpopulation 1) by 0.9 and (ii) multiply
+  survey weights of Albertans (subpopulation 2) by 1.2, then the survey weights
+  of female Albertans are multiplied by 0.9*1.2 = 1.08.
+  >
+  >POHEM conducts its entire business with the altered weights.  So if Lucy the
+  female Albertan has survey weight equal to 200 on the donor database (parameter
+  "Distribution of population at beginning of simulation"), her survey weight
+  would become 216 (based on example above) and POHEM would totally forget that
+  Lucy's survey weight ever was 200 at some point.
+  >
+  >The parameter currently discussed/documented is A: "Reweight population data
+  base: field" (aka pStartPopReweightDefinitionFields).
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+
+  >*//* NOTE (pStartPopReweightDefinitionBounds, EN )
+  >
+  >PARAMETER	Reweight population data base: acceptance range
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION
+  >
+  >DIMENSIONS
+  >[STARTPOP_SUBPOPULATIONS][CONDITIONS_REWEIGHT][cLOWER_UPPER_BOUNDS]
+  >
+  >SOURCE
+  >
+  >DEFINITION	The codesets (e.g. Sex=1 corresponds to male) are found below
+  >Five year age group : 2 = <20, 3 = 20-24, 4 = 25-29, 5 = 30-34, 6 = 35-39, ...
+  ,  13 = 70-74, 14 = 75-79, 15 = 80+
+  >Sex : 0 = Female, 1 = Male
+  >Province : 0 = Newfoundland, 1 = PEI, 2 = Nova Scotia, 3 = New Brunswick, 4 =
+  Quebec, 5 = Ontario, 6 = Manitoba, 7 = Saskatchewan, 8 = Alberta, 9 = BC
+  >Ethnicity : 0 = White, 1 = Non-white
+  >Cultural Origin : 0 = White, 1 = Aboriginal, 2 = Black, 3 = Chinese, 4 = South
+  asian, 5 = Japanese or Korean, 6 = South east asian, 7 = Unknown
+  >Immigrant : 0 = No, 1 = Yes
+  >Recent immigrant (last 9 years) : 0 = No, 1 = Yes
+  >Education : 0 = Less than secondary, 1 = Secondary grad , 2 = Other
+  post-secondary, 3 = Post-secondary grad
+  >Income : 0 = Quartile 1 (poorest), 1 = Quartile 2 (lower middle), 2 = Quartile
+  3 (upper middle), 3 = quartile 4 (richest)
+  >Alcohol drinks per week (dpw) : 0 = Never drank, 1 = Former drinker, 2 = light
+  (< 2 dpw), 3 = moderate (2-14 dpw for male, 2-9 dpw for female), 4 = heavy (>14
+  dpw for male, > 9 dpw for female)
+  >Body mass index in kg/(m^2)
+  >Height in meters
+  >Regular smoker : 0 = No, 1 = Yes
+  >Current/Former smoker : 0 = Never smoker, 1 = Former smoker, 2 = Current
+  smoker
+  >Arthritis : 0 = No, 1 = Yes
+  >OsteoArthritis : 0 = No, 1 = Yes
+  >Had heart attack : 0 = No, 1 = Yes
+  >Angina : 0 = No, 1 = Yes
+  >Congestive heart failure : 0 = No, 1 = Yes
+  >Stroke : 0 = No, 1 = Yes
+  >HUI PUMF component vision problem : 1 = No, 2 = corrected by lenses, 3 =
+  distant not corrected, 4 = close not corrected, 5 = 	Problem seeing close &
+  distant / no sight
+  >HUI PUMF component hearing problem :  1 = No, 2 = corrected, 3 = not corrected
+  >HUI PUMF component speech problem : 1 = No, 2 = partially/not understood
+  >HUI PUMF component mobility problem : 1 = No, 2 = Yes but no aid required, 3 =
+  requires support/wheelchair, 4 = requires help/cannot walk
+  >HUI PUMF component dexterity problem : 1 = No, 2 = Yes but no help required, 3
+  = needs help
+  >HUI PUMF component emotional problem : 1 = Happy and interested in life, 2 =
+  Somewhat happy, 3 = Somewhat unhappy, 4 = Very unhappy, 5 = So unhappy that
+  life is not worthwhile
+  >HUI PUMF component cognitive problem : 1 = No, 2 = little difficulty thinking,
+  3 = Somewhat forgetful, 4 = Somewhat forgetful/little difficulty thinking, 5 =
+  Very forgetful/great difficulty thinking, 6 = Unable to remember/think
+  >HUI PUMF component pain problem : 1 = No, 2 = Mild/moderate pain does not
+  prevent activity, 3 = Moderate pain prevents a few activities, 4 =
+  Moderate/severe pain prevents some activities, 5 = Severe pain prevents most
+  activities
+  >HUI
+  >SPoRT component physical activity : 0 = active, 1 = moderate, 2 = inactive, 3
+  = not stated
+  >SPoRT component smoking : 0 = 20+ daily cigarettes, 1 = <20 daily cigarettes
+  or former daily smoker now occasional or never daily smoker , 2 = Former daily
+  , 3 = Former occasional , 4 = Missing
+  >SPoRT component diet (vegetable & carrot) : 0 = 0-6 weekly, 1 = 7-13 weekly, 2
+  = 14+ weekly but not extreme, 3 = extreme ( > 140 carrots weekly or > 140
+  vegetable weekly) or missing
+  >SPoRT component life stressful : 0 = not at all, 1 = not very, 2 = a bit, 3 =
+  quite a bit, 4 = extremely, 5 = missing
+  >SPoRT component heart disease : 0 = No, 1 = Yes
+  >SPoRT component diabetes : 0 = No, 1 = Yes
+  >SPoRT component hypertension : 0 = No, 1 = Yes
+  >SPoRT component alcohol : 0 = heavy, 1 = medium, 2 = light, 3 = occasional, 4
+  = former never, 5 = binge, 6 = missing
+  >Smoke PackYears
+  >Has cancer : 0 = No, 1 = Yes
+  >Number of chronic conditions among following 16: a) food allergies, b) other
+  allergies, c) asthma, d) fibromyalgia, e) back problems, f) migraine, g)
+  bronchitis/emphysema/COPD , h) epilepsy, i) stomach/intestinal ulcers, j)
+  stroke, k) incontinence, l) bowel disorder/Crohn Disease or colitis, m)
+  Alzheimer/dementia (censored PUMF), n) cataracts, o) glaucoma, p) thyroid
+  condition
+  >Walk for errands : 0 = No, 1 = 0 to 5 hrs/week, 2 = 6 to 10 hrs/week, 3 = 11+
+  hrs/week
+  >Bike for errands : 0 = None, 1 = Some
+  >Level of physical activity for usual day : 0 = Sit, 1 = Stand or walk quite a
+  lot , 2 = Lift/carry light , 3 =  heavy work/carry very heavy loads
+  >Leisure time physical activity : hours/day (e.g. 0.45 hour/day)
+  >Survey weight
+  >
+  >METHODS	The parameter "Distribution of population at beginning of simulation"
+  (aka pStartPop) comes with survey weights that may be altered through the
+  following trio of parameters:
+  >A: "Reweight population data base: field" (aka
+  pStartPopReweightDefinitionFields)
+  >B: "Reweight population data base: acceptance range" (aka
+  pStartPopReweightDefinitionBounds)
+  >C: "Reweight population data base: multiplier" (aka
+  pStartPopReweightMultiplier)
+  >
+  >Parameters A and B allow one to define up to 9 subpopulations and parameter C
+  allows one to specify how survey weights should be altered (multiplicatively)
+  for each population. For instance, if parameters A, B and C are set up to (i)
+  multiply survey weights of women (subpopulation 1) by 0.9 and (ii) multiply
+  survey weights of Albertans (subpopulation 2) by 1.2, then the survey weights
+  of female Albertans are multiplied by 0.9*1.2 = 1.08.
+  >
+  >
+  >POHEM conducts its entire business with the altered weights.  So if Lucy the
+  female Albertan has survey weight equal to 200 on the donor database (parameter
+  "Distribution of population at beginning of simulation"), her survey weight
+  would become 216 (based on example above) and POHEM would totally forget that
+  Lucy's survey weight ever was 200 at some point.
+  >
+  >The parameter currently discussed/documented is B: "Reweight population data
+  base: acceptance range" (aka pStartPopReweightDefinitionBounds).
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+
+  >*//* NOTE (pStartPopReweightMultiplier, EN )
+  >
+  >PARAMETER	Reweight population data base: multiplier
+  >LOCATION	Base(StartPop_Control).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION
+  >
+  >DIMENSIONS
+  >[STARTPOP_SUBPOPULATIONS][DUMMY_ROW_OR_COLUMN]
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS	The parameter "Distribution of population at beginning of simulation"
+  (aka pStartPop) comes with survey weights that may be altered through the
+  following trio of parameters:
+  >A: "Reweight population data base: field" (aka
+  pStartPopReweightDefinitionFields)
+  >B: "Reweight population data base: acceptance range" (aka
+  pStartPopReweightDefinitionBounds)
+  >C: "Reweight population data base: multiplier" (aka
+  pStartPopReweightMultiplier)
+  >
+  >Parameters A and B allow one to define up to 9 subpopulations and parameter C
+  allows one to specify how survey weights should be altered (multiplicatively)
+  for each population. For instance, if parameters A, B and C are set up to (i)
+  multiply survey weights of women (subpopulation 1) by 0.9 and (ii) multiply
+  survey weights of Albertans (subpopulation 2) by 1.2, then the survey weights
+  of female Albertans are multiplied by 0.9*1.2 = 1.08.
+  >
+  >POHEM conducts its entire business with the altered weights.  So if Lucy the
+  female Albertan has survey weight equal to 200 on the donor database (parameter
+  "Distribution of population at beginning of simulation"), her survey weight
+  would become 216 (based on example above) and POHEM would totally forget that
+  Lucy's survey weight ever was 200 at some point.
+  >
+  >The parameter currently discussed/documented is C: "Reweight population data
+  base: multiplier" (aka pStartPopReweightMultiplier).
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+  >
+  >*/
+
+  /* NOTE (UseDport, EN )
+  >
+  >PARAMETER	Use DPoRT algorithm for diabetes incidence
+  >LOCATION	Base(Diseases).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	Use this parameter to indicate if diabetes incidence should be
+  driven by DPoRT equation or an alternative equation derived from the
+  longitudinal National Population Health Survey (NPHS).
+  >
+  >DIMENSIONS
+  >None
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS	When POHEM is executed, two diabetes models are run: DPoRT and
+  longitudinal NPHS-based alternative.  Those two models are independent (one
+  does not impact the other) but involve similar risk factors.  Therefore those
+  who are deemed at high risk of diabetes according to DPoRT will likely also be
+  deemed to be at elevated risk of diabetes according to the longitudinal
+  NPHS-based model.
+  >
+  >The parameter "Use DPoRT algorithm for diabetes incidence" allows one to say
+  which diabetes model will be used in tabulation and other models (e.g. HUI);
+  the other model will run possibly without purpose.
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS
+  >
+  >REFERENCES
+  >
+  >COMMENTS	The longitudinal NPHS-based diabetes model is part of a suite of
+  chronic conditions models that also includes hypertension and heart disease.
+  As far as these longitudinal NPHS-based models are concerned (e.g.
+  hypertension), the longitudinal NPHS-based diabetes model is used regardless of
+  the selection made in the parameter "Use DPoRT algorithm for diabetes
+  incidence".
+  >
+  >*//* NOTE (TimeHorizonForDport, EN )
+  >
+  >PARAMETER	Time horizon used in the implementation of DPoRT
+  >LOCATION	Base(Diabetes).dat
+  >LAST UPDATE
+  >
+  >DESCRIPTION	This parameter provides the time horizon used to convert DPoRT's
+  hazard into annual hazard
+  >
+  >DIMENSIONS
+  >None
+  >
+  >SOURCE
+  >
+  >DEFINITION
+  >
+  >METHODS	DPoRT provides a hazard of people risk of Diabetes as a function of
+  many thing including time since NPHS 1996 interview.  The hazard/risk of
+  developing diabetes 1 nanosecond after the interview differs from that of
+  developing diabetes 2 nanosecond after the interview.  Though modgen (the
+  software/language used to develop POHEM) is totally capable to implement this
+  kind of time varying hazard, it was decided to implement DPoRT with annual
+  hazard that with be constant between birthdays (ceteris paribus).
+  >
+  >This is done by calculating the probability that one would develop diabetes
+  over K years based on DPoRT's hazard and then figuring out what constant hazard
+  over those K years would have led to the same probability.  The outcome of this
+  exercise (constant hazard) depends on K which is the value provided by the
+  parameter "Time horizon used in the implementation of DPoRT".
+  >
+  >ASSUMPTIONS
+  >
+  >DECISIONS	K = 2
+  >
+  >REFERENCES
+  >
+  >COMMENTS
+  >
+
+  >*/
+
+  /* NOTE (DementiaPrevalenceTarget2001, EN )
+	JB extrapolated back to 2001- used years 2002 through 2010 and regression methods
+	*/
+
+
+	/* NOTE (DportAlterationSpecs, EN )
+	>
+	>PARAMETER	Alteration of DPoRT linear predictor by sex and age
+	>LOCATION	Base(Diabetes).dat
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter introduces an additional age*sex term in DPoRT's
+	equation so that POHEM rates of diabetes better align with target  from
+	Canadian Chronic Disease Surveillance System (CCDSS).
+	>
+	>DIMENSIONS	[SEX][FROM_25_TO_90_BY_5]
+	>
+	>SOURCE	Calibration to CCDSS diabetes prevalence rates.
+	>
+	>DEFINITION
+	>
+	>METHODS
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+
+	>
+	>*//* NOTE (DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR, EN )
+	>
+	>PARAMETER	Use altered DPoRT linear predictor in correction for diabetes
+	prevalence
+	>LOCATION	Base(Diabetes).dat
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter introduces an additional age*sex term in DPoRT's
+	equation so that POHEM rates of diabetes better align with target  from
+	Canadian Chronic Disease Surveillance System (CCDSS).
+	>
+	>DIMENSIONS	None
+	>
+	>SOURCE	Calibration to CCDSS diabetes prevalence rates.
+	>
+	>DEFINITION
+	>
+	>METHODS	A method is used to ensure that the distribution of initial diabetes
+	status of people entering the simulation in 2001 agrees with that of parameter
+	"Diabetes prevalence by age, sex and province for year 2001".  The actual
+	method used depend on the parameter "Correspondence between initial diabetes
+	alteration and diabetes risk" (called w thereafter).  If w ? 0  and |w| ? 1,
+	the method will take into consideration a DPoRT-like risk to decide who needs
+	their initial diabetes status to be altered (see "Correspondence between
+	initial diabetes alteration and diabetes risk" for more details).
+	>
+	>The parameter currently discussed ("Use altered DPoRT linear predictor in
+	correction for diabetes prevalence") tells POHEM if the aforementioned
+	DPoRT-like risk  should be altered by the parameter "Alteration of DPoRT linear
+	predictor by sex and age".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	Set to false.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (DiabetesPrevalenceTarget2001, EN )
+	>
+	>PARAMETER	Diabetes prevalence by age, sex and province for year 2001
+	>LOCATION	Base(DiabetesPrevalenceStart).dat
+	>LAST UPDATE	March 2019
+	>
+	>DESCRIPTION	Synthetic diabetes prevalence rate by province, sex and age group
+	according to Canadian Chronic Disease Surveillance System (CCDSS).
+	>
+	>DIMENSIONS
+	>[SEX][FROM_20_TO_80_BY_5][PROVINCE]
+	>
+	>
+	>SOURCE	Two sets of broad prevalence rates from CCDSS were used to create
+	detailed synthetic rates through raking.  The first broad set was prevalence by
+	sex and fine age groups.  The second broad set was prevalence by province, sex
+	and broad age groups.  The detailed synthetic rates are by province, sex and
+	detailed age groups.
+	>
+	>DEFINITION
+	>
+	>METHODS	POHEM comes with a file based on CCHS that provides the joint
+	distribution of people's attributes (e.g. BMI, diabetes, sex, age, etc…).  This
+	file (see parameter "Distribution of population at beginning of simulation") is
+	used to initialise people's initial attributes as they enter POHEM's
+	simulation. For diabetes, CCHS provides information on the prevalence of
+	self-reported diabetes.  We may like POHEM to reflect a different diabetes
+	concept at initialisation.
+	>
+	>The parameter "Diabetes prevalence by age, sex and province for year 2001"
+	currently discussed is used to provide an alternative distribution of diabetes
+	(and hence concept).  At the beginning of their POHEM life, people's diabetes
+	status will tentatively be initialised based on "Distribution of population at
+	beginning of simulation", but a few actors will see this tentative diabetes
+	status assignment altered in order to achieve the prevalence found in the
+	parameter "Diabetes prevalence by age, sex and province for year 2001".
+	Thereafter, the diabetes status will be subject to incidence rates (see
+	parameter "Use DPoRT algorithm for diabetes incidence").
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+
+	>*//* NOTE (WeightForUnderlyingDPoRTishUniform, EN )
+	>
+	>PARAMETER
+	>Correspondence between initial diabetes alteration and diabetes risk
+	>
+	>LOCATION	Base(DiabetesPrevalenceStart).dat
+	>LAST UPDATE	January 2019
+	>
+	>DESCRIPTION	The parameter allows users to select the methods used to ensure
+	that POHEM's initial diabetes distribution agrees with some target.
+	>
+	>DIMENSIONS
+	>None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	The parameter "Initial AMI alteration : Correspondence with AMI risk"
+	(called w thereafter) is used to tell which method to use to insure that
+	initial diabetes prevalence lines up with some target.
+	>* If |w| > 1 then the initial AMI alteration is turned off.
+	>* If |w| ? 1 then a method is used to ensure that the distribution of initial
+	diabetes status of people entering the simulation in 2001 agrees with that of
+	parameter "Diabetes prevalence by age, sex and province for year 2001". The
+	method used ensures that targets are met with minimal alteration to people's
+	diabetes status.  The scope of this adjustment is restricted by parameters "In
+	scope populations for initial diabetes alteration" and "In scope years for
+	initial diabetes alteration"
+	>
+	>The results will depend on w and has an impact on who will see their initial
+	diabetes status altered.  Here are some key values
+	>* w=1: If in a given province, sex, age group category more diabetics are
+	required then those who are not diabetic but are at high risk of diabetes
+	according to a risk equation similar to DPoRT will be see their initial
+	diabetes status change from NO to YES.  If, au contraire, fewer diabetics are
+	required then those who are diabetic but are at low risk of diabetes according
+	to a risk equation similar to DPoRT will be see their initial diabetes status
+	change from YES to NO.
+	>* w=-1: This does things backwards relative to w=1.  In a nutshell, change
+	initial diabetes status from NO to YES if (DPoRT-like) risk of diabetes is low
+	and from YES to NO if risk of diabetes is high.  This is a somewhat silly
+	option.
+	>* w=0: The (DPoRT-like) risk of diabetes is not used to decide who will get an
+	altered initial diabetes status.
+	>
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	w=1
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+
+	>
+	>*//* NOTE (DiabetesInitialAlterationPopulationScope, EN )
+	>
+	>PARAMETER
+	>In scope populations for initial diabetes alteration
+	>
+	>LOCATION	Base(DiabetesPrevalenceStart).dat
+	>LAST UPDATE	March 2019
+	>
+	>DESCRIPTION	Populations over which the alignment of POHEM's initial diabetes
+	status with some target is done.
+	>
+	>DIMENSIONS
+	>[cPopulationSource]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION	In POHEM, there are 3 points of entry: (i) 2001, (ii) new births
+	after 2001, and (iii) new immigrants after 2001.
+	>
+	>METHODS	Parameters "In scope populations for initial diabetes alteration" and
+	"In scope years for initial diabetes alteration" tell POHEM who is subject to
+	alteration of their diabetes status read in from the StartPop file (parameter
+	"Distribution of population at beginning of simulation").
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+
+	>
+	>*//* NOTE (DiabetesInitialAlterationYearScope, EN )
+	>
+	>PARAMETER
+	>In scope years for initial diabetes alteration
+	>
+	>LOCATION	Base(DiabetesPrevalenceStart).dat
+	>LAST UPDATE	March 2019
+	>
+	>DESCRIPTION	Years over which the alignment of POHEM's initial diabetes status
+	with some target is done.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Parameters "In scope populations for initial diabetes alteration" and
+	"In scope years for initial diabetes alteration" tell POHEM who is subject to
+	alteration of their diabetes status read in from the StartPop file (parameter
+	"Distribution of population at beginning of simulation").
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>*/
+
+	/* NOTE (BuiltInBmiAlterationSpecs, EN )
+	>
+	>PARAMETER	BMI model back-end alterations
+	>LOCATION	Base(BMIcore).dat
+	>LAST UPDATE	March 2019
+	>
+	>DESCRIPTION	This parameter is used to make adjustment to the BMI model.  The
+	adjustment are made after the BMI model has done its thing, so the BMI equation
+	is not altered, per se, but its results are.
+	>
+	>DIMENSIONS
+	>[SEX][FROM_25_TO_80_BY_5][BMI_BUILT_IN_ALTERATION_SPECS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	The parameter was used so that the BMI model gives results that are
+	closer to CCHS for years up to 2016.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/
+
+
+	/* NOTE (TableFilterAge, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Age (current)
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Range of ages for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Tabulation in POHEM are restricted to a population of interest define
+	by the following set of 9 parameters.
+	>*Sex(es) must be within those selected in parameter "Tabulation restriction:
+	Sex".
+	>*Province(s) must be within those selected in parameter "Tabulation
+	restriction: Province".
+	>*Education level(s) must be within those selected in parameter "Tabulation
+	restriction: Education".
+	>*Income level(s) must be within those selected in parameter "Tabulation
+	restriction: Income quartile".
+	>*Point(s) of entry must be within those selected in parameter "Tabulation
+	restriction: Entry point/door".
+	>*Age must be within the bounds provided by parameter "Tabulation restriction:
+	Age (current)".
+	>*Initial age must be within the bounds provided by parameter "Tabulation
+	restriction: Initial age (upon actor creation)".
+	>*Year must be within the bounds provided by parameter "Tabulation
+	restriction: Year (current)".
+	>*Initial year must be within the bounds provided by parameter "Tabulation
+	restriction: Initial year (upon actor creation)".
+	>
+	>Note that some tables may have additional conditions that further restrict the
+	population tabulated.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	The default scenario calls for no specific restriction.  Therefore
+	only "additional conditions" specific to each table will restrict the
+	population tabulated.
+	>
+	>*//* NOTE (TableFilterAgeStart, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Initial age (upon actor creation)
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Range of initial ages for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterYear, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Year (current)
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Range of years for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterYearStart, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Initial year (upon actor creation)
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Range of initial years for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterSex, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Sex
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Sexes for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[SEX]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*/
+
+
+	/* NOTE (TableFilterProvince, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Province
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Provinces for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[PROVINCE]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterDoor, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Entry point/door
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Entry point/door for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[cPopulationSource]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterEducation, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Education
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Education level(s) for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[EDUCATION]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS	
+	>
+	>*//* NOTE (TableFilterIncome, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Income quartile
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	June 2019
+	>
+	>DESCRIPTION	Income quartiles for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[INCOME_QUARTILE]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>*/
+
+    /* NOTE (TableFilterAlcohol, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Alcohol
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	May 2022
+	>
+	>DESCRIPTION	Alcohol categories for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[ALCOHOL5]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	There are 5 alcohol categories based on drinks per week (dpw)
+	>1. Never drank
+	>2. Former drinker
+	>3. Light (< 2 dpw)
+	>4. Moderate (2-14 dpw for male, 2-9 dpw for female)
+	>5. Heavy (>14 dpw for male, > 9 dpw for female)
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>*/
+    /* NOTE (TableFilterAlcoholStart, EN )
+	>
+	>PARAMETER
+	>Tabulation restriction: Initial alcohol (upon actor creation)
+	>
+	>LOCATION	Base(Tabulation_Control).dat
+	>LAST UPDATE	May 2022
+	>
+	>DESCRIPTION	Initial alcohol categories for which tabulation should be performed.
+	>
+	>DIMENSIONS
+	>[ALCOHOL5]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	There are 5 alcohol categories based on drinks per week (dpw)
+	>1. Never drank
+	>2. Former drinker
+	>3. Light (< 2 dpw)
+	>4. Moderate (2-14 dpw for male, 2-9 dpw for female)
+	>5. Heavy (>14 dpw for male, > 9 dpw for female)
+	>
+	>METHODS	See notes for input parameter "Tabulation restriction: Age (current)".
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>*/
+
+	/* NOTE (DppAdherencePropensityCorrelation, EN )
+	>
+	>PARAMETER
+	>Correlation in propensity to adhere to DPP 3 aspects
+	>LOCATION	Base(DPP_Intervention).dat
+	>LAST UPDATE	June 2016
+	>
+	>DESCRIPTION	This parameter control how propensity to adhere to the 3 aspects
+	of DPP (BMI, physical activity and metformin) are correlated.
+	>
+	>DIMENSIONS	[SEX]
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Suppose that parameters "Adherence for BMI" and "Adherence for PA" are
+	populated in such a way that, 5 years into the program, 40% are supposed to
+	still adhere to the BMI change/reduction and 40% are still supposed to adhere
+	to physical activity (PA) change/increase.
+	>
+	>If the parameter is set to 0 (no correlation), adherence to PA is independent
+	from adherence to BMI. This means that there will be about
+	>* 0.4*0.4 = 16% of people still adhering to both BMI and PA
+	>* 0.4*0.6 = 24% of people still adhering to BMI but not PA
+	>* 0.6*0.4 = 24% of people still adhering to PA but not BMI
+	>* 0.6*0.6 = 36% of people who no longer adhere to BMI nor PA.
+	>
+	>If the parameter is set to 1, adherence to PA is (perfectly) correlated to
+	adherence to BMI. This means that there will be about
+	>* 40% of people still adhering to both BMI and PA
+	>* 60% of people who no longer adhere to BMI nor PA
+	>
+	>If the parameter is between 0 and 1, so correlation in adherence will be
+	generated, but not as strong as the case above (corr=1).
+	>
+	>
+	>ASSUMPTIONS	Value in base scenario: 0.
+	>
+	>DECISIONS	The value chosen is more in line with previous versions of POHEM.
+	>
+	>REFERENCES	None.
+	>RELATED PARAMETERS or VARIABLES
+	>COMMENTS	Note that this correlation parameter is expected to be non-negative.
+	If a negative value is provided (e.g. -0.75), the effect will be similar (but
+	not identical) to providing its absolute value (0.75).  If the absolute value
+	of the parameter is greater than 1, an error message will be issued.
+	>*/
+
+
+	/* NOTE (CvdportAmiBaseline, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI 5 year baseline cumulative hazard
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	AMI when time since interview is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiLogBaseCumulativeHazard, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI log baseline cumulative hazard
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	AMI when time since birth is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiMainTermsMeans, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI main non-spline terms means
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the mean of main
+	non-spline variables involved in the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiMainTermsCoefficients, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI main non-spline terms coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of main
+	non-spline terms contributing to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiInteractionCoefficients, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI interaction terms
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of
+	interaction terms contributing to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Interaction terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportAmiAgeSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI age cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiAgeSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI age cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportAmiPackYearsSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI pack years cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiPackYearsSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI pack years cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiDrinksSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI drinks last week cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiDrinksSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI drinks last week cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/
+
+	/* NOTE (CvdportAmiMetsSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI METs cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiMetsSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI METs cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportAmiBmiSplineLocationCoef, EN )
+	>
+	>PARAMETER
+	>  	CVDPoRT-AMI BMI cubic spline coefficients
+	>LOCATION
+	>LAST UPDATED
+	>
+	>DESCRIPTION
+	>	This parameter provides information about a person’s BMI contribution to the
+	hazard of AMI
+	>
+	>DIMENSIONS
+	>	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	>	In house/custom estimation of a variation of the model published in Manuel et
+	al.
+	>
+	>DEFINITION
+	>
+	>
+	>METHODS
+	>	See METHODS for “CVDPoRT-AMI BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>
+	>
+	>DECISIONS
+	>
+	>
+	>REFERENCES
+	>	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre Hennessy
+	PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard Perez
+	MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation of a
+	cardiovascular disease risk-prediction model using population health surveys:
+	the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018 July
+	23;190:E871-82. doi: 10.1503/cmaj.170914
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportAmiBmiSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-AMI BMI cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s BMI
+	contribution to the hazard of AMI
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	The hazard of AMI is specified as
+	>  log(hazard) = base  + age*sex calibration terms
+	>      + Non-Spline terms + Non-Spline interaction terms
+	>       + LT(age) + LT(BMI) + LT(Pack-years) + LT(Alcohol) + LT(METs)
+	>       + CS(age) + CS(BMI) + CS(Pack-years) + CS(Alcohol) + CS(METs)
+	>The base is log(K/5) where K is the content of “CVDPoRT-AMI 5 year baseline
+	cumulative hazard” provided that K is not negative.  If K is negative, base is
+	log( H0 (age+1) - H0 (age)   ) where H0 (age)  = exp(log(H0 (age) ))  with
+	log(H0 (age) ) and log(H0 (age+1) ) are provided by the piecewise linear
+	function depicted in parameter “CVDPoRT-AMI log baseline cumulative hazard”.
+	>The “age*sex calibration terms” comes from parameter “Alteration of
+	CVDPoRT-AMI log hazard by sex and age”.
+	>“Non-Spline terms” has the form sum coefficient * (covariate - mean_covariate)
+	with coefficient and mean_covariate provided in parameters “CVDPoRT-AMI main
+	non-spline terms coefficients” and “CVDPoRT-AMI main non-spline terms means”
+	respectively.
+	>“Non-Spline interaction terms” has the form
+								 sum coefficient * (covariate - mean_covariate) *
+	(age – mean_age)  with coefficients and mean_covariate available in parameter
+	“CVDPoRT-AMI interaction terms” and “CVDPoRT-AMI main non-spline terms means”
+	respectively, whereas mean_age is available in “CVDPoRT-AMI age cubic splines
+	companion”.
+	>The CS(.) terms are the cubic splines which come with associated linear term
+	LT(.). In those terms, age is integer age, alcohol is number of drinks in the
+	past week and METs is Metabolic equivalent of task from leisure time physical
+	activity, BMI is body mass index and Pack-years is pack-year smoked in lifetime
+	(1 pack-year is 365 packs of cigarettes). Below, any of those five variables is
+	denoted by x and <…>.  LT and CS described below are sex specific but this is
+	not reflected in notation to ease reading.
+	>LT(x) = coefficient * (coerced(x) – offset_linear) where coerced(x) is x
+	restricted to be no less than A and no more than B, i.e.
+	coerce(x)=max(min(x,B),A).  The parameter “CVDPoRT-AMI <…> cubic splines
+	companion” contains A, B, offset_linear and the coefficient.
+	>CS(x) = sum coefficient(k) * CS((coerced(x) – offset_cubic)/power_range,k)
+	with CS(z,k) being the kth restricted cubic spline as described in
+	5621-2016.pdf (see reference),  coefficient(k) being the corresponding
+	coefficient, and power_range being (last knot – first knot)^power with power
+	provided in paramter “CVDPoRT-AMI <…> cubic splines companion”. The sum is
+	taken over the first K-2 knots where K is the total number of knots provided.
+	The parameter “CVDPoRT-AMI <…> cubic splines coefficient” provides the location
+	of the K knots (locations are assumed to be in ascending order) and the
+	coefficients, whereas coerced(x) is the same as what was explained in the
+	description of LT(x) above. The parameter “CVDPoRT-AMI <…> cubic splines
+	companion” contains offset_cubic.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+	https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+	>Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre Hennessy
+	PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard Perez
+	MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation of a
+	cardiovascular disease risk-prediction model using population health surveys:
+	the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018 July
+	23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS	Note that if one uses 0 or 2/3 as the “Power of knot range for
+	scaling” in the parameter “CVDPoRT-AMI <…> cubic splines companion”, this will
+	reproduce the results of the function rcspline.eval in the R package Hmisc with
+	parameter norm set 0 and 2 respectively. The LT terms would typically arise
+	from using inclx=TRUE in the rcspline.eval.
+	>
+	>*//* NOTE (CVDportAmiAlterationSpecs, EN )
+	>
+	>PARAMETER	Alteration of CVDPoRT-AMI log hazard by sex and age
+	>LOCATION
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter introduces an additional age*sex term in
+	CVDPoRT-AMI’s equation so that POHEM rates of AMI better align with target.
+	>
+	>DIMENSIONS	[SEX][FROM_25_TO_90_BY_5]
+	>
+	>SOURCE	Calibration to AMI prevalence rates (probably not Canadian Chronic
+	Disease Surveillance System (CCDSS)).
+	>
+	>DEFINITION
+	>
+	>METHODS
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (CVDportAmiAlterationSpecsAppliesToPrevalenceFixSR, EN )
+	>
+	>PARAMETER	Use altered CVDPoRT-AMI log hazard in correction for initial AMI
+	prevalence
+	>LOCATION
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter indicates whether the additional age*sex term in
+	CVDPoRT-AMI’s equation (see parameter “Alteration of CVDPoRT-AMI log hazard by
+	sex and age”) should be used to for the purpose of evaluating risk in the
+	correction of initial self-reported AMI.
+	>
+	>DIMENSIONS	None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	A method is used to ensure that the distribution of initial AMI status
+	of people entering the simulation in 2001 agrees with that of parameter
+	“Initial AMI alteration : Prevalence by age, sex and province for year 2001”.
+	The actual method used depend on the parameter “Initial AMI alteration :
+	Correspondence with AMI risk” (called w thereafter).  If w != 0  and |w| <= 1,
+	the method will take into consideration a CVDPoRT-like risk to decide who needs
+	their initial AMI status to be altered.
+	>
+	>The parameter currently discussed (“Use altered CVDPoRT-AMI log hazard in
+	correction for initial AMI prevalence”) tells POHEM if the aforementioned
+	CVDPoRT-like risk should be altered by the parameter “Alteration of CVDPoRT-AMI
+	log hazard by sex and age”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	Set to false.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>*//* NOTE (AmiCvdportPrevalenceTarget2001, EN)
+	>
+	>PARAMETER	Initial AMI alteration : Prevalence by age, sex and province for
+	year 2001
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Synthetic AMI prevalence rate by province, sex and age group
+	according to Canadian Chronic Disease Surveillance System (CCDSS).
+	>
+	>DIMENSIONS
+	>[SEX][FROM_20_TO_80_BY_5][PROVINCE]
+	>
+	>
+	>SOURCE	Two sets of broad prevalence rates from CCDSS were used to create
+	detailed synthetic rates through raking.  The first broad set was prevalence by
+	sex and fine age groups.  The second broad set was prevalence by province, sex
+	and broad age groups.  The detailed synthetic rates are by province, sex and
+	detailed age groups.
+	>
+	>DEFINITION
+	>
+	>METHODS	POHEM comes with a file based on CCHS that provides the joint
+	distribution of people’s attributes (e.g. BMI, diabetes, sex, age, etc…).  This
+	file (see parameter “Distribution of population at beginning of simulation”) is
+	used to initialise people’s initial attributes as they enter POHEM’s
+	simulation. For AMI, CCHS provides information on the prevalence of
+	self-reported AMI.  We may like POHEM to reflect a different AMI concept at
+	initialisation.
+	>
+	>The parameter “Initial AMI alteration : Prevalence by age, sex and province
+	for year 2001” currently discussed is used to provide an alternative
+	distribution of AMI (and hence concept).  At the beginning of their POHEM life,
+	people’s AMI status will tentatively be initialised based on “Distribution of
+	population at beginning of simulation”, but a few actors will see this
+	tentative AMI status assignment altered in order to achieve the prevalence
+	found in the parameter “Initial AMI alteration : Prevalence by age, sex and
+	province for year 2001”.  Thereafter, the AMI status will be subject to
+	incidence rates (see parameter “CVDPoRT-AMI BMI cubic spline companion”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (WeightForUnderlyingAmiCvdportishUniform, EN )
+	>
+	>PARAMETER
+	>Initial AMI alteration : Correspondence with AMI risk
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	The parameter allows users to select the methods used to ensure
+	that POHEM’s initial AMI distribution agrees with some target.
+	>
+	>DIMENSIONS
+	>None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	The parameter “Initial AMI alteration : Correspondence with AMI risk”
+	(called w thereafter) is used to tell which method to use to insure that
+	initial AMI prevalence lines up with some target.
+	>* 	If |w| > 1 then the initial AMI alteration is turned off.
+	>* 	If |w| <= 1 then a method is used to ensure that the distribution of initial
+	AMI status of people entering the simulation in 2001 agrees with that of
+	parameter “Initial AMI alteration : prevalence by age, sex and province for
+	year 2001”. The method used ensures that targets are met with minimal
+	alteration to people’s AMI status.  The scope of this adjustment is restricted
+	by parameters “Initial AMI alteration : In scope populations” and “Initial AMI
+	alteration : In scope years”
+	>
+	>The results will depend on w and has an impact on who will see their initial
+	AMI status altered.  Here are some key values
+	>* 	w=1: If in a given province, sex, age group category more people with AMI
+	are required then those who did not have an AMI but are at high risk of AMI
+	according to a risk equation similar to CVDPoRT will be see their initial AMI
+	status change from NO to YES.  If, au contraire, fewer people with AMI are
+	required then those who had an AMI but are at low risk of AMI according to a
+	risk equation similar to CVDPoRT will be see their initial AMI status change
+	from YES to NO.
+	>* 	w=-1: This does things backwards relative to w=1.  In a nutshell, change
+	initial AMI status from NO to YES if (CVDPoRT-like) risk of AMI is low and from
+	YES to NO if risk of AMI is high.  This is a somewhat silly option.
+	>* 	w=0: The (CVDPoRT-like) risk of AMI is not used to decide who will get an
+	altered initial AMI status.
+	>
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	w=1.  (Considered w=12, i.e. turn off, as we unsure if we have
+	proper targets.)
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*//* NOTE (AmiCvdportInitialAlterationPopulationScope, EN )
+	>
+	>PARAMETER
+	>Initial AMI alteration: In scope populations
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Populations over which the alignment of POHEM’s initial AMI status
+	with some target is done.
+	>
+	>DIMENSIONS
+	>[cPopulationSource]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION	In POHEM, there are 3 points of entry: (i) 2001, (ii) new births
+	after 2001, and (iii) new immigrants after 2001.
+	>
+	>METHODS	Parameters “Initial AMI alteration : In scope populations” and
+	“Initial AMI alteration : In scope years” tell POHEM who is subject to
+	alteration of their AMI status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (AmiCvdportInitialAlterationYearScope, EN )
+	>
+	>PARAMETER
+	>Initial AMI alteration: In scope years
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Years over which the alignment of POHEM’s initial AMI status with
+	some target is done.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Parameters “Initial AMI alteration : In scope populations” and
+	“Initial AMI alteration : In scope years” tell POHEM who is subject to
+	alteration of their AMI status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>*/
+
+	/* NOTE (CvdportStrokeBaseline, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke 5 year baseline cumulative hazard
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	stroke when time since interview is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeLogBaseCumulativeHazard, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke log baseline cumulative hazard
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	stroke when time since birth is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeMainTermsMeans, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke main non-spline terms means
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the mean of main
+	non-spline variables involved in the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeMainTermsCoefficients, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke main non-spline terms coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of main
+	non-spline terms contributing to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeInteractionCoefficients, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke interaction terms
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of
+	interaction terms contributing to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Interaction terms
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeAgeSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke age cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeAgeSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke age cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportStrokePackYearsSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke pack years cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokePackYearsSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke pack years cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeDrinksSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke drinks last week cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeDrinksSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke drinks last week cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeMetsSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke METs cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeMetsSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke METs cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>*/
+
+	/* NOTE (CvdportStrokeBmiSplineLocationCoef, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke BMI cubic spline coefficients
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s BMI
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “CVDPoRT-Stroke BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre
+	Hennessy PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard
+	Perez MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation
+	of a cardiovascular disease risk-prediction model using population health
+	surveys: the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018
+	July 23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (CvdportStrokeBmiSplineCompanion, EN )
+	>
+	>PARAMETER	CVDPoRT-Stroke BMI cubic spline companion
+	>LOCATION
+	>LAST UPDATE	August 2019
+	>
+	>DESCRIPTION	This parameter provides information about a person’s BMI
+	contribution to the hazard of stroke
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE	In house/custom estimation of a variation of the model published in
+	Manuel et al.
+	>
+	>DEFINITION
+	>
+	>METHODS	The hazard of stroke is specified as
+	>  log(hazard) = base  + age*sex calibration terms
+	>       + Non-Spline terms + Non-Spline interaction terms
+	>       + LT(age) + LT(BMI) + LT(Pack-years) + LT(Alcohol) + LT(METs)
+	>       + CS(age) + CS(BMI) + CS(Pack-years) + CS(Alcohol) + CS(METs)
+	>The base is log(K/5) where K is the content of “CVDPoRT-Stroke 5 year baseline
+	cumulative hazard” provided that K is not negative.  If K is negative, base is
+	log( H0 (age+1) - H0 (age)   ) where H0 (age)  = exp(log(H0 (age) ))  with
+	log(H0 (age) ) and log(H0 (age+1) ) are provided by the piecewise linear
+	function depicted in parameter “CVDPoRT-Stroke log baseline cumulative hazard”.
+
+	>The “age*sex calibration terms” comes from parameter “Alteration of
+	CVDPoRT-Stroke log hazard by sex and age”.
+	>“Non-Spline terms” has the form sum coefficient * (covariate - mean_covariate)
+	with coefficient and mean_covariate provided in parameters “CVDPoRT-Stroke main
+	non-spline terms coefficients” and “CVDPoRT-Stroke main non-spline terms means”
+	respectively.
+	>“Non-Spline interaction terms” has the form
+								 sum coefficient * (covariate - mean_covariate) *
+	(age – mean_age)  with coefficients and mean_covariate available in parameter
+	“CVDPoRT-Stroke interaction terms” and “CVDPoRT-Stroke main non-spline terms
+	means” respectively, whereas mean_age is available in “CVDPoRT-Stroke age cubic
+	splines companion”.
+	>The CS(.) terms are the cubic splines which come with associated linear term
+	LT(.). In those terms, age is integer age, alcohol is number of drinks in the
+	past week and METs is Metabolic equivalent of task from leisure time physical
+	activity, BMI is body mass index and Pack-years is pack-year smoked in lifetime
+	(1 pack-year is 365 packs of cigarettes). Below, any of those five variables is
+	denoted by x and <…>.  LT and CS described below are sex specific but this is
+	not reflected in notation to ease reading.
+	>LT(x) = coefficient * (coerced(x) – offset_linear) where coerced(x) is x
+	restricted to be no less than A and no more than B, i.e.
+	coerce(x)=max(min(x,B),A).  The parameter “CVDPoRT-Stroke <…> cubic splines
+	companion” contains A, B, offset_linear and the coefficient.
+	>CS(x) = sum coefficient(k) * CS((coerced(x) – offset_cubic)/power_range,k)
+	with CS(z,k) being the kth restricted cubic spline as described in
+	5621-2016.pdf (see reference),  coefficient(k) being the corresponding
+	coefficient, and power_range being (last knot – first knot)^power with power
+	provided in paramter “CVDPoRT-Stroke <…> cubic splines companion”. The sum is
+	taken over the first K-2 knots where K is the total number of knots provided.
+	The parameter “CVDPoRT-Stroke <…> cubic splines coefficient” provides the
+	location of the K knots (locations are assumed to be in ascending order) and
+	the coefficients, whereas coerced(x) is the same as what was explained in the
+	description of LT(x) above. The parameter “CVDPoRT-Stroke <…> cubic splines
+	companion” contains offset_cubic.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+	https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+	>Douglas G. Manuel MD, Meltem Tuna PhD, Carol Bennett MSc, Deirdre Hennessy
+	PhD, Laura Rosella PhD, Claudia Sanmartin PhD, Jack V. Tu MD, Richard Perez
+	MSc, Stacey Fisher MSc, Monica Taljaard PhD. Development and validation of a
+	cardiovascular disease risk-prediction model using population health surveys:
+	the Cardiovascular Disease Population Risk Tool (CVDPoRT). CMAJ 2018 July
+	23;190:E871-82. doi: 10.1503/cmaj.170914.
+	>
+	>COMMENTS	Note that if one uses 0 or 2/3 as the “Power of knot range for
+	scaling” in the parameter “CVDPoRT-Stroke <…> cubic splines companion”, this
+	will reproduce the results of the function rcspline.eval in the R package Hmisc
+	with parameter norm set 0 and 2 respectively. The LT terms would typically
+	arise from using inclx=TRUE in the rcspline.eval.
+	>
+	>*//* NOTE (CVDportStrokeAlterationSpecs, EN )
+	>
+	>PARAMETER	Alteration of CVDPoRT-Stroke log hazard by sex and age
+	>LOCATION
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter introduces an additional age*sex term in
+	CVDPoRT-Stroke’s equation so that POHEM rates of stroke better align with
+	target.
+	>
+	>DIMENSIONS	[SEX][FROM_25_TO_90_BY_5]
+	>
+	>SOURCE	Calibration to stroke prevalence rates (probably not Canadian Chronic
+	Disease Surveillance System (CCDSS)).
+	>
+	>DEFINITION
+	>
+	>METHODS
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (CVDportStrokeAlterationSpecsAppliesToPrevalenceFixSR, EN )
+	>
+	>PARAMETER	Use altered CVDPoRT-Stroke log hazard in correction for initial
+	stroke prevalence
+	>LOCATION
+	>LAST UPDATE
+	>
+	>DESCRIPTION	This parameter indicates whether the additional age*sex term in
+	CVDPoRT-Stroke’s equation (see parameter “Alteration of CVDPoRT-Stroke log
+	hazard by sex and age”) should be used to for the purpose of evaluating risk in
+	the correction of initial self-reported stroke.
+	>
+	>DIMENSIONS	None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	A method is used to ensure that the distribution of initial stroke
+	status of people entering the simulation in 2001 agrees with that of parameter
+	“Initial stroke alteration : Prevalence by age, sex and province for year
+	2001”.  The actual method used depend on the parameter “Initial stroke
+	alteration : Correspondence with stroke risk” (called w thereafter).  If w != 0
+	and |w| <= 1,  the method will take into consideration a CVDPoRT-like risk to
+	decide who needs their initial stroke status to be altered.
+	>
+	>The parameter currently discussed (“Use altered CVDPoRT-Stroke log hazard in
+	correction for initial stroke prevalence”) tells POHEM if the aforementioned
+	CVDPoRT-like risk should be altered by the parameter “Alteration of
+	CVDPoRT-Stroke log hazard by sex and age”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	Set to false.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>*//* NOTE (StrokeCvdportPrevalenceTarget2001, EN )
+	>
+	>PARAMETER	Initial stroke alteration : Prevalence by age, sex and province for
+	year 2001
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Synthetic stroke prevalence rate by province, sex and age group
+	according to Canadian Chronic Disease Surveillance System (CCDSS).
+	>
+	>DIMENSIONS
+	>[SEX][FROM_20_TO_80_BY_5][PROVINCE]
+	>
+	>
+	>SOURCE	Two sets of broad prevalence rates from CCDSS were used to create
+	detailed synthetic rates through raking.  The first broad set was prevalence by
+	sex and fine age groups.  The second broad set was prevalence by province, sex
+	and broad age groups.  The detailed synthetic rates are by province, sex and
+	detailed age groups.
+	>
+	>DEFINITION
+	>
+	>METHODS	POHEM comes with a file based on CCHS that provides the joint
+	distribution of people’s attributes (e.g. BMI, diabetes, sex, age, etc…).  This
+	file (see parameter “Distribution of population at beginning of simulation”) is
+	used to initialise people’s initial attributes as they enter POHEM’s
+	simulation. For stroke, CCHS provides information on the prevalence of
+	self-reported stroke.  We may like POHEM to reflect a different stroke concept
+	at initialisation.
+	>
+	>The parameter “Initial stroke alteration : Prevalence by age, sex and province
+	for year 2001” currently discussed is used to provide an alternative
+	distribution of stroke (and hence concept).  At the beginning of their POHEM
+	life, people’s stroke status will tentatively be initialised based on
+	“Distribution of population at beginning of simulation”, but a few actors will
+	see this tentative stroke status assignment altered in order to achieve the
+	prevalence found in the parameter “Initial stroke alteration : Prevalence by
+	age, sex and province for year 2001”.  Thereafter, the stroke status will be
+	subject to incidence rates (see parameter “CVDPoRT-stroke BMI cubic spline
+	companion”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (WeightForUnderlyingStrokeCvdportishUniform, EN )
+	>
+	>PARAMETER
+	>Initial stroke alteration : Correspondence with stroke risk
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	The parameter allows users to select the methods used to ensure
+	that POHEM’s initial stroke distribution agrees with some target.
+	>
+	>DIMENSIONS
+	>None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	The parameter “Initial stroke alteration : Correspondence with stroke
+	risk” (called w thereafter) is used to tell which method to use to insure that
+	initial stroke prevalence lines up with some target.
+	>* 	If |w| > 1 then the initial stroke alteration is turned off.
+	>* 	If |w| <= 1 then a method is used to ensure that the distribution of initial
+	stroke status of people entering the simulation in 2001 agrees with that of
+	parameter “Initial stroke alteration : prevalence by age, sex and province for
+	year 2001”. The method used ensures that targets are met with minimal
+	alteration to people’s stroke status.  The scope of this adjustment is
+	restricted by parameters “Initial stroke alteration : In scope populations” and
+	“Initial stroke alteration : In scope years”
+	>
+	>The results will depend on w and has an impact on who will see their initial
+	stroke status altered.  Here are some key values
+	>* 	w=1: If in a given province, sex, age group category more people with stroke
+	are required then those who did not have a stroke but are at high risk of
+	stroke according to a risk equation similar to CVDPoRT will be see their
+	initial stroke status change from NO to YES.  If, au contraire, fewer people
+	with stroke are required then those who had a stroke but are at low risk of
+	stroke according to a risk equation similar to CVDPoRT will be see their
+	initial stroke status change from YES to NO.
+	>* 	w=-1: This does things backwards relative to w=1.  In a nutshell, change
+	initial stroke status from NO to YES if (CVDPoRT-like) risk of stroke is low
+	and from YES to NO if risk of stroke is high.  This is a somewhat silly option.
+	>* 	w=0: The (CVDPoRT-like) risk of stroke is not used to decide who will get an
+	altered initial stroke status.
+	>
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	w=12. Turn off until we get proper targets.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*//* NOTE (StrokeCvdportInitialAlterationPopulationScope, EN )
+	>
+	>PARAMETER
+	>Initial stroke alteration: In scope populations
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Populations over which the alignment of POHEM’s initial stroke
+	status with some target is done.
+	>
+	>DIMENSIONS
+	>[cPopulationSource]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION	In POHEM, there are 3 points of entry: (i) 2001, (ii) new births
+	after 2001, and (iii) new immigrants after 2001.
+	>
+	>METHODS	Parameters “Initial stroke alteration : In scope populations” and
+	“Initial stroke alteration : In scope years” tell POHEM who is subject to
+	alteration of their stroke status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (StrokeCvdportInitialAlterationYearScope, EN )
+	>
+	>PARAMETER
+	>Initial stroke alteration : In scope years
+	>
+	>LOCATION
+	>LAST UPDATE	September 2019
+	>
+	>DESCRIPTION	Years over which the alignment of POHEM’s initial stroke status
+	with some target is done.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Parameters “Initial stroke alteration : In scope populations” and
+	“Initial stroke alteration : In scope years” tell POHEM who is subject to
+	alteration of their stroke status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>*/
+
+	/* NOTE (DementiaMinimumAgeForIncidence, EN )
+	>
+	>PARAMETER	DEMPORT minimum incidence age
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	Minimum age at which dementia may occur
+	>
+	>DIMENSIONS	None
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>REFERENCES
+	>
+	>COMMENTS	In Base scenario, this is set to 55
+	>
+	>
+	>*//* NOTE (DementiaBaseline, EN )
+	>
+	>PARAMETER	DEMPORT 5 year baseline cumulative hazard
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	dementia when time since interview is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (DementiaLogBaseCumulativeHazard, EN )
+	>
+	>PARAMETER	DEMPORT log baseline cumulative hazard
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about the baseline hazard of
+	dementia when time since birth is used as time in the hazard modeling
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	Default values are entered as zeros. These can be altered as needed
+	by the model user.
+	>
+	>
+	>*/ /* NOTE (DementiaMainTermsMeans, EN )
+	>
+	>PARAMETER	DEMPORT main non-spline terms means
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about the mean values of main
+	non-spline variables involved in the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>Exception to the above is the value for the dichotomous ethnicity covariate
+	(i.e., white vs. non-white). The version of DemPoRT documented on the GitHub
+	repo includes a four-level ethnicity category while the version implemented in
+	POHEM includes only a dichotomous covariate.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (DementiaMainTermsCoefficients, EN )
+	>
+	>PARAMETER	DEMPORT main non-spline terms coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of main
+	non-spline terms contributing to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Main non-spline terms
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>Exception to the above is the value for the dichotomous ethnicity covariate
+	(i.e., white vs. non-white). The version of DemPoRT documented on the GitHub
+	repo includes a four-level ethnicity category while the version implemented in
+	POHEM includes only a dichotomous covariate.
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (DementiaInteractionCoefficients, EN )
+	>
+	>PARAMETER	DEMPORT interaction terms
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about the coefficients of
+	interaction terms contributing to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Interaction terms
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (DementiaAgeSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT age cubic spline coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	A maximum of 20 knots are allowed in this parameter. A value of -9 is
+	used for unneeded knot locations.
+	>
+	>
+	>*/ /* NOTE (DementiaAgeSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT age cubic spline companion
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s age
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION	The spline companions included in the parameter are: (i) lower
+	bound for entity used to compute spline; (ii) upper bound for entity used to
+	compute spline; (iii) power of knot range used for scaling; (iv) center linear
+	term; (v) coefficient for linear term; (vi) center cubic spline term.
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*/ /* NOTE (DementiaPackYearsSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT pack years cubic spline coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	A maximum of 20 knots are allowed in this parameter. A value of -9 is
+	used for unneeded knot locations.
+	>
+	>
+	>*/ /* NOTE (DementiaPackYearsSplineCompanion, EN )
+	>
+	>PARAMETER	DEMPORT pack years cubic spline companion
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s pack years
+	smoked contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION	The spline companions included in the parameter are: (i) lower
+	bound for entity used to compute spline; (ii) upper bound for entity used to
+	compute spline; (iii) power of knot range used for scaling; (iv) center linear
+	term; (v) coefficient for linear term; (vi) center cubic spline term.
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (DementiaDrinksSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT drinks last week cubic spline coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	A maximum of 20 knots are allowed in this parameter. A value of -9 is
+	used for unneeded knot locations.
+	>
+	>
+	>*/ /* NOTE (DementiaDrinksSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT drinks last week cubic spline companion
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s number of
+	drinks last week contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION	The spline companions included in the parameter are: (i) lower
+	bound for entity used to compute spline; (ii) upper bound for entity used to
+	compute spline; (iii) power of knot range used for scaling; (iv) center linear
+	term; (v) coefficient for linear term; (vi) center cubic spline term.
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>*/ /* NOTE (DementiaMetsSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT METs cubic spline coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	A maximum of 20 knots are allowed in this parameter. A value of -9 is
+	used for unneeded knot locations.
+	>
+	>
+	>*/ /* NOTE (DementiaMetsSplineCompanion, EN )
+	>
+	>PARAMETER	DEMPORT METs cubic spline companion
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s METs
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION	The spline companions included in the parameter are: (i) lower
+	bound for entity used to compute spline; (ii) upper bound for entity used to
+	compute spline; (iii) power of knot range used for scaling; (iv) center linear
+	term; (v) coefficient for linear term; (vi) center cubic spline term.
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS
+	>
+	>
+	>*/
+
+	/* NOTE (DementiaBmiSplineLocationCoef, EN )
+	>
+	>PARAMETER	DEMPORT BMI cubic spline coefficients
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s BMI
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline knots location and coefficient, List of knots
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION
+	>
+	>METHODS	See METHODS for “DEMPORT BMI cubic spline companion”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	A maximum of 20 knots are allowed in this parameter. A value of -9 is
+	used for unneeded knot locations.
+	>
+	>
+	>
+	>
+	>
+	>
+	>*/ /* NOTE (DementiaBmiSplineCompanion, EN )
+	>
+	>PARAMETER	DEMPORT BMI cubic spline companion
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter provides information about a person’s BMI
+	contribution to the hazard of dementia
+	>
+	>DIMENSIONS	Sex, Cubic spline companion
+	>
+	>SOURCE
+	https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>DEFINITION	The spline companions included in the parameter are: (i) lower
+	bound for entity used to compute spline; (ii) upper bound for entity used to
+	compute spline; (iii) power of knot range used for scaling; (iv) center linear
+	term; (v) coefficient for linear term; (vi) center cubic spline term.
+	>
+	>METHODS	The hazard of dementia is specified as
+	>  log(hazard) = base  + age*sex calibration terms
+	>      + Non-Spline terms + Non-Spline interaction terms
+	>       + LT(age) + LT(BMI) + LT(Pack-years) + LT(Alcohol) + LT(METs)
+	>       + CS(age) + CS(BMI) + CS(Pack-years) + CS(Alcohol) + CS(METs)
+	>The base is log(K/5) where K is the content of “DEMPORT 5 year baseline
+	cumulative hazard”, provided that K is not negative. If K is negative, the base
+	is log(H0(age+1) - H0(age)) where H0(age) = exp(log(H0 (age))) with
+	log(H0(age)) and log(H0 (age+1) ) are provided by the piecewise linear function
+	depicted in parameter “DEMPORT log baseline cumulative hazard”.
+	>
+	>The “age*sex calibration terms” comes from parameter “Alteration of DEMPORT
+	log hazard by sex and age”.
+	>“Non-Spline terms” has the form sum coefficient * (covariate - mean_covariate)
+	with coefficient and mean_covariate provided in parameters “DEMPORT main
+	non-spline terms coefficients” and “DEMPORT main non-spline terms means”,
+	respectively.
+	>“Non-Spline interaction terms” has the form
+								 sum coefficient * (covariate - mean_covariate) *
+	(age – mean_age)  with coefficients and mean_covariate available in parameter
+	“DEMPORT interaction terms” and “DEMPORT main non-spline terms means”,
+	respectively, whereas mean_age is available in “DEMPORT age cubic splines
+	companion”.
+	>The CS(.) terms are the cubic splines, which come with associated linear term,
+	LT(.). In those terms, age is integer age, alcohol is number of drinks in the
+	past week, METs is Metabolic equivalent of task from leisure time physical
+	activity, BMI is body mass index, and Pack-years is pack-year smoked in
+	lifetime (1 pack-year is 365 packs of cigarettes). Below, any of those five
+	variables is denoted by x and <…>.  LT and CS described below are sex-specific,
+	but this is not reflected in notation to ease reading.
+	>LT(x) = coefficient * (coerced(x) – offset_linear) where coerced(x) is x
+	restricted to be no less than A and no more than B, i.e.,
+	coerce(x)=max(min(x,B),A).  The parameter “DEMPORT <…> cubic splines companion”
+	contains A, B, offset_linear and the coefficient.
+	>CS(x) = sum coefficient(k) * CS((coerced(x) – offset_cubic)/power_range,k)
+	with CS(z,k) being the kth restricted cubic spline as described in
+	5621-2016.pdf (see reference),  coefficient(k) being the corresponding
+	coefficient, and power_range being (last knot – first knot)^power with power
+	provided in paramter “DEMPORT <…> cubic splines companion”. The sum is taken
+	over the first K-2 knots where K is the total number of knots provided. The
+	parameter “DEMPORT <…> cubic splines coefficient” provides the location of the
+	K knots (locations are assumed to be in ascending order) and the coefficients,
+	whereas coerced(x) is the same as what was explained in the description of
+	LT(x) above. The parameter “DEMPORT <…> cubic splines companion” contains
+	offset_cubic.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES	Restricted Cubic Spline Regression: A Brief Introduction
+	https://support.sas.com/resources/papers/proceedings16/5621-2016.pdf
+	>https://github.com/Big-Life-Lab/PoRT-cchsshared-dementia-v1-PBLwebsite-imp
+	>
+	>COMMENTS	Note that if one uses 0 or 2/3 as the “Power of knot range for
+	scaling” in the parameter “DEMPORT <…> cubic splines companion”, this will
+	reproduce the results of the function rcspline.eval in the R package Hmisc with
+	parameter norm set 0 and 2 respectively. The LT terms would typically arise
+	from using inclx=TRUE in the rcspline.eval.
+	>
+	>
+	>*//* NOTE (DementiaAlterationSpecs, EN )
+	>
+	>PARAMETER	Alteration of DEMPORT log hazard by sex and age
+	>LOCATION	Base(Dementia).dat
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter introduces an additional age*sex term in DemPoRT’s
+	equation so that the POHEM incidence and/or prevalence rates of dementia better
+	align with target.
+	>
+	>DIMENSIONS	[SEX][FROM_25_TO_90_BY_5]
+	>
+	>SOURCE	Calibration to dementia incidence rates as obtained from the Canadian
+	Chronic Disease Surveillance System (CCDSS). Custom tabulations of CCDSS
+	dementia incidence and prevalence data provided by smaller age groups at the
+	national level.
+	>
+	>DEFINITION
+	>
+	>METHODS
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (DementiaAlterationSpecsAppliesToPrevalenceFixSR, EN )
+	>
+	>PARAMETER	Use altered DEMPORT log hazard in correction for initial dementia
+	prevalence
+	>LOCATION
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	This parameter indicates whether the additional age*sex term in
+	DemPoRT’s equation (see parameter “Alteration of DEMPORT log hazard by sex and
+	age”) should be used to for the purpose of evaluating risk in the correction of
+	initial self-reported dementia.
+	>
+	>DIMENSIONS	None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	A method is used to ensure that the distribution of initial dementia
+	status of people entering the simulation in 2001 agrees with that of parameter
+	“Initial dementia alteration : Prevalence by age, sex and province for year
+	2001”.  The actual method used depends on the parameter “Initial dementia
+	alteration : Correspondence with dementia risk” (called w thereafter).  If w !=
+	0  and |w| <= 1,  the method will take into consideration a DemPoRT-like risk to
+	decide who needs their initial dementia status to be altered.
+	>
+	>The parameter currently discussed (“Use altered DEMPORT log hazard in
+	correction for initial dementia prevalence”) tells POHEM if the aforementioned
+	DemPoRT-like risk should be altered by the parameter “Alteration of DEMPORT log
+	hazard by sex and age”.
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS	Set to false in base scenario.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>*//* NOTE (DementiaPrevalenceTarget2001, EN )
+	>
+	>PARAMETER	Initial dementia alteration: Prevalence by age, sex and province for
+	year 2001
+	>LOCATION
+	>LAST UPDATE	March 2021
+	>
+	>DESCRIPTION	Synthetic dementia prevalence rate by province, sex and age group
+	derived based on data available in the Canadian Chronic Disease Surveillance
+	System (CCDSS).
+	>
+	>DIMENSIONS
+	>[SEX][FROM_20_TO_80_BY_5][PROVINCE]
+	>
+	>
+	>SOURCE	CCDSS provides dementia prevalence (and incidence) data starting in
+	2002 (www.health-infobase.canada.ca/ccdss/data-tool), therefore it was
+	necessary to extrapolate estimates backwards to derive a target dementia
+	prevalence rate for the year 2001. A custom tabulation of CCDSS dementia data
+	was also made available for this project: dementia prevalence data was provided
+	at the national level for more detailed age groups (65-69, 70-74, 75-79, 80-84,
+	85-89, 90+), separately for males and females.
+	>
+	>DEFINITION	Dementia case counts from CCDSS were compared to population counts
+	obtained from CANSIM in order to derive rates (proportions).
+	>
+	>METHODS	POHEM comes with a file based on 2001 CCHS that provides the joint
+	distribution of people’s attributes (e.g., BMI, diabetes, sex, age, etc.).
+	This file (see parameter “Distribution of population at beginning of
+	simulation”) is used to initialise people’s initial attributes as they enter
+	POHEM’s simulation. Although self-reported dementia was not originally provided
+	as a stand-alone variable on the Public Use Microdata File for 2001, special
+	permission was obtained to release and use this variable. Even so, it may be
+	necessary to further adjust the reported prevalence of dementia in POHEM to
+	reflect a different dementia concept at initialisation.
+	>
+	>The parameter “Initial dementia alteration: Prevalence by age, sex and
+	province for year 2001” currently discussed is used to provide an alternative
+	distribution of dementia (and hence concept).  At the beginning of their POHEM
+	life, people’s dementia status will tentatively be initialised based on
+	“Distribution of population at beginning of simulation”, but a few actors will
+	see this tentative dementia status assignment altered in order to achieve the
+	prevalence found in the parameter “Initial dementia alteration: Prevalence by
+	age, sex and province for year 2001”.  Thereafter, the dementia status will be
+	subject to incidence rates (see parameter “DEMPORT BMI cubic spline
+	companion”).
+	>
+	>To estimate the dementia prevalence target for 2001, CCDSS dementia prevalence
+	rates were examined separately by sex, age group and province for years 2002
+	through 2016, which is the most recent year available in CCDSS. In plotting
+	these, it appeared as though the trend was linear in the early years of CCDSS.
+	As such, a linear model was used to predict 2001 prevalence rates for each
+	combination of sex, age group, and province using CCDSS observed data for years
+	2002 through 2010, inclusive.
+	>
+	>ASSUMPTIONS	CCDSS does not obtain or provide dementia incidence or prevalence
+	data for Saskatchewan. In POHEM, age- and sex-specific dementia prevalence
+	target rates from Manitoba were used as proxies for Saskatchewan.
+	>
+	>DECISIONS	The CCDSS only collects dementia incidence and prevalence
+	information for Canadians age 65 years and older. DemPoRT evaluates the risk of
+	dementia for individuals age 55 years and older, and the 2001 CCHS asked for
+	self-reported dementia for respondents age 18 years and older. Therefore, there
+	are some age scope discrepancies between the various sources of dementia data.
+	In setting the dementia prevalence in POHEM in 2001, it was decided (based on
+	low dementia incidence and prevalence rates for individuals younger than age 65
+	in CCDSS) that any self-reported dementia prevalence from 2001 CCHS for
+	individuals under age 65 would be set to zero based on the parameter “Initial
+	dementia alteration: Prevalence by age, sex and province for year 2001”.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*//* NOTE (DementiaInitialAlterationPopulationScope, EN )
+	>
+	>PARAMETER
+	>Initial dementia alteration: In scope populations
+	>
+	>LOCATION
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	Populations over which the alignment of POHEM’s initial dementia
+	status with some target is done.
+	>
+	>DIMENSIONS
+	>[cPopulationSource]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION	In POHEM, there are 3 points of entry: (i) 2001, (ii) new births
+	after 2001, and (iii) new immigrants after 2001.
+	>
+	>METHODS	Parameters “Initial dementia alteration: In scope populations” and
+	“Initial dementia alteration: In scope years” tell POHEM who is subject to
+	alteration of their dementia status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>*//* NOTE (DementiaInitialAlterationYearScope, EN )
+	>
+	>PARAMETER
+	>Initial dementia alteration: In scope years
+	>
+	>LOCATION
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	Years over which the alignment of POHEM’s initial dementia status
+	with some target is done.
+	>
+	>DIMENSIONS
+	>[cLOWER_UPPER_BOUNDS]
+	>
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	Parameters “Initial dementia alteration: In scope populations” and
+	“Initial dementia alteration: In scope years” tell POHEM who is subject to
+	alteration of their dementia status read in from the StartPop file (parameter
+	“Distribution of population at beginning of simulation”).
+	>
+	>ASSUMPTIONS
+	>
+	>DECISIONS
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+	>
+	>
+	>*//* NOTE (WeightForUnderlyingDemportUniform, EN )
+	>
+	>PARAMETER
+	>Initial dementia alteration: Correspondence with dementia risk
+	>
+	>LOCATION
+	>LAST UPDATE	June 2021
+	>
+	>DESCRIPTION	The parameter allows users to select the methods used to ensure
+	that POHEM’s initial dementia distribution agrees with some target.
+	>
+	>DIMENSIONS
+	>None
+	>
+	>SOURCE
+	>
+	>DEFINITION
+	>
+	>METHODS	The parameter “Initial dementia alteration: Correspondence with
+	dementia risk” (called w hereafter) is used to tell which method to use to
+	insure that initial dementia prevalence lines up with some target.
+	>* 	If |w| > 1 then the initial dementia alteration is turned off.
+	>* 	If |w| <= 1 then a method is used to ensure that the distribution of initial
+	dementia status of people entering the simulation in 2001 agrees with that of
+	parameter “Initial dementia alteration: prevalence by age, sex and province for
+	year 2001”. The method used ensures that targets are met with minimal
+	alteration to people’s dementia status.  The scope of this adjustment is
+	restricted by parameters “Initial dementia alteration: In scope populations”
+	and “Initial dementia alteration: In scope years”
+	>
+	>The results will depend on w and has an impact on who will see their initial
+	dementia status altered.  Here are some key values
+	>* 	w=1: If, in a given province, sex, and age group category, more people with
+	dementia are required, then those who did not initially have dementia but are
+	at high risk of dementia (according to a risk equation similar to DemPoRT) will
+	see their initial dementia status changed from NO to YES. By contrast, if fewer
+	people with dementia are required, then those who initially had dementia but
+	are at low risk of dementia (according to a risk equation similar to DemPoRT)
+	will see their initial dementia status changed from YES to NO.
+	>* 	w=-1: This does things backwards relative to w=1. In short, POHEM will
+	change an actor’s initial dementia status from NO to YES if (DemPoRT-like) risk
+	of dementia is low, and from YES to NO if risk of dementia is high. This is a
+	somewhat silly option.
+	>* 	w=0: The (DemPoRT-like) risk of dementia is not used to decide who will get
+	an altered initial dementia status.  It is random.
+	>
+	>
+	>ASSUMPTIONS
+	>DECISIONS	Value set to w=1 in base scenario.
+	>
+	>REFERENCES
+	>
+	>COMMENTS
+	>
+
+	>
+	>*/
+
+};

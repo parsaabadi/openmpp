@@ -1,0 +1,250 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) DiabetesPrevalenceStart
+/* FILE_NOTE(EN) 
+This module assigns diabetes prevalence status at start of the simulation. 
+Essentially, there is a mis-alignment between self-reported diabetes prevalence in our starting population (CCHS) and our target diabetes prevalence in 2001 (CCDSS). 
+Sometimes there is an under-reporting of diabetes as compared with our target data, but sometimes there is over-reporting. The differences vary by age, sex and province. 
+
+This module reassigns diabetes so that (i) target rates are met and (ii) minimal alteration is done to the CCHS information read in.
+When re-assigning, the risk of diabetes may be taken into consideration.  So if more diabetes is needed in a given  age/sex/province cell, we will tend to take a person with no diabetes according
+to CCHS but with elevated risk of (future) diabetes as a candidate for flipping (from no diabetes to diabetes) at case initiation.  
+This behavior is achieved by using WeightForUnderlyingDPoRTishUniform=1. 
+
+
+*/
+partition AGE_GROUP_5_85	{ 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85 };
+partition FROM_20_TO_80_BY_15 { 20, 35, 50, 65, 80 };
+partition FROM_20_TO_80_BY_5  { 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80 };
+partition FROM_20_TO_90_BY_5  { 20,25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90 };
+partition FROM_55 { 55 };
+
+
+parameter_group pgDiabetes_Calibration_Inputs { //EN Diabetes calibration parameters
+	DiabetesInitialAlterationPopulationScope ,
+	DiabetesInitialAlterationYearScope ,      
+	WeightForUnderlyingDPoRTishUniform, 
+	DiabetesPrevalenceTarget2001
+	
+};
+
+
+parameters {
+	//Alteration of diabetes status found on StartPop file (CCHS)
+	logical DiabetesInitialAlterationPopulationScope [cPopulationSource];   //EN In scope populations for initial diabetes alteration 
+	int     DiabetesInitialAlterationYearScope       [cLOWER_UPPER_BOUNDS]; //EN In scope years for initial diabetes alteration   
+	double WeightForUnderlyingDPoRTishUniform;                              //EN Correspondence between initial diabetes alteration and diabetes risk
+	double DiabetesPrevalenceTarget2001[SEX][FROM_20_TO_80_BY_5][PROVINCE]; //EN Diabetes prevalence by age, sex and province for year 2001
+
+
+	 model_generated double UnderlyingUniformWhereaboutsForSrDiabetes[DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+	 model_generated double UnderlyingUniformWhereaboutsForDPoRTish  [DB_RECORDS][cLOWER_UPPER_BOUNDS] ;
+};
+
+actor Person            // Core Individual
+{
+	void    DiabetesAlterInitialValue();
+	hook    DiabetesAlterInitialValue, InitializationEmptyHub, 40; // 40 = execution number, the higher the value, the later the execution
+
+
+	logical	Imputed_Diabetes_Start     = gDiabetes_Initial == DIAB_NO  && gDiabetes_Initial_Altered == DIAB_YES ;  //EN Db flipped from NO to YES at case initialisation
+	logical Imputed_Non_Diabetes_Start = gDiabetes_Initial == DIAB_YES && gDiabetes_Initial_Altered == DIAB_NO  ;  //EN Db flipped from YES to NO at case initialisation
+	logical Imputed_Either             = gDiabetes_Initial  != gDiabetes_Initial_Altered;                          //EN Db altered at case initialisation
+};
+
+void	Person::DiabetesAlterInitialValue()
+{
+	//MessageWhoWhenWhere(__FUNCTION__,TRUE);
+
+	if ( std::abs(WeightForUnderlyingDPoRTishUniform) <= 1.0 && DiabetesInitialAlterationPopulationScope [ population_source ]  &&
+		 DiabetesInitialAlterationYearScope [LOWER_BOUND] <= calendar_year && calendar_year <= DiabetesInitialAlterationYearScope [UPPER_BOUND] ) 
+	{
+		double gods_unif_for_db , gods_unif_for_DPoRTish, unif_for_db_draw, cauchy_noise ;
+		double weight = WeightForUnderlyingDPoRTishUniform;
+
+		gods_unif_for_DPoRTish = runif(RandUniform(140),UnderlyingUniformWhereaboutsForDPoRTish   [cchs_record][LOWER_BOUND],UnderlyingUniformWhereaboutsForDPoRTish  [cchs_record][UPPER_BOUND]);
+		cauchy_noise = qcauchy(RandUniform(139),0,1);
+		unif_for_db_draw = pcauchy( weight*qcauchy(gods_unif_for_DPoRTish,0,1) + (1-std::abs(weight))*cauchy_noise ,0,1);
+		/* NOTES
+		     A few interesting special cases of the above
+		       weight =  1 ==> unif_for_db_draw =   gods_unif_for_DPoRTish which turns out to be the proper things to use
+		       weight =  0 ==> unif_for_db_draw =   RandUniform(139)       which is OKish (OK but does not take person's risk according to DPoRTish)
+		       weight = -1 ==> unif_for_db_draw = 1-gods_unif_for_DPoRTish which is bad (improper use of person's risk according to DPoRTish)
+             In any case (any weight),  unif_for_db_draw ~ U(0,1)
+		*/
+
+		gods_unif_for_db       = runif(unif_for_db_draw,UnderlyingUniformWhereaboutsForSrDiabetes [cchs_record][LOWER_BOUND],UnderlyingUniformWhereaboutsForSrDiabetes[cchs_record][UPPER_BOUND]);
+		//This is U(0,1) and perceived as the uniform variates used by God to simulate the respondent's SR diabetes.
+
+
+		//God assigns NO for small U(0,1) and YES otherwise.  We do the reverse below.  We thus need to flip God's uniform variate.
+		gods_unif_for_db = 1.0 - gods_unif_for_db;
+		gDiabetes_Initial_Altered = gods_unif_for_db < DiabetesPrevalenceTarget2001[sex][SPLIT(truncated_age, FROM_20_TO_80_BY_5)][province] ? DIAB_YES : DIAB_NO;  
+			/*
+				char line[199];
+				snprintf(line,199,"%i, %15.1f, %0.9f,  %i, %i, %i, %i, %i, %i \n", (int)case_id, (double)case_seed, gods_unif_for_db, population_source, calendar_year, sex , truncated_age, gDiabetes_Initial,gDiabetes_Initial_Altered ); 
+				WriteDebugLogEntry(line);
+			*/
+		
+	
+
+		gDiabetes_DPoRT = gDiabetes_Initial_Altered ;
+		if(!UseDport)
+			gDiabetes_PA    = gDiabetes_Initial_Altered ;
+		
+		/*
+		if(case_id <= 100000)
+		{
+			char line[199];
+			snprintf(line,199,"%i, %i, %i, %i, %i, %0.9f, %0.9f , %0.9f , %0.9f  \n", sex , SPLIT(truncated_age,FROM_20_TO_80_BY_5), province, gDiabetes_Initial,gDiabetes_Initial_Altered, log(DportPredictor(10.0)) ,
+			               UnderlyingUniformWhereaboutsForSrDiabetes [cchs_record][LOWER_BOUND],UnderlyingUniformWhereaboutsForSrDiabetes[cchs_record][UPPER_BOUND] ,gods_unif_for_db        ); 
+			WriteDebugLogEntry(line);
+		}
+		*/
+	}
+
+
+	
+	
+};
+
+
+
+
+void PreSimulation()
+{
+	int    covariates[SIZE(COVARIATE_X)] = {cDb_Sex,cDb_Province,-1,cDb_Sex};//icitte try move this here for debugger
+
+	/* BEGIN get underlying uniform for SR diabetes  */
+	if( TRUE ) //Just want self contained chunk for SR diabetes. For instance, I can declare int covariates here and then declare it again later for the DPort chunk.  Safer that way.
+	{
+	//	int    covariates[SIZE(COVARIATE_X)] = {cDb_Sex,cDb_Province,-1,cDb_Sex};//DEBUG compilation does not like this
+		double in_scope  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = {  -1.0, 9e9,
+					                                                         -1.0, 9e9,  
+				                                                             -1.0, 9e9, 
+						                                                     -1.0, 9e9  } ;
+
+		for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+			if(mgCumStartPopWeight[record_looper] > 0.0)
+				mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+
+
+
+
+		int n_records_tot = StoreData(mgStartPopCopy  ,covariates,cDb_SP_DM,mgStartPopAlternativeX,NULL,in_scope );  //Compute Xgroup from covariates and Y=cDb_SP_DM and copy them to mgStartPopCopy with respondent weight and ID (row number).
+		
+		qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+		GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForSrDiabetes, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+		/* icitte debug does not like this 
+		for(int k =0; k<SIZE(DB_RECORDS_CDF); k++)
+		{
+			char line[199];
+			snprintf(line,199,"%i,  %i, %0.9f, %0.9f , %0.9f  \n", (int)mgStartPopCopy[k][RXYCC_RECORD],(int)mgStartPopCopy[k][RXYCC_X_GROUP],mgStartPopCopy[k][RXYCC_Y],mgStartPopCopy[k][RXYCC_CDFINF],mgStartPopCopy[k][RXYCC_CDFSUP]);               
+			WriteDebugLogEntry(line);
+		}
+				
+		for(int k =0; k<SIZE(DB_RECORDS_CDF); k++)
+		{
+			char line[199];
+			snprintf(line,199,"%0.9f , %0.9f  \n", UnderlyingUniformWhereaboutsForSrDiabetes[k][LOWER_BOUND],  UnderlyingUniformWhereaboutsForSrDiabetes[k][UPPER_BOUND] );               
+			WriteDebugLogEntry(line);
+		}
+		*/
+
+
+	}
+	  /* END get underlying uniform for SR diabetes */
+
+ 
+
+
+    /* BEGIN get underlying uniform for DPoRT-like risk */ 
+
+	if( TRUE ) //Just want self contained chunk for SR diabetes. For instance, I can declare int covariates here and then declare it again later for the DPort chunk.  Safer that way.
+	{
+		//int    covariates[SIZE(COVARIATE_X)] = {cDb_Sex,cDb_Province,-1,cDb_SP_DM}; //DEBUG compilation does not like this
+
+		       covariates[0] =  cDb_Sex                           ; 
+		       covariates[1] =          cDb_Province              ; 
+		       covariates[2] =                       -1           ; 
+		       covariates[3] =                          cDb_SP_DM ; 
+	
+
+		double in_scope  [SIZE(COVARIATE_X)][SIZE(cLOWER_UPPER_BOUNDS)] = {  -1.0, 9e9,
+					                                                         -1.0, 9e9,  
+				                                                             -1.0, 9e9, 
+						                                                     -1.0, 9e9  } ;
+
+		for(int record_looper=0; record_looper<SIZE(DB_RECORDS); record_looper++)
+			if(mgCumStartPopWeight[record_looper] > 0.0)
+			{
+				mgStartPopAlternativeX[record_looper] = SPLIT(5*pStartPop[record_looper][cDb_AgeGrp] + 7 ,FROM_20_TO_80_BY_5); // 5*[cDb_AgeGrp] + 7 :   3 --> 5*3 + 7 ==22  ; 4 --> 5*4 + 7 ==27 , ... 
+				mgStartPopAlternativeY[record_looper] =      DPoRTish10YearProb(pStartPop[record_looper]) ;
+			//	mgStartPopAlternativeY[record_looper] = int( DPoRTish10YearProb(pStartPop[record_looper]) * 1000.0 ) / 1000.0;
+
+
+			}
+
+
+		int n_records_tot = StoreData(mgStartPopCopy  ,covariates,-1,mgStartPopAlternativeX,mgStartPopAlternativeY,in_scope );  //Compute Xgroup from covariates and Y=DPoRTish and copy them to mgStartPopCopy with respondent weight and ID (row number).
+
+		qsort(mgStartPopCopy, n_records_tot, SIZE(RECORD_X_Y_CDFINF_CDFSUP)*sizeof(double), compare_two_RXYCC_vectors); //   sort mgStartPopCopy by Xgroup and Y 
+
+		GetUnderlyingUniformWhereabouts(mgStartPopCopy , UnderlyingUniformWhereaboutsForDPoRTish, n_records_tot); // For each record get Prob(Y < y | X = x) and  Prob(Y <= y | X = x) .  Note that this function also alters mgStartPopCopy which is fine.
+
+	}
+	/* END   get underlying uniform for DPoRT-like risk */                 
+  
+}
+
+
+double DPoRTish10YearProb(const double person_characteristics[SIZE(DB_FIELDS)])  // (double *person_characteristics)  should work as well 
+{
+
+	EDUCATION local_Education        = ( EDUCATION   ) int(person_characteristics[cDb_Education]);
+	SEX       local_sex              = ( SEX         ) int(person_characteristics[cDb_Sex      ]);
+	int       local_gBMI_diabetes    = SPLIT              (person_characteristics[cDb_BMI      ], BMI_diabetes);
+	
+	int       local_hypertension     =                 int(person_characteristics[cDb_SP_HBP   ]);
+	int       local_AgeGrp           =                 int(person_characteristics[cDb_AgeGrp   ]);
+
+	int       local_age              = 5*local_AgeGrp + 7 ; // 3 --> 22, 4 --> 27
+	int       local_gAgeGrp_diabetes = SPLIT(local_age, AGE_DIABETES_GROUP);
+
+		// prepare new categorical variables
+		
+		int nPostSecondary = local_Education == EDUC3 || local_Education == EDUC4 ? 1 : 0 ;
+
+		 /* BEGIN smoke  icitte 
+	SMOKER1 gSmoker = (smoking_module_choice == NPHS_SMOKING_MODULE ) 
+						? gSmoking_NPHS
+						: ( smoking_status==NON_SMOKER ) 
+							? cNOT_REGULAR_SMOKER 
+							: cREGULAR_SMOKER; //EN Smoker regular (or not)
+	 END smoke */
+		
+			double mu, scale, u ;
+
+		scale = pDiabetes_Beta[local_sex][DB_Scale];
+		//Center the variables with respect to the "means" by which is meant "proportions"
+
+		 mu =  pDiabetes_Corrected_Intercept[local_sex]
+			+ pDiabetes_Beta[local_sex][DB_Hypertensive] * (double) local_hypertension
+			+ pDiabetes_Beta[local_sex][DB_Nonwhite] *      person_characteristics[cDb_Ethnicity] 
+			+ pDiabetes_Beta[local_sex][DB_ImmigrantEver] * person_characteristics[cDb_Immig] 
+			+ pDiabetes_Beta[local_sex][DB_PostSecondary] * (double) nPostSecondary
+			+ pDiabetes_Beta[local_sex][DB_HeartDisease] *  person_characteristics[cDb_SP_HRT]
+//icitte			+ pDiabetes_Beta[local_sex][DB_Smoker] * (double) ((int) gSmoker) //QQQ updated during simulation? 
+			+ pDiabetes_Beta_BMI_Age[local_sex][local_gBMI_diabetes][local_gAgeGrp_diabetes]
+			+ DportAlterationSpecs[local_sex][SPLIT(local_age, FROM_25_TO_90_BY_5) ] * (DportAlterationSpecsAppliesToDiabetesPrevalenceFixSR ? 1.0 : 0.0);
+
+		u = (log(3652.5) - mu)/scale;							// 10 year prediction because the model was constructed in unit of days 
+		return (1.0 - exp(-exp(u)));					// 10 year probability of developing diabetes
+
+}
+
+
+
+

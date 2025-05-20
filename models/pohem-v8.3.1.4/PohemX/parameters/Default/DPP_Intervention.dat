@@ -1,0 +1,168 @@
+parameters {
+	logical	DPP_NonAdherence_BMI_ResetToPrior = TRUE; //EN Mode of BMI evolution when DPP adherence ceases
+
+	 //EN Adherence for BMI
+	double	DPP_AdherenceBMI[DPP_YEARS][SEX][FROM_25_TO_75_BY_10] = {
+		// 0
+		(2) {
+			(7) 1, 
+		},
+		// 1
+		(2) {
+			(7) 0.5, 
+		},
+		// 2
+		(2) {
+			(7) 0.44, 
+		},
+		// 3
+		(2) {
+			(7) 0.38, 
+		},
+		// 4
+		(2) {
+			(7) 0.32, 
+		},
+		// 5
+		(2) {
+			(7) 0.26, 
+		},
+		// 6
+		(2) {
+			(7) 0.2, 
+		},
+		// 7
+		(2) {
+			(7) 0.14, 
+		},
+		// 8
+		(2) {
+			(7) 0.08, 
+		},
+		// 9 - 10
+		(2) {
+			(2) {
+				(7) 0.02, 
+			},
+		},
+	};
+
+	 //EN Adherence for PA
+	double	DPP_AdherencePA[DPP_YEARS][SEX][FROM_25_TO_75_BY_10] = {
+		// 0
+		(2) {
+			(7) 1, 
+		},
+		// 1
+		(2) {
+			(7) 0.74, 
+		},
+		// 2
+		(2) {
+			(7) 0.66, 
+		},
+		// 3
+		(2) {
+			(7) 0.58, 
+		},
+		// 4
+		(2) {
+			(7) 0.5, 
+		},
+		// 5
+		(2) {
+			(7) 0.42, 
+		},
+		// 6
+		(2) {
+			(7) 0.34, 
+		},
+		// 7
+		(2) {
+			(7) 0.26, 
+		},
+		// 8
+		(2) {
+			(7) 0.18, 
+		},
+		// 9
+		(2) {
+			(7) 0.10, 
+		},
+		// 10
+		(2) {
+			(7) 0.02, 
+		},
+	};
+
+	 //EN Adherence for Metformin
+	double	DPP_AdherenceMetformin[DPP_YEARS][SEX][FROM_25_TO_75_BY_10] = {
+		// 0 - 10
+		(11) {
+			(2) {
+				(7) 1, 
+			},
+		},
+	};
+
+	 //EN Correlation in propensity to adhere to DPP 3 aspects (PA, BMI, Metformin)
+	double	DppAdherencePropensityCorrelation[SEX] = {
+		(2) 0, 
+	};
+
+	 //EN Minimum level of BMI (during year(s) for DPP program) to be a target
+	double	DPP_gBMI[SEX] = {
+		(2) 24, 
+	};
+	logical	DPP_Intervention_active = FALSE; //EN DPP Intervention active?
+
+	 //EN Age range (during year(s) for DPP program) to be a target
+	int	DppAgeRange[SEX][cLOWER_UPPER_BOUNDS] = {
+		(2) {
+			25, 79, 
+		},
+	};
+
+	 //EN Proportion of DPP participants who experience shift in BMI (due to DPP)
+	double	DPP_proportion_reduc_BMI[SEX][FROM_25_TO_75_BY_10] = {
+		(2) {
+			(7) 1, 
+		},
+	};
+
+	 //EN Proportion of DPP participants who experience shift in LTPA (due to DPP)
+	double	DPP_proportion_shift_LTPA[LTPA_4CAT][SEX][FROM_25_TO_75_BY_10] = {
+		// LTPA_NO - LTPA_0_30
+		(2) {
+			(2) {
+				(7) 1, 
+			},
+		},
+		// LTPA_30_60 - LTPA_60_plus
+		(2) {
+			(2) {
+				(7) 0, 
+			},
+		},
+	};
+
+	 //EN Relative reduction in BMI due to DPP
+	double	DPP_Reduction_in_BMI[SEX][FROM_25_TO_75_BY_10] = {
+		(2) {
+			(7) 0.07, 
+		},
+	};
+
+	 //EN DPoRT threshold for Elevated Plasma Glucose
+	double	Threshold_for_Elevated_Plasma_Glucose[SEX][FROM_25_TO_80_BY_5] = {
+		(13) 0.062, 
+		(13) 0.048, 
+	};
+
+	 //EN Year range for DPP program
+	int	Year_for_DPP_program[cLOWER_UPPER_BOUNDS] = {
+		2015, 2017, 
+	};
+	double	pDiabetesRRMetformin = 1.0; //EN Relative risk of metformin on risk of developing diabetes
+};
+

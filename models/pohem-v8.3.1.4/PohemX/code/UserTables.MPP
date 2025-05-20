@@ -1,0 +1,446 @@
+#include "pohem.h"
+
+//FILE_LABEL (EN) UserTables created by analysing output in other Tables
+/* FILE_NOTE(EN)
+	UserTables created by analysing output in other Tables.
+*/
+
+
+range RANGE01{ 0,1 };
+partition INCIDENCE_AGE_GROUP{ 35,40,50,60,70,80 };
+classification CROSS_SECTIONAL_OR_LONGITUDINAL
+{
+	HALE_LE_CROSS_SECTIONAL, //EN Cross-sectional
+	HALE_LE_LONGITUDINAL     //EN Longitudinal
+};
+
+double Get_New_Baseline_Rates_AMI(int nRegion, int nSex, int nAge,
+	double Target, double Baseline,
+	CString InTable, CString OutTable);
+double Get_New_Baseline_Rates_OA(int nSex, int nAge,
+	double Target,		// target rates
+	double Baseline,	// current baseline
+	CString InTable,	// table data to calculate next baseline
+	CString OutTable);
+
+void UserTables()
+{
+	int nAllCases = int(GetAllCases());
+	int CaseClones = (int)(mgNumCases[cStartPop] - mgNumRecordsOnStartPopFile);
+
+	double AgeSex_Original_Distribution[SIZE(SEX)][SIZE(AGE_GROUP_from25_to80_by5)];
+	double AgeSex_Altered_Distribution[SIZE(SEX)][SIZE(AGE_GROUP_from25_to80_by5)];
+
+
+	for (int sexe = 0; sexe < SIZE(SEX); sexe++)
+		for (int group_age = 0; group_age < SIZE(AGE_GROUP_from25_to80_by5); group_age++)
+		{
+			AgeSex_Original_Distribution[sexe][group_age] = 0.0;
+			AgeSex_Altered_Distribution[sexe][group_age] = 0.0;
+		}
+
+
+	for (int nRecord = 0; nRecord < SIZE(DB_RECORDS); nRecord++)
+	{
+		int group_age = int(pStartPop[nRecord][cDb_AgeGrp]);
+		int sexe = int(pStartPop[nRecord][cDb_Sex]);
+		double survey_w = pStartPop[nRecord][cDb_Weight];
+
+		if (survey_w >= 0.0)
+		{
+			/*
+			SetTableValue( "tStart_Pop_Age.E",            group_age                         ,nRecord);
+			SetTableValue( "tStart_Pop_Sex.E",            sexe                              ,nRecord);
+			SetTableValue( "tStart_Pop_Bmi.E",            pStartPop[nRecord][cDb_BMI    ]   ,nRecord);
+			SetTableValue( "tStart_Pop_Survey_Weight.E",  survey_w                          ,nRecord);
+			*/
+
+			AgeSex_Original_Distribution[sexe][group_age - 3] += survey_w;
+			AgeSex_Altered_Distribution[sexe][group_age - 3] += mgCumStartPopWeight[nRecord];
+		}
+
+	}
+	/*
+
+			for(int sexe = 0; sexe<SIZE(SEX);sexe++)
+				for(int group_age = 0; group_age<SIZE(AGE_GROUP_from25_to80_by5) ; group_age++)
+				{
+					SetTableValue( "tStart_Pop_AgeSex_Original_Distribution.E",AgeSex_Original_Distribution[sexe][group_age] ,sexe,group_age);
+					SetTableValue( "tStart_Pop_AgeSex_Altered_Distribution.E" ,AgeSex_Altered_Distribution [sexe][group_age] ,sexe,group_age);
+				}
+	*/
+
+	SetTableValue("utPresimView.A0", mgNumRecordsOnStartPopFile, 0);
+	SetTableValue("utPresimView.C0", mgNumCasesRaw[cStartPop], 0);
+	SetTableValue("utPresimView.C1", mgNumCasesRaw[cNewBirth], 0);
+	SetTableValue("utPresimView.C2", mgNumCasesRaw[cNewImmig], 0);
+	SetTableValue("utPresimView.E0", mgNumCases[cStartPop], 0);
+	SetTableValue("utPresimView.E1", mgNumCases[cNewBirth], 0);
+	SetTableValue("utPresimView.E2", mgNumCases[cNewImmig], 0);
+	SetTableValue("utPresimView.E4", mgNewImmigAdjustFactor, 0);
+	SetTableValue("utPresimView.E5", mgNewBirthAdjustFactor, 0);
+	SetTableValue("utPresimView.E6", mgNewBirthAdjustFactorUnduplicate, 0);
+	SetTableValue("utPresimView.E7", mgNewBirthAdjustFactorReduceAim, 0);
+	SetTableValue("utPresimView.E8", (double)GetAllCases(), 0);
+	SetTableValue("utPresimView.E9", (double)GetPopulation(), 0);
+	SetTableValue("utPresimView.E10", ((double)GetPopulation()) / GetAllCases(), 0);
+
+
+	/*
+	SetTableValue( "ScenarioDic_Table.E0", GetPopulation()  ,FEMALE);
+	SetTableValue( "ScenarioDic_Table.E0", GetPopulation()  ,  MALE);
+	SetTableValue( "ScenarioDic_Table.E1", GetAllCases()    ,FEMALE);
+	SetTableValue( "ScenarioDic_Table.E1", GetAllCases()    ,  MALE);
+	*/
+
+	/*
+	if ( pDisease[DM_DIABETES][ROW_1] ) {
+		UserTable_Prevalence_Calibration_Diabetes();
+	};
+	*/
+};
+
+// calibration ratio = target / pohemrate(i)
+// baseline(i+1) = calibration ratio * baseline(i)
+
+double Get_New_Baseline_Rates_OA(int nSex, int nAge,
+	double Target,		// target rates
+	double Baseline,	// current baseline
+	CString InTable,	// table data to calculate next baseline
+	CString OutTable)	// table with next baseline estimates
+{
+	double dNewBaseline, dSquaredError, deltaBaseline, dPohemRate;
+	double P_obs, P_esp;
+	double dNumAtRisk, dCumProbAtRisk;
+
+	dSquaredError = 0;
+	dPohemRate = GetTableValue(InTable + ".Expr0", nSex, nAge);
+	dNumAtRisk = GetTableValue(InTable + ".Expr1", nSex, nAge);
+	dCumProbAtRisk = GetTableValue(InTable + ".Expr2", nSex, nAge);
+
+	if (Target == 0.0)
+	{
+		dNewBaseline = 0.0; // Baseline;
+	}
+	else if (dNumAtRisk > 0.0)
+	{
+		P_esp = Target;							// Input rates (expected aka target)
+		P_obs = dCumProbAtRisk / dNumAtRisk;	// POHEM generated (aka observed in this context)
+
+		if (P_obs > 0.0)
+		{
+			// When new estimate is in range 0 to 1, make calibration adjustment to improve baseline
+			dNewBaseline = (P_esp / P_obs)* Baseline;
+
+			// When new baseline exceeds 1, use midpoint between last baseline and 1
+			if (dNewBaseline > 1) {
+				dNewBaseline = (Baseline + 1) / 2;
+			};
+
+			// Calculate the square error between expected (Target) and observed (POHEM) probs
+			dSquaredError = pow(P_obs - P_esp, 2);
+		}
+		else {
+			// When new estimate is 0 (or lower?), keep last baseline estimate 
+			dNewBaseline = Baseline;
+		}
+	}
+	else if (nAge > MIN(OA_AGE_RANGE))
+	{
+		// When POHEM does not generate any persons at a particular age,
+		// then we assign the new calibrated baseline estimate to be the same 
+		// as the new calibrated estimated at the previous age, provided the age exceeds the
+		// minimum age at risk (to avoid perpetuating 0 values to subsequent age groups)
+		dNewBaseline = GetTableValue(OutTable + ".E0", nSex, nAge - 1);
+	}
+	else
+	{
+		// Age below minimum age at risk of disease, Target not 0, and no POHEM cases 
+		// (included for completeness, but not an anticipated possibility)
+		dNewBaseline = Baseline;
+	};
+
+	/* OutTable = NEW_OA_BASELINE */
+	SetTableValue(OutTable + ".E0", dNewBaseline, nSex, nAge);
+
+	// Difference between current baseline and the next baseline estimate
+	deltaBaseline = dNewBaseline - Baseline;
+	SetTableValue(OutTable + ".E1", deltaBaseline, nSex, nAge);
+
+	return dSquaredError;
+};
+
+//------------------------------------------
+/* functionNOTE (Get_New_Baseline_Rates_AMI, EN)
+This function calculates the next estimate for the baseline incidence
+at a specific age and sex, as well as returning the squared difference
+between the pohem calculated rate and the target rate
+Jean-Marie methode:
+	dvalue = exp ( 	ln(P_esp/(1-P_esp))*alpha_t0 /
+					ln(P_obs/(1-P_obs) )) = Baseline_t1
+note P_esp is the expected, ie, Target, value passed to the routine
+Because Framingham risk function based on logistic regression.
+Note alpha_t0 = -ln( baseline_t0 )
+*/
+//------------------------------------------
+
+/******************/
+void UserTable_Prevalence_And_Incidence_Calibration_OA()
+{
+	int nSex = { 0 };
+	int	nAge = { 0 };
+	double dSquaredError_Total_Incidence = { 0.0 };
+	double dSquaredError_BySex_Incidence = { 0.0 };
+	double dSquaredError_Total_Prevalence = { 0.0 };
+	double dSquaredError_BySex_Prevalence = { 0.0 };
+	double Baseline_Incidence_error = { 0.0 };
+	double Baseline_Prevalence_error = { 0.0 };
+	int lConvergence;
+	int lprConvergence;
+
+	dSquaredError_Total_Incidence = 0.0;
+	dSquaredError_Total_Prevalence = 0.0;
+
+	for (nSex = 0; nSex < SIZE(SEX); nSex++)
+	{
+		dSquaredError_BySex_Incidence = 0.0;
+		dSquaredError_BySex_Prevalence = 0.0;
+
+		for (nAge = 0; nAge < SIZE(LIFE); nAge++)
+		{
+			Baseline_Incidence_error = Get_New_Baseline_Rates_OA(
+				nSex, nAge,
+				OA_IncidenceRate_Observed[nSex][nAge],
+				OA_IncidenceRate_Baseline[nSex][nAge],
+				"tOA_Incidence_in_StartYear",
+				"utNEW_OA_INCIDENCE_BASELINE");
+
+			Baseline_Prevalence_error = Get_New_Baseline_Rates_OA(
+				nSex, nAge,
+				OA_PrevalenceRate_Target[nSex][nAge],
+				OA_PrevalenceRate_Baseline[nSex][nAge],
+				"tOA_Prevalence_at_StartUp",
+				"utNEW_OA_PREVALENCE_BASELINE");
+
+			dSquaredError_BySex_Incidence += Baseline_Incidence_error;
+			dSquaredError_BySex_Prevalence += Baseline_Prevalence_error;
+		};
+		dSquaredError_Total_Incidence += dSquaredError_BySex_Incidence;	// sum across both sexes
+		dSquaredError_Total_Prevalence += dSquaredError_BySex_Prevalence;	// sum across both sexes
+		SetTableValue("utITERATOR_SSQD_SEX.E0", dSquaredError_BySex_Incidence, nSex);
+		SetTableValue("utITERATOR_SSQD_SEX.E1", dSquaredError_BySex_Prevalence, nSex);
+	};
+	SetTableValue("utITERATOR_SSQD.E0", dSquaredError_Total_Incidence);
+	SetTableValue("utITERATOR_SSQD.E1", dSquaredError_Total_Prevalence);
+
+	// CONVERGENCE TESTS
+	// Manually open utITERATOR_SSQD_SEXREGION and utITERATOR_SSQD to determine if the error is small enough
+	// Manually compare (graph) pohem rates found in tAMI_CALIBRATION against observed.
+	// Manually compare (graph) successive estimates of baseline rates against each other
+
+	/* HISTORICALLY WE AUTOMATED THE CONVERGENCE TEST, BUT THE VB PROGRAM HAS NOT BEEN KEPT UP TO DATE
+	The following code tests for convergence conditional on setting a level of error
+	that we are willing to tolerate. This was used by the VB program iterator
+	when deciding when to stop. It is no longer used, since we have lost the knowledge of how to use it
+	Iterator reads this value to determine if the POHEM rate has converged to the Target rate.
+	*/
+	lConvergence = 0;
+	if ((dSquaredError_Total_Incidence < ITERATOR_ERROR_TOLERANCE)) {
+		lConvergence = 1;
+	}
+	SetTableValue("utITERATOR_CONVERGENCE_FLAG.E0", lConvergence);
+
+	lprConvergence = 0;
+	if ((dSquaredError_Total_Prevalence < ITERATOR_ERROR_TOLERANCE)) {
+		lprConvergence = 1;
+	}
+	SetTableValue("utITERATOR_CONVERGENCE_FLAG.E1", lprConvergence);
+
+};
+
+
+table_group Scenario_Settings_Tables{ //EN Scenario Settings
+	utPresimView
+	//ScenarioDic_Table
+	/*
+	tStart_Pop_Sex,
+	tStart_Pop_Bmi,
+	tStart_Pop_Age,
+	tStart_Pop_Survey_Weight,
+	tStart_Pop_Donor_Used_Count,
+	*/
+	/*
+	tStart_Pop_AgeSex_Original_Distribution,
+	tStart_Pop_AgeSex_Altered_Distribution,
+	*/
+
+};
+
+
+
+/*
+user_table  ScenarioDic_Table	//EN Cases and population size
+{
+	SEX
+	*
+	{
+		E0,	//EN PopulationSize
+		E1		//EN Cases
+	}	//EN Measure
+};
+
+*/
+
+/*
+user_table tStart_Pop_Survey_Weight //EN StartPop: Survey weight of CCHS respondents
+{
+	{
+		E //EN Survey weight of CCHS respondent
+	}
+	*
+	DB_RECORDS+
+};
+
+user_table tStart_Pop_Bmi //EN StartPop: BMI of CCHS respondents
+{
+	{
+		E //EN BMI of CCHS respondent
+	}
+	*
+	DB_RECORDS+
+};
+
+
+user_table tStart_Pop_Sex //EN StartPop: Sex of CCHS respondents
+{
+	{
+		E //EN Sex of CCHS respondent
+	}
+	*
+	DB_RECORDS+
+};
+
+user_table tStart_Pop_Age //EN StartPop: Age of CCHS respondents
+{
+	{
+		E //EN Age group of CCHS respondent
+	}
+	*
+	DB_RECORDS+
+};
+
+
+*/
+/*
+user_table tStart_Pop_AgeSex_Original_Distribution //EN StartPop: Orignial age, sex distribution of CCHS respondents
+{
+	{
+		E //EN Weighted count
+	}
+	*
+	SEX
+	*
+	AGE_GROUP_from25_to80_by5
+};
+
+
+user_table tStart_Pop_AgeSex_Altered_Distribution //EN StartPop: Altered age, sex distribution of CCHS respondents
+{
+	{
+		E //EN Weighted count
+	}
+	*
+	SEX
+	*
+	AGE_GROUP_from25_to80_by5
+};
+*/
+
+
+user_table utPresimView //EN Some PreSimulation calculation 
+{
+	{
+		A0, //EN Number of in scope records in StartPop db
+		C0, //EN mgNumCasesRaw[cStartPop]    Weights of in scope records in StartPop db
+		C1, //EN mgNumCasesRaw[cNewBirth]    New Births (subsequent years) 
+		C2, //EN mgNumCasesRaw[cNewImmig]    New Immigrants (subsequent years) 
+		E0, //EN mgNumCases[cStartPop]       Weights of in scope records in StartPop db
+		E1, //EN mgNumCases[cNewBirth]       New Births (subsequent years) 
+		E2, //EN mgNumCases[cNewImmig]       New Immigrants (subsequent years) 
+		E4, //EN mgNewImmigAdjustFactor     decimals=9
+		E5, //EN mgNewBirthAdjustFactor     decimals=9
+		E6, //EN mgNewBirthAdjustFactorUnduplicate  decimals=9
+		E7, //EN mgNewBirthAdjustFactorReduceAim    decimals=9
+		E8, //EN Number of cases                   decimals=9
+		E9, //EN Number of Canadians               decimals=9
+		E10 //EN Number of Canadians per case      decimals=9
+	}
+	*
+	DUMMY_ROW_OR_COLUMN
+};
+
+/*
+user_table utNEW_AMI_BASELINE		//EN Next AMI baseline incidence rates -- calibration(i)
+{
+	{
+		E0,	// New estimated baseline incidence rate decimals=9
+		E1	// Difference between previous estimate and this estimate  decimals=9
+	}
+	*REGION
+	*SEX
+	*LIFE
+};
+
+user_table utITERATOR_SSQD //EN Calibration check: Sum of squared differences (target-pohem estimate)
+{
+	{
+		E0,	// Incidence decimals=8
+		E1	// Prevalence decimals=8
+	}
+};
+user_table utITERATOR_CONVERGENCE_FLAG	//EN Calibration check: Convergence indicator (0=false,1=true)
+{
+	{
+		E0, // Incidence 
+		E1	// Prevalence
+	}
+};
+user_table utITERATOR_SSQD_SEX	//EN Calibration check: Sum of squared differences (target-pohem estimate) by sex
+{
+	{
+		E0,	// Incidence decimals=8
+		E1	// Prevalence decimals=8
+	}
+	*SEX
+};
+user_table utITERATOR_SSQD_SEXREGION	//EN Calibration check: Sum of squared differences (target-pohem estimate) by sex and region
+{
+	{
+		E0	// SSE decimals=8
+	}
+	*REGION
+	*SEX
+};
+user_table utNEW_OA_INCIDENCE_BASELINE		//EN Next OA baseline incidence rates -- calibration(i)
+{
+	{
+		E0,	// New estimated baseline incidence rate decimals=9
+		E1,	// Difference between previous estimate and this estimate  decimals=9
+		E2 //  Squared error decimals=9
+	}
+	*SEX
+	*LIFE
+};
+
+user_table utNEW_OA_PREVALENCE_BASELINE		//EN Next OA baseline startup prevalence rates -- calibration(i)
+{
+	{
+		E0,	// New estimated baseline prevalence rate decimals=9
+		E1,	// Difference between previous estimate and this estimate  decimals=9
+		E2 //  Squared error decimals=9
+	}
+	*SEX
+	*LIFE
+};
+
+*/

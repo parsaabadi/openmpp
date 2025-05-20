@@ -1,0 +1,310 @@
+//LABEL(Mortality, EN) Mortality
+
+/*NOTE(Mortality, EN)
+	This file describes general population-level mortality, such as mortality hazards, 
+	and projection options; maximum number of years to limit simulation execution, and
+	maximum age of simulated individuals; and cause of death distribution by major 
+	disease groups, specifically for the cancers modeled.
+*/
+
+range PERIOD_UPDATE {1972,  2051} ;	//EN span of life
+
+classification MORTALITY_PROJECTION { //EN mortality projections
+	MORT_LOW,  //EN mortality projection #1 (LOW life expectancy)
+	MORT_MID,  //EN mortality projection #3 (MEDIUM life expectancy)
+	MORT_HIGH  //EN mortality projection #6 (HIGH life expectancy)
+};
+classification MORTALITY_ENGINE { //EN Mortality engine
+	MORTALITY_ENGINE_DEMOGRAPHY,  //EN Demography projection
+	MORTALITY_ENGINE_NPHS      ,  //EN NPHS
+	MORTALITY_ENGINE_MPORT_V2     //EN MPoRT V2
+};
+
+parameters {
+	MORTALITY_ENGINE MortalityEngine; //EN Mortality engine/model
+
+	//EN Year simulation ends
+	int			MaxYear;
+
+	//EN Minimum number of years of life
+	int			MinLife;	
+
+	//EN Maximum number of years of life
+	int			MaxLife;		
+
+	//EN Cohort mortality rates 
+	double		MortHazard[SEX][YEAR][LIFE_SPAN];
+
+	//EN Period mortality projection scenario corresponding to Low, Medium or High life expectancy
+	MORTALITY_PROJECTION		MortProjectionScenario;
+	
+	//EN extrapolate period mortality rates beyond update period?
+	logical		MortHazardExtrapolationFlag;
+
+	//EN Period mortality rates update - Low life expectancy scenario
+	double		PeriodMortHazardLOW[SEX][LIFE_SPAN][PERIOD_UPDATE];			
+	
+	//EN Period mortality rates update - Medium life expectancy scenario
+	double		PeriodMortHazardMID[SEX][LIFE_SPAN][PERIOD_UPDATE];			
+	
+	//EN Period mortality rates update - High life expectancy scenario
+	double		PeriodMortHazardHIGH[SEX][LIFE_SPAN][PERIOD_UPDATE];			
+
+	//EN updated cohort mortality rates 
+	model_generated double	ModelMortHazard[SEX][YEAR][LIFE_SPAN];
+
+
+};
+
+parameter_group pgMORTALITY_ENGINE { //EN Mortality engines/models
+	MortalityEngine,
+	pgMORTALITY_DEMO_DIVISION,
+    pgMORTALITY_NPHS,
+    pgMORTALITY_MPORT_V2
+};
+
+
+parameter_group pgMortality { //EN Mortality parameters 
+	MortProjectionScenario,
+	MaxYear,
+	MinLife,	
+	MaxLife,	
+	pgMORTALITY_ENGINE,
+	//MORTALITY_ExpertsOnly,
+	MORTALITY_Residual_ExpertsOnly
+};
+
+//parameter_group MORTALITY_ExpertsOnly { //EN Experts only
+parameter_group pgMORTALITY_DEMO_DIVISION { //EN Demography Division mortality hazards
+	MortHazard,
+	MortHazardExtrapolationFlag, 
+	PeriodMortHazardLOW, 
+	PeriodMortHazardMID, 
+	PeriodMortHazardHIGH
+};
+
+
+
+actor Person            // Core Individual
+{
+	double	mort_hazard	= ResidualMortalityHazard[sex][RANGE_POS( YEAR, year_of_birth )][lifespan_age] *gDiabetes_rr_mortality; 	//EN Mortality Hazard
+
+	event	timeMortalityEvent, MortalityEvent;
+	event	timeMaxLifeEvent, MaxLifeEvent;
+	event	timeMaxYearEvent, MaxYearEvent;
+	event   timeTabulateEndOfLifeCostEvent, TabulateEndOfLifeCostEvent,250; // give event high priority
+	void	CheckFinish(logical this_is_really_the_end);
+
+};
+
+TIME Person::timeMortalityEvent()
+{
+	TIME	event_time = { TIME_INFINITE };
+
+	/*
+	if ( !IndexAMI_event )	// DH this will need further investigation re prevalence ami and mortality ami
+	{
+		if ( mort_hazard > 0.0 ) {
+			event_time = WAIT( - TIME( log( RandUniform(54) ) / mort_hazard ) );
+		}
+	}
+	*/
+
+	// Preserved this part of code from the commented out code above (lines 104-111)
+	if (mort_hazard > 0.0) {
+		event_time = WAIT(-TIME(log(RandUniform(54)) / mort_hazard));
+	}
+
+	return event_time;
+}
+
+void hook_MortalityEvent() {};
+
+void Person::MortalityEvent()
+{
+	int	nCause;
+	
+	Lookup_ResidualCauseOfDeath( RandUniform(55), sex, lifespan_age, &nCause );
+	cause_of_death = DISEASES( nCause );
+	CheckFinish(MortalityEngine == MORTALITY_ENGINE_DEMOGRAPHY);
+
+	hook_MortalityEvent();
+}
+
+TIME Person::timeMaxLifeEvent()
+{
+	return ( date_of_birth + double( MaxLife ) );
+}
+
+void hook_MaxLifeEvent() {};
+
+void Person::MaxLifeEvent()
+{
+	alive_deterministic_MaxLife = FALSE;
+	cause_of_death = OTHER_DISEASE;
+	CheckFinish(TRUE);
+
+	hook_MaxLifeEvent();
+}
+/* 
+A person's time of death is determined by a set of cohort mortality hazards 
+by sex, birth year and age.  Mortality will also occur once a person has 
+reached the age of MaxLife or the calendar year of MaxYear.
+*/
+
+TIME Person::timeMaxYearEvent()
+{
+	return MaxYear;
+}
+
+void hook_MaxYearEvent() {};
+
+void Person::MaxYearEvent()
+{
+	alive_deterministic_MaxYear = FALSE;
+	cause_of_death = OTHER_DISEASE;
+	CheckFinish(TRUE);
+
+	hook_MaxYearEvent();
+}
+
+TIME Person::timeTabulateEndOfLifeCostEvent()
+{
+	return it_is_time_to_tabulate_end_of_life_cost ? WAIT(0.0) : TIME_INFINITE;
+  //return tabulate_dementia_cost_in_this_time_cat == END_OF_LIFE ? WAIT(0.0) : TIME_INFINITE;
+}
+
+void hook_TabulateEndOfLifeCostEvent() {};
+
+void Person::TabulateEndOfLifeCostEvent()
+{
+	//states like alive_deterministic_MaxYear, cause_of_death have been set previously;  
+	tabulate_dementia_cost_in_this_time_cat = END_OF_LIFE;  
+	CheckFinish(TRUE);
+	it_is_time_to_tabulate_end_of_life_cost = FALSE;
+
+	hook_TabulateEndOfLifeCostEvent();
+}
+
+void hook_CheckFinish() {};
+
+void Person::CheckFinish(logical this_is_really_the_end)
+{
+	if(this_is_really_the_end && (lifespan_age >= MinLife || time == MaxYear ))
+	{
+		if (alive_deterministic_MaxYear && time < MaxYear)  // No tabulation if died because reached MaxYear (alive_deterministic_MaxYear==FALSE) ... but do tabulate if age reached MaxLife
+		{
+			//BEGIN for tEnd_Of_Life_Costs_For_Dementia
+			dementia_physician_end_of_life = DementiaPhysicianCosts[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			dementia_prescription_end_of_life = DementiaPrescriptionDrugs[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			dementia_hospital_admissions_end_of_life = DementiaHospitalAdmissions[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			dementia_homecare_end_of_life = DementiaHomeCare[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			dementia_longtermcare_end_of_life = DementiaLongTermCare[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			dementia_assistive_devices_end_of_life = DementiaAssistiveDevices[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE];
+			//END for tEnd_Of_Life_Costs_For_Dementia
+
+		   //BEGIN  for tDementia_Costs
+		//  double time_in_end_of_life = min(time - dementia_time_begin, 1.0);  //Bad rubbish for those who do not have dementia
+			double time_in_end_of_life = min(time - time_person_created, 1.0);
+			if (tabulate_dementia_cost_in_this_time_cat == PROGRESSION)
+			{
+				punctual_dementia_costs_physician -= dementia_physician_progression * time_in_end_of_life;
+				punctual_dementia_costs_prescription -= dementia_prescription_progression * time_in_end_of_life;
+				punctual_dementia_costs_hospital_admissions -= dementia_hospital_admissions_progression * time_in_end_of_life;
+				punctual_dementia_costs_homecare -= dementia_homecare_progression * time_in_end_of_life;
+				punctual_dementia_costs_longtermcare -= dementia_longtermcare_progression * time_in_end_of_life;
+				punctual_dementia_costs_assistive_devices -= dementia_assistive_devices_progression * time_in_end_of_life;
+			}
+			if (tabulate_dementia_cost_in_this_time_cat == END_OF_LIFE)
+			{
+				punctual_dementia_costs_physician += DementiaPhysicianCosts[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+				punctual_dementia_costs_prescription += DementiaPrescriptionDrugs[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+				punctual_dementia_costs_hospital_admissions += DementiaHospitalAdmissions[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+				punctual_dementia_costs_homecare += DementiaHomeCare[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+				punctual_dementia_costs_longtermcare += DementiaLongTermCare[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+				punctual_dementia_costs_assistive_devices += DementiaAssistiveDevices[sex][SPLIT(lifespan_age, FROM_25_TO_90_BY_5)][dementia][END_OF_LIFE] * time_in_end_of_life;
+			}
+
+			//END  for tDementia_Costs
+		} // end if (!alive_deterministic_MaxYear)
+
+
+		if (tabulate_dementia_cost_in_this_time_cat == END_OF_LIFE)
+		{
+			if (EcrireDebugLogEntry == 21 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND])
+			{
+				char line[199];
+				snprintf(line, 199, "%i, %i, %15.1f, %i, %i, %15.9f, %15.9f, %15.9f  \n", (int)population_source, (int)case_id, (double)case_seed, (int)dementia_initial_altered, (int)dementia, (double)time_person_created, (double)dementia_time_begin, (double)time);
+				WriteDebugLogEntry(line);
+
+			}
+			if (EcrireDebugLogEntry == 22 && CasesDebugLogEntry[LOWER_BOUND] <= case_id && case_id <= CasesDebugLogEntry[UPPER_BOUND])
+			{
+				//std::stringstream ss;
+				//ss << "\nDead, " << case_seed << ", " << dementia_initial_altered << ", " << dementia;
+				//WriteDebugLogEntry(ss.str().c_str());
+				char line[199];
+				snprintf(line, 199, "%i, %15.1f, Dead, %15.9f, %15.9f, %i, %i  \n", (int)case_id, (double)case_seed, (double)time, (double)age, int(dementia_initial_altered), int(dementia));
+				WriteDebugLogEntry(line);
+				
+			}
+			alive = FALSE;
+			Finish();
+		}
+		// reach line below if tabulate_dementia_cost_in_this_time_cat  was  PROGRESSION
+		it_is_time_to_tabulate_end_of_life_cost = TRUE;        //This triggers event TabulateEndOfLifeCostEvent
+	 // tabulate_dementia_cost_in_this_time_cat = END_OF_LIFE; //This triggers event TabulateEndOfLifeCostEvent ... BAD!!! ... what was meant for PROGRESSION will be tabulated in END_OF_LIFE
+		
+	}
+
+	hook_CheckFinish();
+};
+
+/*
+==========================================================
+Mortality PreSimulation
+==========================================================
+This PreSimulation code deletes the proportion of death 
+associated with the modeled or deleted (as of March 19, 2002) 
+diseases from the total hazard (actually a probability)
+all diseases mortality hazards.
+========================================================== 
+*/
+void PreSimulation()
+{
+//	if ( MortalityEngine == MORTALITY_ENGINE_MPORT_V2  ) ModelExit("\n MPoRT V2 disabled from now.");
+
+	int		nSex;
+	int		nAge;
+	int		nBirthYear = {0};
+	int		nYear = {0};
+	int		tYear = {0};
+
+	for ( nSex = 0; nSex < SIZE( SEX ); nSex++ ) {
+		for ( nAge = 0; nAge < SIZE( LIFE_SPAN ); nAge++ ) {
+			for ( nBirthYear = 0; nBirthYear < SIZE( YEAR ); nBirthYear++ ) {
+				tYear = nBirthYear + nAge + MIN( YEAR ) - MIN( PERIOD_UPDATE ) ;
+				nYear = min( tYear, ( SIZE( PERIOD_UPDATE ) - 1 ) );
+				if ( nYear >= 0 ) {
+					if ( MortHazardExtrapolationFlag && tYear >= SIZE( PERIOD_UPDATE ) ) {
+						ModelMortHazard[nSex][nBirthYear][nAge] = ModelMortHazard[nSex][nBirthYear-1][nAge] * ModelMortHazard[nSex][nBirthYear-1][nAge] / ModelMortHazard[nSex][nBirthYear-2][nAge];			 
+					}
+					else {
+						if ( MortProjectionScenario == MORT_LOW ) {
+							ModelMortHazard[nSex][nBirthYear][nAge] = PeriodMortHazardLOW[nSex][nAge][nYear];
+						}
+						else if ( MortProjectionScenario == MORT_HIGH ) {
+							ModelMortHazard[nSex][nBirthYear][nAge] = PeriodMortHazardHIGH[nSex][nAge][nYear];
+						}
+						else {
+							ModelMortHazard[nSex][nBirthYear][nAge] = PeriodMortHazardMID[nSex][nAge][nYear];
+						}
+					}
+				}
+				else {
+					ModelMortHazard[nSex][nBirthYear][nAge] = MortHazard[nSex][nBirthYear][nAge];
+				}
+			}
+		}
+	}
+};

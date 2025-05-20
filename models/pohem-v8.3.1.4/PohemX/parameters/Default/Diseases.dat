@@ -1,0 +1,9 @@
+parameters {
+
+	 //EN Disease model on/off controls
+	logical	pDisease[DISEASES_MODELED][DUMMY_ROW_OR_COLUMN] = {
+		FALSE, TRUE, (2) FALSE, TRUE,
+	};
+	logical	UseDport = TRUE; //EN Use DPoRT algorithm for diabetes incidence
+};
+

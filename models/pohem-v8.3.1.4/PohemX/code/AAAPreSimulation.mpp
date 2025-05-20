@@ -1,0 +1,69 @@
+
+//FILE_LABEL (EN) AAAPreSimulation
+/* FILE_NOTE(EN) 
+	This file contains PreSimulation code that needs to be run before other PreSimulation
+*/
+
+
+void PreSimulation()
+{
+	// Create cumrate mgCumStartPopWeight  (records not in scope get a weight of 0) 
+	// In scope means in scope wrt pStartPopReweightDefinitionFields and pStartPopReweightDefinitionBounds and positive weight on db
+	// mgCumStartPopWeight will be used in further calculations (e.g. mgNumCases[cStartPop]) and in Lookup_
+	// The code below is the only place where pStartPop[nRecord][cDb_Weight] should be used.  Elsewhere mgCumStartPopWeight[nRecord] ought to be used
+	for (int nRecord = 0; nRecord < SIZE( DB_RECORDS ); nRecord++ ) 
+	{		 
+		mgCumStartPopWeight[nRecord] = pStartPop[nRecord][cDb_Weight] > 0.0 ? pStartPop[nRecord][cDb_Weight]  : 0.0 ; //this handles filler by setting mgCumStartPopWeight[nRecord] = 0
+
+		for(int subpop =0; subpop < SIZE(STARTPOP_SUBPOPULATIONS); subpop++)
+		{
+			logical in_this_sub_pop = TRUE;
+			for(int condition=0; condition<SIZE(CONDITIONS_REWEIGHT); condition++)
+			{
+				double value = pStartPop[nRecord][ pStartPopReweightDefinitionFields[subpop][condition] ] ;
+				in_this_sub_pop = in_this_sub_pop && pStartPopReweightDefinitionBounds[subpop][condition][LOWER_BOUND] <=value && 
+			                                                                                                             value <= pStartPopReweightDefinitionBounds[subpop][condition][UPPER_BOUND] ;
+			}
+
+			mgCumStartPopWeight[nRecord] *= (in_this_sub_pop ? pStartPopReweightMultiplier[subpop][ROW_1] : 1.0);
+		}
+		/*
+		if(mgCumStartPopWeight[nRecord] > 0.0)
+		{
+			char line[199];
+			snprintf(line,199," %i,%0.9f,%0.9f,%0.9f,%0.9f,%0.9f,%0.9f \n",nRecord,pStartPop[nRecord][cDb_AgeGrp],pStartPop[nRecord][cDb_Sex],pStartPop[nRecord][cDb_Province],pStartPop[nRecord][cDb_BMI],pStartPop[nRecord][cDb_Weight],mgCumStartPopWeight[nRecord]);               
+			WriteDebugLogEntry(line);
+		}
+		*/
+
+	}
+
+// ==========================================================================
+// YOUNGEST AGE and AGE GROUP represented in pStartPop (initialization db)
+// ==========================================================================
+/* Method 1 depended on input parameter pDbAgeDecode
+	This code disabled because it depended on the user to correctly identify the 
+	youngest age group in the decode table 
+	// The new method follows:
+	*/
+
+	// Find the youngest age group represented in cross-sectional init db
+	// Assumes that lowest age group number is the youngest age group.
+	int nAgeCodeOldest = -99;
+	int nAgeCodeYoungest = 99;
+	int nAgeCode;
+	for (int nRecord = 0; nRecord < SIZE( DB_RECORDS ); nRecord++ ) 
+	{
+		// REAL records on db 
+		if ( mgCumStartPopWeight[nRecord] > 0.0 ) 
+		{
+			nAgeCode = (int) pStartPop[nRecord][cDb_AgeGrp];
+			if ( nAgeCode < nAgeCodeYoungest ) 
+				nAgeCodeYoungest = nAgeCode;
+			if ( nAgeCode > nAgeCodeOldest ) 
+				nAgeCodeOldest = nAgeCode;
+		}
+	}
+	mgAgeCodeYoungest = nAgeCodeYoungest;  //this model_generated parameter is needed in both BMIyouth.mpp and StartPop.mpp
+	mgAgeCodeOldest   = nAgeCodeOldest  ; 
+}

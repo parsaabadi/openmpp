@@ -1,0 +1,89 @@
+#include "pohem.h"
+
+
+parameter_group pgBMI_Adult_Model2_Equation {//EN BMI model 2 regression coefficients and sigma (NPHS)
+BMI_Ordonnee_origine,
+BMI_t_minus_2,
+BMI_t_minus_4,
+BMI_t_minus_6,
+BMI_t_minus_8,
+BMI_Educ,
+BMI_Income,
+BMI_Region,
+BMI_Age,
+BMI_Sigma   
+};
+
+parameter_group pgBMI_Adult_Model2 {  //EN Adult BMI model 2 (with education, income and region)
+	pgExpertBMIAdultModel2
+};
+
+parameter_group pgExpertBMIAdultModel2{ //EN Experts only
+	pgBMI_Adult_Model2_Equation
+};
+
+
+parameters {
+
+	double	    BMI_Ordonnee_origine[AR_ORDER_INDEX_4][SEX] ; //EN BMI regression parameters: Intercept
+	double	    BMI_t_minus_2[AR_ORDER_INDEX_4][SEX] ; //EN BMI regression parameters: auto-regression of lag 1 (t-2)
+	double	    BMI_t_minus_4[AR_ORDER_INDEX_4][SEX] ; //EN BMI regression parameters: auto-regression of lag 2 (t-4)
+	double	    BMI_t_minus_6[AR_ORDER_INDEX_4][SEX] ; //EN BMI regression parameters: auto-regression of lag 3 (t-6)
+	double	    BMI_t_minus_8[AR_ORDER_INDEX_4][SEX] ;//EN BMI regression parameters: auto-regression of lag 4 (t-8) 
+	double	    BMI_Educ     [AR_ORDER_INDEX_4][SEX][EDUCATION] ;//EN BMI regression parameters: education
+	double	    BMI_Income   [AR_ORDER_INDEX_4][SEX][INCOME_QUARTILE] ; //EN BMI regression parameters: income
+	double	    BMI_Region   [AR_ORDER_INDEX_4][SEX][REGION] ;//EN BMI regression parameters: region
+	double	    BMI_Age      [AR_ORDER_INDEX_4][SEX][AGE_GROUP5] ; //EN BMI regression parameters: age
+	double	    BMI_Sigma    [AR_ORDER_INDEX_4][SEX] ; //EN BMI regression parameters: standard deviation of error term
+
+};
+
+
+actor Person            // Core Individual
+{					
+	double CalculateBMI_Model2();
+};
+
+double	Person::CalculateBMI_Model2()
+{
+	double	dBMIvalue;	
+	double	mu;
+	double  sigma;
+
+	// First update of BMI
+	if (bmi_ar_order==0) 
+	{
+		bmi_value_at_t_minus_2 = BmiFeedBack ? gBMI : gBMI_AdultModel;
+		bmi_value_at_t_minus_4 = 1.0;
+		bmi_value_at_t_minus_6 = 1.0;
+		bmi_value_at_t_minus_8 = 1.0;
+		
+		//bmi_bootstrap_index = ... not applicable for BMI model 2
+	}
+
+	// All updates of BMI
+	mu  =   BMI_Ordonnee_origine[bmi_ar_order][sex] + 
+			BMI_t_minus_2[bmi_ar_order][sex] * log(bmi_value_at_t_minus_2) + 
+			BMI_t_minus_4[bmi_ar_order][sex] * log(bmi_value_at_t_minus_4) + 
+			BMI_t_minus_6[bmi_ar_order][sex] * log(bmi_value_at_t_minus_6) + 
+			BMI_t_minus_8[bmi_ar_order][sex] * log(bmi_value_at_t_minus_8) + 
+			BMI_Income[bmi_ar_order][sex][gIncomeQuartile]  + 
+			BMI_Region[bmi_ar_order][sex][gRegion]  + 
+			BMI_Educ[bmi_ar_order][sex][gEducation]  + 
+			BMI_Age[bmi_ar_order][sex][SPLIT(truncated_age,AGE_GROUP5)] ;
+
+	sigma=BMI_Sigma[bmi_ar_order][sex]*sigma_multiplier;  
+
+	dBMIvalue = exp(mu + RandLogistic(80) * sigma / mgMathConstant_PiOverSqrt3 );  
+
+	// Coerce dBMIvalue 
+	dBMIvalue = COERCE(BMI_RANGE, dBMIvalue);
+	
+	bmi_value_at_t_minus_8 = bmi_value_at_t_minus_6;
+	bmi_value_at_t_minus_6 = bmi_value_at_t_minus_4;
+	bmi_value_at_t_minus_4 = bmi_value_at_t_minus_2;
+	bmi_value_at_t_minus_2 = dBMIvalue;	   
+
+	return dBMIvalue ;
+};
+

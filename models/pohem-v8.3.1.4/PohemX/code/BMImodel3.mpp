@@ -1,0 +1,112 @@
+#include "pohem.h"
+
+parameter_group pgBMI_Adult_Model3_Equation {//EN BMI model 3 regression coefficients and sigma2 (NPHS)
+ BMI_Intercept , 
+ BMI_Log_bmi_Lt ,  
+ BMI_Log_bmi_L2t ,
+ BMI_Log_bmi_L3t , 
+ BMI_Log_bmi_L4t , 
+ BMI_Age_group10_t ,  
+ BMI_Bike2job_some_t ,
+ BMI_Down_diff_pa_level ,
+ BMI_Down_diff_smoke ,
+ BMI_Down_diff_walk2job ,
+ BMI_Smoke_cat_t ,
+ BMI_T_leisure_rindex_t ,
+ BMI_Up_diff_pa_level ,
+ BMI_Up_diff_smoke ,
+ BMI_Up_diff_walk2job, 
+ BMI_Sigma2 
+};
+
+parameter_group pgBMI_Adult_Model3 {  //EN Adult BMI model 3 (with physical activity and smoking)           
+	pgExpertBMIAdultModel3
+};
+
+parameter_group pgExpertBMIAdultModel3{ //EN Experts only
+	pgBMI_Adult_Model3_Equation,
+	BmiModel3BootstrapOffset,
+	BmiModel3BootstrapIndexMultiplier
+};
+
+
+
+parameters {
+
+int BmiModel3BootstrapOffset ;           //EN First bootstrap replicate to be used
+int BmiModel3BootstrapIndexMultiplier ;  //EN Allow the use of bootstrap replicates (1) or not (0)
+
+double BMI_Intercept         [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: Intercept
+double BMI_Log_bmi_Lt        [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: auto-regression of lag 1 (t-2)
+double BMI_Log_bmi_L2t       [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: auto-regression of lag 2 (t-4)
+double BMI_Log_bmi_L3t       [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: auto-regression of lag 3 (t-6)
+double BMI_Log_bmi_L4t       [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: auto-regression of lag 4 (t-8)
+double BMI_Age_group10_t     [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][AGE_GROUP3080 ];//EN BMI regression parameters: age
+double BMI_Bike2job_some_t   [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][BIKE_ERRANDS ];//EN BMI regression parameters: PA (bike for errands)
+double BMI_T_leisure_rindex_t[SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][LTPA_4CAT ];   //EN BMI regression parameters: PA (leisure time)
+double BMI_Down_diff_pa_level[SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: PA (overall PA downtrend)
+double BMI_Up_diff_pa_level  [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: PA (overall PA uptrend)
+double BMI_Down_diff_walk2job[SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: PA (walking for errands downtrend)
+double BMI_Up_diff_walk2job  [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: PA (walking for errands uptrend)
+double BMI_Smoke_cat_t       [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4][SMOKING_STATE3 ];     //EN BMI regression parameters: smoking (current status)
+double BMI_Down_diff_smoke   [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: smoking downtrend
+double BMI_Up_diff_smoke     [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: smoking uptrend
+double BMI_Sigma2            [SEX][BOOTSTRAP_INDEX_39][AR_ORDER_INDEX_4];               //EN BMI regression parameters: variance of error term
+
+};
+
+
+actor Person            // Core Individual
+{					
+	double CalculateBMI_Model3();
+};
+
+double	Person::CalculateBMI_Model3()
+{
+	double	dBMIvalue;	
+	double	mu;
+	double  sigma;
+
+	// First update of BMI
+	if (bmi_ar_order==0) 
+	{
+		bmi_value_at_t_minus_2 = BmiFeedBack ? gBMI : gBMI_AdultModel;
+		bmi_value_at_t_minus_4 = 1.0;
+		bmi_value_at_t_minus_6 = 1.0;
+		bmi_value_at_t_minus_8 = 1.0;
+
+		bmi_bootstrap_index =BmiModel3BootstrapOffset + BmiModel3BootstrapIndexMultiplier*(GetCaseSample() % (SIZE(BOOTSTRAP_INDEX_39)-BmiModel3BootstrapOffset));
+	}
+
+	// All updates of BMI
+	mu  =   BMI_Intercept   [sex][bmi_bootstrap_index][bmi_ar_order]  
+		      + BMI_Log_bmi_Lt  [sex][bmi_bootstrap_index][bmi_ar_order] * log(bmi_value_at_t_minus_2) 
+			  + BMI_Log_bmi_L2t [sex][bmi_bootstrap_index][bmi_ar_order] * log(bmi_value_at_t_minus_4)
+			  + BMI_Log_bmi_L3t [sex][bmi_bootstrap_index][bmi_ar_order] * log(bmi_value_at_t_minus_6)
+			  + BMI_Log_bmi_L4t [sex][bmi_bootstrap_index][bmi_ar_order] * log(bmi_value_at_t_minus_8)
+			  + BMI_Age_group10_t [sex][bmi_bootstrap_index][bmi_ar_order][SPLIT(truncated_age,AGE_GROUP3080)] 
+			  + BMI_Bike2job_some_t [sex][bmi_bootstrap_index][bmi_ar_order][gBike_errands ]
+			  + BMI_T_leisure_rindex_t [sex][bmi_bootstrap_index][bmi_ar_order][gLTPA_cat ]
+			  + BMI_Smoke_cat_t [sex][bmi_bootstrap_index][bmi_ar_order][smoking_cancer_dynamic ]
+			  + BMI_Down_diff_smoke [sex][bmi_bootstrap_index][bmi_ar_order]   * (gSmoking_NPHS < gSmoking_NPHS_Prev_t2 )
+			  + BMI_Up_diff_smoke   [sex][bmi_bootstrap_index][bmi_ar_order]   * (gSmoking_NPHS > gSmoking_NPHS_Prev_t2 )
+			  + BMI_Down_diff_pa_level [sex][bmi_bootstrap_index][bmi_ar_order]* (gPA_usual_day < gPA_usual_day_before_update )
+			  + BMI_Up_diff_pa_level [sex][bmi_bootstrap_index][bmi_ar_order]  * (gPA_usual_day > gPA_usual_day_before_update )
+			  + BMI_Down_diff_walk2job [sex][bmi_bootstrap_index][bmi_ar_order]* (gWalk_errands < gWalk_errands_before_update )
+			  + BMI_Up_diff_walk2job [sex][bmi_bootstrap_index][bmi_ar_order]  * (gWalk_errands > gWalk_errands_before_update );
+
+	sigma = sqrt(BMI_Sigma2 [sex][bmi_bootstrap_index][bmi_ar_order])*sigma_multiplier;  
+
+	dBMIvalue = exp(mu + RandLogistic(93) * sigma / mgMathConstant_PiOverSqrt3 );  
+
+	// Coerce dBMIvalue 
+	dBMIvalue = COERCE(BMI_RANGE, dBMIvalue);
+	
+	bmi_value_at_t_minus_8 = bmi_value_at_t_minus_6;
+	bmi_value_at_t_minus_6 = bmi_value_at_t_minus_4;
+	bmi_value_at_t_minus_4 = bmi_value_at_t_minus_2;
+	bmi_value_at_t_minus_2 = dBMIvalue;	   
+
+	return dBMIvalue ;
+};
+

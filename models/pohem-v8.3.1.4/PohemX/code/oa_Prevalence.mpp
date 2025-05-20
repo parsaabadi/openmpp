@@ -1,0 +1,503 @@
+#include "pohem.h"
+
+//================================================================================
+// OA PREVALENCE ( code replaced March 28, 2008 by Bill)
+//================================================================================
+
+range OAP_YEARS_PAST {1,40}; //EN Allowable number of years of OA prevalence at start of simulation
+
+partition OA_PREV_HUI_GROUP { 0.7, 0.9, 0.95 };	//EN HUI partition
+partition OA_PREV_HR_AGE_GROUP { 20, 30, 40, 50, 60, 70, 80}; //EN Ten year age groups (20-80) 
+partition OA_SURV_AGE_GROUP_TABLES	{50, 60, 70, 80, 90}; //EN Ten year age groups (50-90)
+
+classification HUI_GROUPS {				// HUI groups for stratifying risk of SROA
+	HUI_GROUP_1,	//EN <0.7
+		HUI_GROUP_2,	//EN [0.7, 0.9)
+		HUI_GROUP_3,	//EN [0.9, 0.95)
+		HUI_GROUP_4		//EN 0.95+
+};
+
+parameters {
+	/* NOTE ( OAP_Conditional_on_SROA_at_StartUp, EN )
+	Set to FALSE while calibrating OA prevalence baseline rates for risk factors. Then optionally,
+	Set to TRUE  to make OA prevalence at startup conditional on self-reported OA 
+		(SROA from StartPop based on CCHS).
+	One (or more) additional calibration runs will be required.
+	NB: It is very important to keep this parameter set in accordance with how the model was 
+	calibrated.
+	*/
+	//EN Make initial assignment of OA prevalence at start of simulation conditional on SROA 
+	logical OAP_Conditional_on_SROA_at_StartUp;
+
+	/* NOTE ( OA_PrevalenceRate_Target, EN )
+	Target prevalence rates generated from the observed admin OA incidence rates (simple method).
+	These were not adjusted for risk factors or SROA.
+	>Method: Estimated by first running POHEM sufficiently far into future to generate 
+	stable estimates of prevalance from the incidence rates. Result is stored in table
+	tPrevOA_years which is then copied back into this parameter as the target prevalence rates
+	for future runs.
+	>
+	>Note: The pohem rates at age 18 are what one would expect from the incidence rates, 
+	but are lower than the observed admin BC rates, presumably because OA occurs in persons less 
+	than 18 that we are not capturing in pohem.
+	*/
+	//EN Estimated target prevalence rate of OA at start of simulation (simple method)
+	double OA_PrevalenceRate_Target[SEX][LIFE]; 
+
+	/* NOTE ( OA_PrevalenceRate_Baseline, EN )
+	Simple baseline OA prevalence rates estimated through model calibration (simple method).
+	>For calibation exercise, initial guess for baseline values are the estimated "target" prevalence rates.
+	>See parameter: OA_PrevalenceRate_Target
+	*/
+	//EN Baseline prevalence rate of OA at start of simulation (simple method)
+	double OA_PrevalenceRate_Baseline[SEX][LIFE]; 
+
+	/* NOTE ( OA_PrevalenceState_DistributionAtStart , EN )
+	Probability of being in each of the OA prevalence states at start of simulation (by age and sex). 
+	Used to determine where in the progression of OA the person is.
+	Probabilities estimated by first running POHEM using the incidence rates to generate 
+	prevalance sufficiently far out in time (at least 20 years).
+	*/
+	//EN Probability of being in OA prevalence state at start of simulation 
+	cumrate	OA_PrevalenceState_DistributionAtStart[SEX][OA_AGE_GROUP][OA_PREVALENCE_STATES]; 
+
+	/* NOTE ( OA_PrevalenceState_DurationAtStart , EN )
+	Average duration in each of the OA prevalence states at start of the simulation (by age and sex)
+	Used to assign the age at time of the OA event that put the person in their OA prevalence state.
+	This is needed in order to use the survival parameters to estimate time to next OA event.
+	Durations were estimated by first running POHEM using the incidence rates to generate 
+	prevalance sufficiently far out in time (at least 20 years) (added May 23, 2007)
+	>
+	>Method: see POHEM table vOA_DecisionToTreat which reports the duration of OA events occurring in 2025.
+	Prevalence=0 in 2001, and applied BC incidence rates (no impact of bmi).
+	Run: \2007-06-04\AOA2_p0b0_1971_2001_2100_June01.sce
+	>
+	> Usage Example: For a female aged 45 whose most recent past OA Event was diagnosis of OA, 
+	we assume that the average duration of 37.7 years is half in the past in order to assign 
+	the age at the most recent past event (diagnosis) to determine which Weibull 
+	to use in the estimation of remaining time. 
+	We acknowledge that this is very crude and we're looking only to generate reasonable results 
+	at this point. (June 2007)
+	*/
+	//EN Average duration in each of the OA prevalence states at start of the simulation 
+	double OA_PrevalenceState_DurationAtStart[SEX][OA_SURV_AGE_GROUP_TABLES][OA_EVENT_STATE]; 
+
+	/* NOTE ( OA_Prevalence_Modifier , EN )
+	Prevalence rate modifier to scale prevalence rate. To perform sensitivity analysis where 
+	prevalence rate is 10% higher (set to 1.1) for 10% lower (set to 0.9).
+	>Default: 1.0
+	*/
+	//EN Prevalence rate modifier 
+	double OA_Prevalence_Modifier[SEX][OA_SURV_AGE_GROUP_TABLES]; 
+
+	/* NOTE ( OA_Prevalence_SurvivalTimeOffset , EN )
+	Used to delay (+) or advance (-) the survival waiting time (years) to next OA event 
+	for prevalent cases at startup
+	Default: 0
+	Test: Set to 0.5 so that prevalence is more comparable to incidence which
+	occurs during the year not at the beginning of the year.
+	*/
+	//EN Delay or advance survival to next OA event by fixed amount (for debug/testing)
+	double OA_Prevalence_SurvivalTimeOffset; 
+
+	/* NOTE ( SROA_RelativeRisk, EN )
+	Relative risk of self-reporting OA by sex, age, BMI, and HUI groups.
+	>Method: Relative risks were calculated from probabilities in parameter SROA_PredictorProbability
+	as the ratio of each probability to the probability of the reference group 
+	(within age and sex). The reference group was BMI normal and HUI group 0.9-0.95
+	*/
+	//EN Relative risk of self-reporting OA based on BMI and HUI groups.
+	double SROA_RelativeRisk[SEX][OA_PREV_HR_AGE_GROUP][BMI_INDEX][HUI_GROUPS];
+
+	/* NOTE ( SROA_PredictorProbability, EN )
+	Predicted probability of SROA given age, sex, bmi group, and HUI group. 
+	>Source: Jacek's team in BC.
+	*/
+	//EN Predicted probability of SROA given age, sex, BMI and HUI group.
+	double SROA_PredictorProbability[SEX][OA_PREV_HR_AGE_GROUP][BMI_INDEX][HUI_GROUPS];
+};
+
+actor Person            // Core Individual
+{
+	double	PrevOA_p = {0.0};	//EN Probability of OA prevalence
+	double	Predicted_Prob_SROA;				//EN Probability of SROA given HUI and BMI, and age and sex
+	logical	Unadjusted_PrevOA_Event = {FALSE};	//EN Flags prevalence cases that would have been generated from unadjusted target rates (for reporting)
+	logical	SROA_predicted = {FALSE};			//EN Flags SROA cases that would have been generated from predicted probabilities (for reporting)
+	double	DaysPerYear = {365.24};				//EN Days per year
+	void	OAPrevalenceReportYear();
+	hook	OAPrevalenceReportYear, NewYearsEvent;	// identify prevalent case survival
+	void	OAPrevalenceCheck();
+	hook	OAPrevalenceCheck, InitializationEmptyHub, 50;	// 50 = execution number, the higher the value, the later the execution	// OA prevalence to be done after Person's initial state assigned but before interventions to risk factors
+};
+
+void	Person::OAPrevalenceCheck()
+{
+	//MessageWhoWhenWhere(__FUNCTION__, 4==4);
+	/* Nb: the estimate of age at diagnosis of OA in prevalence cases (age_IndexOA) is assigned here, 
+	but	very crudely. Where age at Dx is important in reporting Tables, should distinguish between 
+	prevalent and incidence	cases and interpret carefully.	*/
+
+	// Declare local variables
+
+	int		nPrevalenceState;
+	int		OA_surv_age_group_past = 0;
+	double	OA_past_duration = 0.0;
+	int		nAgeGroup = SPLIT( truncated_age, OA_SURV_AGE_GROUP_TABLES);
+	int		nPathAgeGroup = SPLIT( truncated_age, OA_AGE_GROUP);
+	int		OA_prev_age_group = SPLIT( truncated_age, OA_PREV_HR_AGE_GROUP);
+//unused	int		OA_prev_HR_age_group = SPLIT( truncated_age, OA_PREV_HR_AGE_GROUP);
+	int		nOS_PR_Index;	//EN OA progression index from OS visit[i] to Primary surgery
+	int		nOS_OS_Index;	//EN OA progression index from OS to OS visits 
+
+	//	double	PrevOA_Prob;	// applies to all cases (StartPop, new immigrants, new births)
+	double	uprev=RandUniform(19);	// Random number used to assign initial OA prevalence
+	double	uPast;
+	double	dHR = {1.0};
+	double	RR_SROA={1.0};
+	HUI_GROUPS	HUI_group = (HUI_GROUPS) SPLIT( gHUI, OA_PREV_HUI_GROUP);
+
+	
+	// Code to assign OA prevalence
+
+	PrevOA_p = 0.0;  // reset for each simulated case
+
+	if ( pDisease[DM_OA][ROW_1] && truncated_age >= MIN( OA_AGE_RANGE ) && !IndexOA_event )
+	{ 
+		/* ==================================================================== */
+		/* Preliminary tests for reporting prevalence							*/
+		/* ==================================================================== */
+		// Predict SROA from derived probabilities (will compare with observed SROA on CCHS)
+		Predicted_Prob_SROA = SROA_PredictorProbability[sex][OA_prev_age_group][bmi-1][HUI_group];
+		if (uprev < Predicted_Prob_SROA ) {
+			SROA_predicted = TRUE;				// for reporting
+		};
+
+		// TARGET unadjusted rates
+		PrevOA_p = OA_PrevalenceRate_Target[sex][truncated_age];	// applies to all cases (StartPop, new immigrants, new births)
+		if (uprev < PrevOA_p)			// OA prevalent case
+		{ 
+			Unadjusted_PrevOA_Event = TRUE;		// for reporting
+		}
+
+		/* ==================================================================== */
+		/* Adjust Probability of OA Prevalence according to Risk Factors		*/
+		/* ==================================================================== */
+		PrevOA_p = OA_PrevalenceRate_Baseline[sex][truncated_age];	// applies to all cases (StartPop, new immigrants, new births)
+		RR_SROA = SROA_RelativeRisk[sex][OA_prev_age_group][bmi-1][HUI_group];
+		PrevOA_p = PrevOA_p * RR_SROA ;
+		// previously used the rr associated with the incidence (BMI)
+		//	PrevOA_p = 1 - pow(1-PrevOA_Prob,HROABPS[sex][bmi]); // apply hazard ratio of BMI to adjust probability
+
+		// Scaling Modifier of prevalence by age group and sex, eg RR=0.9 is a 10% reduction
+		PrevOA_p = PrevOA_p * OA_Prevalence_Modifier[sex][nAgeGroup];	
+
+		//	PrevOA_p = PrevOA_p / (1+PrevOA_p); // Not sure if I need to do this
+		PrevOA_p = COERCE(RANGE01, PrevOA_p);
+
+		/* ==================================================================== */
+		/* Adjust Probability of OA Prevalence Conditional on SROA (optioinal)	*/
+		/* ==================================================================== 
+		Done only when user sets parameter OAP_Conditional_on_SROA_at_StartUp to TRUE
+			(and ideally recalibrates OA prevalence baseline rates (one more iteration).			
+		When S > T, then for SROA cases the conditional target rates are T / S in order to 
+			choose the right number of cases from this subgroup and reprodice T for 
+			the whole population in this age-sex.
+		When S <= T then for non-SROA cases the conditional target rates are (T-S) /(1-S), 
+			since all S cases are assigned and we need to pick the remaining cases (T-S) 
+			from the remaining nonSROA population (1-S).
+		======================================================================= */
+		if ( OAP_Conditional_on_SROA_at_StartUp ) 
+		{ 
+			// Number of SROA cases exceeds number of target OA cases needed for this age group and sex
+			// so select OA cases from SROA cases 
+			// rate in SROA subpopulation given by T/S, where T = B*RR and S rate of SROA)
+			if ( OA_PrevalenceRate_Target[sex][truncated_age] <= mgStartPop_SROA_Rate[sex][truncated_age]  ) {
+				if ( gSROA ) {	// SROA case
+					PrevOA_p = PrevOA_p / mgStartPop_SROA_Rate[sex][truncated_age];
+				}
+				else {
+					PrevOA_p = 0.0;
+				}
+			}
+			// Number of OA cases exceeds number of SROA cases for this age group and sex
+			// so select all SROA cases as OA cases, then select additional OA from non-SROA 
+			// rate in non-SROA subpopulation given by (T-S)/(1-S) where T = B*RR and S rate of SROA
+			else {
+				if ( gSROA ) {	// SROA
+					PrevOA_p = 1.0;	// SROA => OA
+				}
+				else {
+					PrevOA_p = ( PrevOA_p - mgStartPop_SROA_Rate[sex][truncated_age] ) 
+								/ (1.0 - mgStartPop_SROA_Rate[sex][truncated_age]);
+				}
+			};
+			PrevOA_p = COERCE(RANGE01, PrevOA_p);
+		};
+
+		/* ======================================================================= */
+		// Assign OA Prevalence (true or false) subject to random number draw (discrete) 
+		/* ==================================================================== */
+		if (uprev < PrevOA_p)
+		{ 
+			OA_time_to_Visit_to_OS=TIME_INFINITE;
+			OA_time_to_Primary_Surgery=TIME_INFINITE;
+			OA_time_to_Revision_Surgery=TIME_INFINITE;
+
+			IndexOA_event = TRUE;
+			PrevOA_event=TRUE;
+
+			// Generate a random proportion that would have occurred to be used to
+			// estimate the time the event has occurred in the past from 
+			uPast = RandUniform(24);	
+
+			// ==================================================================
+			// assign prevalence state 
+			// ==================================================================
+			Lookup_OA_PrevalenceState_DistributionAtStart( RandUniform(23), sex, nPathAgeGroup, &nPrevalenceState );
+			OA_prevalence_state = OAP_None;	// reset for table purpsoses (no effect)
+			OA_prevalence_state = (OA_PREVALENCE_STATES) nPrevalenceState;
+
+			// ==================================================================
+			// Diagnosed with OA (but no OS Visit yet)
+			// ==================================================================
+			if ( OA_prevalence_state == OAP_Diagnosis ) {
+				OA_Event_State = OA_Diagnosis;
+
+				// estimate age at previous event for appropriate Weibull selection
+				OA_past_duration = OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Event_State]/2.0;
+				year_at_OAevent = max(MIN(YEARS), int(calendar_year - OA_past_duration));
+				age_OAevent = max(18, truncated_age - OA_past_duration);
+				OA_surv_age_group_past = SPLIT( age_OAevent, OA_SURV_AGE_GROUP);
+				
+				// Assigning intial value to "Drug-VARiables" for both HUi and COST calcultion
+				if (OA_past_duration < 2) {   // Using OA_past_duration  to assigne random value to "Drug_cycle"
+					Drug_time=0.0;         // triggers use of drugs for direct_cost
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=LESS2Y; 
+				}
+				else if (OA_past_duration >= 2 && OA_past_duration < 5) {
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=TWO_5Y;
+				}
+				else { 
+					Drug_time5=TIME_INFINITE; // BUG FIX 5.0; 
+					Drug_cycle=MORE5Y;
+				};
+				// estimate age at diagnosis OA
+				age_IndexOA = age_OAevent;
+
+				OA_time_to_Visit_to_OS = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(22),
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_uFixed],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_tFixed],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_lambda1],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_beta1],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_lambda2],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_beta2],
+					OA_Weibull[Dx_OS][sex][OA_surv_age_group_past][Weibull_rr])
+					/DaysPerYear;	// day unit parameters
+			
+						
+			}
+
+			// ==================================================================
+			// Had an OS Visit (but not primary surgery)
+			// ==================================================================
+			else if ( OA_prevalence_state >= OAP_OS1_Visit && 
+				OA_prevalence_state <= OAP_OS3_Visit ) 
+			{
+				OA_OS_Visits = FALSE;
+				OA_OS_Visits = TRUE;
+
+				// assign OA event state (incidence model) from the prevalence state
+				OA_Number_Visits_to_OS = nPrevalenceState-1;						// mapping from OA_PREVALENCE_STATES to number of OS visits
+				nOS_OS_Index = OA_Number_Visits_to_OS;					// mapping to OA_PROGRESSION
+				nOS_PR_Index=nOS_OS_Index+3;							// mapping within OA_PROGRESSION
+				OA_Event_State = (OA_EVENT_STATE) (nOS_OS_Index+1);	// mapping from OA_PROGRESSION to OA_EVENT_STATE
+
+				// estimate age at previous event for appropriate Weibull selection
+				OA_past_duration = OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Event_State]/2.0;
+				year_at_OAevent = max(MIN(YEARS), int(calendar_year - OA_past_duration));
+				age_OAevent = max(18, truncated_age - OA_past_duration);
+				OA_surv_age_group_past = SPLIT( age_OAevent, OA_SURV_AGE_GROUP);
+				
+				// Assigning intial value to "Drug-VARiables"			
+				if (OA_past_duration < 2) {
+					Drug_time=0.0;         // triggers use of drugs for direct_cost
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=LESS2Y; 
+				}
+				else if (OA_past_duration >= 2 && OA_past_duration < 5) {
+					Drug_time2=2.0;
+					Drug_time5=5.0;
+					Drug_cycle=TWO_5Y;
+				}
+				else { 
+					Drug_time5=TIME_INFINITE; // BUG FIX 5.0; 
+					Drug_cycle=MORE5Y;
+				};
+
+				// estimate age at diagnosis OA
+				OA_past_duration += OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Diagnosis];
+				age_IndexOA = max(18, truncated_age - OA_past_duration);
+
+				OA_time_to_Visit_to_OS = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(59),
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_uFixed],	
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_tFixed],
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_lambda1],
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_beta1],
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_lambda2],
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_beta2],
+					OA_Weibull[nOS_OS_Index][sex][OA_surv_age_group_past][Weibull_rr])
+					/DaysPerYear;
+
+				OA_time_to_Primary_Surgery = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(60),
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_uFixed],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_tFixed],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_lambda1],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_beta1],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_lambda2],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_beta2],
+					OA_Weibull[nOS_PR_Index][sex][OA_surv_age_group_past][Weibull_rr])
+					/DaysPerYear;
+								
+			}
+			// ==================================================================
+			// Had primary surgery (unknown if revision has occured)
+			// ==================================================================
+			else if ( OA_prevalence_state >= OAP_Primary_Surgery1 
+				&& OA_prevalence_state <= OAP_Primary_Surgery4 ) 
+			{
+				OA_Number_Revision_Surgeries = 0; // assumption
+				OA_Number_Primary_Surgeries = nPrevalenceState - 4;			// mapping from OA_PREVALENCE_STATES to Primary Surgery 1 to 4
+				OA_Event_State = OA_Primary_Surgery;
+
+				// estimate age at previous event for appropriate Weibull selection
+				OA_past_duration = OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Event_State]/2.0;
+				year_at_OAevent = max(MIN(YEARS), int(calendar_year - OA_past_duration));
+				age_OAevent = max(18, truncated_age - OA_past_duration);
+				OA_surv_age_group_past = SPLIT( age_OAevent, OA_SURV_AGE_GROUP);
+				
+				// Assigning intial value to "Drug-VARiables"
+				if (OA_past_duration < 2) { // Using OA_past_duration  to assigne random value to "Drug_cycle"
+					Drug_time=0.0;         // triggers use of drugs for direct_cost
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=LESS2Y; 
+				}
+				else if (OA_past_duration >= 2 && OA_past_duration < 5) {
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=TWO_5Y;
+				}
+				else { 
+					Drug_time5=TIME_INFINITE; // BUG FIX 5.0; 
+					Drug_cycle=MORE5Y;
+				};
+
+				// estimate age at diagnosis OA
+				OA_past_duration += OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Diagnosis]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS1_Visit]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS2_Visit]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS3_Visit];
+				age_IndexOA = max(18, truncated_age - OA_past_duration);
+
+				if (OA_Number_Primary_Surgeries<pOA_Ctr[OA_Surgery]) {	// limits number of revisions allowed
+					OA_time_to_Primary_Surgery = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(61),
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_uFixed],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_tFixed],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_lambda1],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_beta1],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_lambda2],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_beta2],
+						OA_Weibull[PR_PR][sex][OA_surv_age_group_past][Weibull_rr])
+						/DaysPerYear;
+				}
+				if (OA_Number_Revision_Surgeries<pOA_Ctr[OA_Revision]) {	// limits number of revisions allowed
+					OA_time_to_Revision_Surgery = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(62),
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_uFixed],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_tFixed],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_lambda1],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_beta1],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_lambda2],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_beta2],
+						OA_Weibull[PR_RE][sex][OA_surv_age_group_past][Weibull_rr])
+						/DaysPerYear;
+				}
+			
+			}  //Closes "Else If" for primary surgery
+	
+
+			// ==================================================================
+			// Had Revision surgery (unknown how many previous primary surgeries)
+			// ==================================================================
+			else { // revision 
+				OA_Number_Revision_Surgeries = nPrevalenceState - 8; 			// mapping from OA_PREVALENCE_STATES to Revision Surgery 1 to 4
+				OA_Number_Primary_Surgeries = OA_Number_Revision_Surgeries ;							// must have had at least as many surgeries as revisions (assuming not more)
+				OA_Event_State = OA_Revision_Surgery;
+
+				// estimate age at previous event for appropriate Weibull selection
+				OA_past_duration = OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Event_State]/2.0;
+				year_at_OAevent = max(MIN(YEARS), int(calendar_year - OA_past_duration));
+				age_OAevent = max(18, truncated_age - OA_past_duration);
+				OA_surv_age_group_past = SPLIT( age_OAevent, OA_SURV_AGE_GROUP);
+				
+				// Assigning intial value to "Drug-VARiables"
+				if (OA_past_duration < 2) {		// Using OA_past_duration  to assigne random value to "Drug_cycle"
+					Drug_time=0.0;				// triggers use of drugs for direct_cost
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=LESS2Y; 
+					
+				}
+				else if (OA_past_duration >= 2 && OA_past_duration < 5) {
+					Drug_time2=2.0; 
+					Drug_time5=5.0;
+					Drug_cycle=TWO_5Y;
+				}
+				else { 
+					Drug_time5=TIME_INFINITE; // BUG FIX 5.0; 
+					Drug_cycle=MORE5Y;
+				};
+
+				// estimate age at diagnosis OA
+				OA_past_duration += OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Diagnosis]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS1_Visit]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS2_Visit]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_OS3_Visit]+
+					OA_PrevalenceState_DurationAtStart[sex][nAgeGroup][OA_Primary_Surgery];
+				age_IndexOA = max(18, truncated_age - OA_past_duration);
+
+				if (OA_Number_Primary_Surgeries<pOA_Ctr[OA_Surgery]) {	// limits number of revisions allowed
+					OA_time_to_Primary_Surgery = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(63),
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_uFixed],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_tFixed],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_lambda1],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_beta1],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_lambda2],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_beta2],
+						OA_Weibull[RE_PR][sex][OA_surv_age_group_past][Weibull_rr])
+						/DaysPerYear;
+				}
+				if (OA_Number_Revision_Surgeries<pOA_Ctr[OA_Revision]) {	// limits number of revisions allowed
+					OA_time_to_Revision_Surgery = PiecewiseInverseWeibullPrevalence( uPast, RandUniform(64),
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_uFixed],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_tFixed],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_lambda1],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_beta1],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_lambda2],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_beta2],
+						OA_Weibull[RE_RE][sex][OA_surv_age_group_past][Weibull_rr])
+						/DaysPerYear;
+				}
+			
+			
+			} //Closes 'Else' for "revision"
+		} //CLOSES for "if (uprev < PrevOA_p)"below /Assign OA Prevalence
+	}
+};
+
+	
+
