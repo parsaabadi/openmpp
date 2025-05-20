@@ -203,6 +203,34 @@ public:
                 sumweight[j] = 0.0;
             }
         }
+
+        if (Tcollections > 0) {
+            coll = std::vector<std::vector<std::forward_list<double>>>(
+                Tcollections,
+                std::vector<std::forward_list<double>>(
+                    Tcells,
+                    std::forward_list<double>()
+                )
+            );
+        }
+
+        if (Textras > 0) {
+            extra = std::vector<std::vector<double>>(
+                Textras,
+                std::vector<double>(Tcells, 0.0)
+            );
+        }
+
+        if (Textremas > 0) {
+            extrema = std::vector<std::vector<std::pair<std::multiset<double>, std::multiset<double>>>>(
+                Textremas,
+                std::vector<std::pair<std::multiset<double>, std::multiset<double>>>(
+                    Tcells,
+                    std::pair<std::multiset<double>, std::multiset<double>>()
+                )
+            );
+        }
+
     };
 
     virtual void initialize_accumulators() = 0;
@@ -259,19 +287,22 @@ public:
     /**
      * observation collections storage
      */
-    std::array<std::array<std::forward_list<double>, Tcollections>, Tcells> coll; // coll[Tcells][Tcollections]
+std::vector<std::vector<std::forward_list<double>>> coll; // coll[Tcollections][Tcells]
+
 
     /**
      * Extras storage.
      */
-    std::array<std::array<double, Textras>, Tcells> extra; // extra[Tcells][Textras]
+std::vector<std::vector<double>> extra; // extra[Textras][Tcells]
+
 
     /**
      * Extremas storage.
      * 
      * Each extrema is a pair of multisets, first holds lowest values, second holds highest values.
      */
-    std::array<std::array<std::pair<std::multiset<double>, std::multiset<double>>, Textremas>, Tcells> extrema; // extrema[Tcells][Textremas]
+std::vector<std::vector<std::pair<std::multiset<double>, std::multiset<double>>>> extrema; // extrema[Textremas][Tcells]
+
 };
 
 /**

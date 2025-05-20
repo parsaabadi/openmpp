@@ -514,7 +514,7 @@ CodeBlock EntityTableSymbol::cxx_definition_global()
         c += "P98[j] = UNDEF_VALUE;";
         c += "P99[j] = UNDEF_VALUE;";
         c += "gini[j] = UNDEF_VALUE;";
-        c += "auto &lst = coll[cell][j];";
+        c += "auto &lst = coll[j][cell];";
         c += "lst.sort();";
         c += "double total_count = (double)distance(lst.begin(), lst.end());";
         c += "if (total_count > 0) {";
@@ -1199,7 +1199,7 @@ void EntityTableSymbol::build_body_push_increment()
         {
             c += "const int obs_index = " + to_string(acc->obs_collection_index) + "; // observation collection index";
             if (acc->updates_obs_collection) {
-                c += "auto& obs_coll = table->coll[cell][obs_index];";
+                c += "auto& obs_coll = table->coll[obs_index][cell];";
                 c += "obs_coll.push_front(dIncrement);";
             }
             else {
