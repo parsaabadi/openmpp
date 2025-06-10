@@ -1,0 +1,16 @@
+github.com/alexbrainman/odbc v0.0.0-20250529085159-436621372e5f h1:4PahtqxlUY6KgjYBBkC2uDVrD6Srz//4GzDiH5SrECM=
+github.com/alexbrainman/odbc v0.0.0-20250529085159-436621372e5f/go.mod h1:c5eyz5amZqTKvY3ipqerFO/74a/8CYmXOahSr40c+Ww=
+github.com/go-ole/go-ole v1.2.5/go.mod h1:pprOEPIfldk/42T2oK7lQ4v4JSDwmV0As9GaiUsvbm0=
+github.com/husobee/vestigo v1.1.1 h1:bsReVP78YhmHUn/nQ4AxIEfObmWMSLGLGXP1OwgFa9s=
+github.com/husobee/vestigo v1.1.1/go.mod h1:JigD7C8lzUfpo1uzqYgefpyZLswrtJbAQxMw7ds7YCE=
+github.com/jeandeaual/go-locale v0.0.0-20250421151639-a9d6ed1b3d45 h1:vFdvrlsVU+p/KFBWTq0lTG4fvWvG88sawGlCzM+RUEU=
+github.com/jeandeaual/go-locale v0.0.0-20250421151639-a9d6ed1b3d45/go.mod h1:ZDXo8KHryOWSIqnsb/CiDq7hQUYryCgdVnxbj8tDG7o=
+github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 h1:WjT3fLi9n8YWh/Ih8Q1LHAPsTqGddPcHqscN+PJ3i68=
+github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19/go.mod h1:hY+WOq6m2FpbvyrI93sMaypsttvaIL5nhVR92dTMUcQ=
+github.com/mattn/go-sqlite3 v1.14.28 h1:ThEiQrnbtumT+QMknw63Befp/ce/nUPgBPMlRFEum7A=
+github.com/mattn/go-sqlite3 v1.14.28/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
+golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.33.0 h1:q3i8TbbEz+JRD9ywIRlyRAQbM0qF7hu24q3teo2hbuw=
+golang.org/x/sys v0.33.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
+golang.org/x/text v0.25.0 h1:qVyWApTSYLk/drJRO5mDlNYskwQznZmkpV2c8q9zls4=
+golang.org/x/text v0.25.0/go.mod h1:WEdwpYrmk1qmdHvhkSTNPm3app7v4rsT8F2UD6+VHIA=

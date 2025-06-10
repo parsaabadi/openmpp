@@ -1,0 +1,64 @@
+##############
+# use ubuntu 22.04 to check:
+#
+# debian:stable
+# ubuntu:24.04
+# ubuntu:22.04
+# redhat/ubi9
+#
+# optional:
+#
+# opensuse/leap:latest
+# opensuse/tumbleweed:latest
+# registry.suse.com/bci/bci-base:latest
+
+export OMPP_STAMP=20250122
+
+# copy models
+
+cd ~
+rm -rf ~/models
+cp -pr ~/ubuntu-2204/build/openmpp_ubuntu-2204_${OMPP_STAMP}/models/bin ~/models
+
+# create check-ompp-lx.sh (see below)
+
+export OMPP_LX="debian:stable ubuntu:24.04 ubuntu:22.04 redhat/ubi9"
+
+# ./check-ompp-lx.sh
+
+
+####
+# create check-ompp-lx.sh
+#
+# cd ~
+# nano check-ompp-lx.sh
+# chmod a+x check-ompp-lx.sh
+#
+
+#/bin/bash
+#
+# check model runs using Linux images
+
+set -e
+
+[ -n "${OMPP_LX}" ] || echo 'Error: OMPP_LX is empty, do export OMPP_LX="Linux:1 Linux:2"' || exit 1
+
+for C in ${OMPP_LX} ; do
+
+  echo "================ $C"
+
+  docker run \
+  --user "$(id -u):$(id -g)" \
+  -v /etc/passwd:/etc/passwd:ro \
+  -v /etc/group:/etc/group:ro \
+  -v ~/models:/tmp \
+  -it "$C" \
+  bash -c \
+  'set -e && cd /tmp && for m in modelOne IDMM RiskPaths ; do echo "==== $m:" && ./$m -OpenM.ProgressPercent 50 || exit 1 ; done && echo "**** OK"'
+
+  if [ ! $? ] ;
+  then
+    echo FAILED: $C
+    exit 1
+  fi
+done
